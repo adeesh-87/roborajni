@@ -24,5 +24,16 @@ Requirements: Python 3.10 or newer, bash (Git Bash or WSL on Windows).
 The ut skill uses only Graphify's local code mode (`update`, `query`, `explain`, `path`). The wrapper removes
 LLM API keys from Graphify's environment, so no code or names are sent to any model provider.
 
+## C/C++ fixes (ut skill code, not part of Graphify)
+`scripts/graphify_ut.py` runs around the unmodified Graphify, so the wheel can be upgraded independently:
+- **mirror**: copies only the in-scope files; with `--cdb compile_commands.json` it preprocesses each source with
+  its real flags (macros expanded, inactive `#if` branches removed, system/third-party header text dropped) and
+  keeps a line map back to the original files.
+- **augment** (after `graphify update`): original files/lines restored, `static` flags, external callees as nodes
+  (`kind` function / pointer / macro / library / test-framework, `declared_in`), one node per
+  `TEST`/`TEST_F`/`TEST_GROUP`/... block, duplicates from several translation units merged, recursion kept.
+- **deps** / **tests**: the two questions unit-test work asks most (mock candidates; tests reaching a function).
+Graphify's own `GRAPH_REPORT.md` and `graph.html` are produced before the fixes; `graph.json` has them.
+
 To upgrade: replace the wheel, update the version in `scripts/graphify.sh` (`GRAPHIFY_VERSION`), delete `.venv/`,
 run `setup`, and re-test on a known codebase.

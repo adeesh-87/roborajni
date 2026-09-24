@@ -2,11 +2,16 @@
 # graphify.sh - run the bundled, pinned Graphify (tree-sitter code knowledge graph) for the ut skill.
 #
 #   graphify.sh setup                            create the skill-local venv, install the bundled wheel
-#   graphify.sh build   OUT_DIR PATH...          graph of the C/C++ files in PATH... (files or dirs)
+#   graphify.sh build [--cdb compile_commands.json] OUT_DIR PATH...
+#                                                graph of the C/C++ files in PATH... (files or dirs)
 #                                                -> OUT_DIR/out/graph.json, GRAPH_REPORT.md, graph.html
+#                                                --cdb: preprocess with the build's real flags first (macros,
+#                                                #if variants resolved; lines mapped back). Use the TEST build's DB.
 #   graphify.sh query   OUT_DIR "question" [--budget N]   local graph search (no LLM)
 #   graphify.sh explain OUT_DIR "name"           one node and its neighbours (callers, callees, file)
 #   graphify.sh path    OUT_DIR "A" "B"          shortest chain of calls/references from A to B
+#   graphify.sh deps    OUT_DIR FILE|FUNCTION    what it calls outside itself: mock/stub candidates first
+#   graphify.sh tests   OUT_DIR FUNCTION [HOPS]  which test blocks reach FUNCTION (default 3 call hops)
 #   graphify.sh wheelhouse DIR PLATFORM PYVER    download every wheel for an OFFLINE machine,
 #                                                e.g. win_amd64 3.11 | manylinux2014_x86_64 3.12 | macosx_11_0_arm64 3.12
 #   graphify.sh version
@@ -24,7 +29,7 @@ VENV="$VENDOR/.venv"
 WHEELS="$VENDOR/wheels"
 
 die() { echo "graphify.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,19p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,24p' "$0"; exit 2; }
 CMD=$1; shift
 
 venv_py() {
@@ -76,71 +81,45 @@ run_graphify() {   # code-only: strip every LLM credential / endpoint
 }
 
 do_build() {
+  local cdb=""
+  if [ "${1:-}" = "--cdb" ]; then
+    [ -f "${2:-}" ] || die "compile DB not found: ${2:-}"; cdb=$(cd "$(dirname "$2")" && pwd -P)/$(basename "$2"); shift 2
+  fi
   local out=$1; shift
-  [ $# -ge 1 ] || die "usage: build OUT_DIR PATH..."
+  [ $# -ge 1 ] || die "usage: build [--cdb compile_commands.json] OUT_DIR PATH..."
   mkdir -p "$out" || die "cannot create $out"
   out=$(cd "$out" && pwd -P)
-  # Mirror only the in-scope C/C++ files, keeping repo-relative paths, so the graph covers exactly
-  # the requested scope and nothing is written into the repository.
-  "$(venv_py)" - "$out/scan" "$@" <<'PY' || exit 1
-import os, shutil, subprocess, sys
-scan, paths = sys.argv[1], sys.argv[2:]
-exts = {'.c', '.cc', '.cpp', '.cxx', '.h', '.hh', '.hpp', '.hxx', '.inl', '.ipp', '.tpp'}
-first = os.path.abspath(paths[0])
-start = first if os.path.isdir(first) else os.path.dirname(first)
-try:
-    root = subprocess.run(['git', '-C', start, 'rev-parse', '--show-toplevel'], capture_output=True, text=True, check=True).stdout.strip()
-except Exception:
-    root = os.path.commonpath([os.path.abspath(p) for p in paths]) if len(paths) > 1 else start
-root = os.path.realpath(root)
-if os.path.isdir(scan):
-    shutil.rmtree(scan)
-files = []
-for p in paths:
-    p = os.path.realpath(p)
-    if os.path.isfile(p):
-        files.append(p)
-    elif os.path.isdir(p):
-        for d, dirs, names in os.walk(p):
-            dirs[:] = [x for x in dirs if x not in ('.git', 'graphify-out')]
-            files += [os.path.join(d, n) for n in names if os.path.splitext(n)[1].lower() in exts]
-    else:
-        sys.exit(f"graphify.sh: no such path: {p}")
-n = 0
-for f in sorted(set(files)):
-    rel = os.path.relpath(f, root)
-    if rel.startswith('..'):
-        sys.exit(f"graphify.sh: {f} is outside the repository root {root}")
-    dst = os.path.join(scan, rel)
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copy2(f, dst); n += 1
-if n == 0:
-    sys.exit("graphify.sh: no C/C++ files found in: " + " ".join(paths))
-with open(os.path.join(os.path.dirname(scan), 'SOURCE_ROOT'), 'w') as fh:
-    fh.write(root + "\n")
-print(f"scope: {n} C/C++ files (paths relative to {root})")
-PY
+  # 1. mirror only the in-scope files (preprocessed with the real flags when a compile DB is given);
+  #    nothing is written into the repository
+  "$(venv_py)" "$HERE/graphify_ut.py" mirror "$out/scan" ${cdb:+--cdb "$cdb"} "$@" || return 1
+  # 2. Graphify, local code mode. Start from an empty graph every time: `update` is incremental and would
+  #    otherwise carry over nodes of the previous build (and of the previous augment step). Parse cache is kept.
+  rm -f "$out/out/graph.json" "$out/out/manifest.json"
   ( cd "$out" && GRAPHIFY_OUT="$out/out" run_graphify update "$out/scan" --force ) > "$out/build.log" 2>&1
   local rc=$?
   grep -E 'warning|Rebuilt|error' "$out/build.log" | cut -c1-400
   [ $rc -eq 0 ] && [ -f "$out/out/graph.json" ] || { echo "graphify build FAILED (rc=$rc), see $out/build.log"; return 1; }
+  # 3. C/C++ fixes: original lines, static flags, external callees, one node per TEST block
+  "$(venv_py)" "$HERE/graphify_ut.py" augment "$out/out/graph.json" "$out/scan" || echo "WARNING: augment step failed; graph is plain Graphify output"
   echo "graph:  $out/out/graph.json"
-  echo "report: $out/out/GRAPH_REPORT.md   (view: $out/out/graph.html)"
+  echo "report: $out/out/GRAPH_REPORT.md   (Graphify's own report, written before the fixes; view: $out/out/graph.html)"
 }
 
 case $CMD in
   setup)   do_setup ;;
   version) ensure; run_graphify --version 2>/dev/null || "$(venv_py)" -c "import importlib.metadata as m; print('graphifyy', m.version('graphifyy'))" ;;
-  build)   [ $# -ge 2 ] || die "usage: build OUT_DIR PATH..."; ensure; do_build "$@" ;;
+  build)   [ $# -ge 2 ] || die "usage: build [--cdb FILE] OUT_DIR PATH..."; ensure; do_build "$@" ;;
   query)   [ $# -ge 2 ] || die "usage: query OUT_DIR \"question\" [--budget N]"
            ensure; o=$1; q=$2; shift 2; run_graphify query "$q" --graph "$o/out/graph.json" "$@" ;;
   explain) [ $# -ge 2 ] || die "usage: explain OUT_DIR NAME"; ensure; run_graphify explain "$2" --graph "$1/out/graph.json" ;;
   path)    [ $# -ge 3 ] || die "usage: path OUT_DIR A B"; ensure; run_graphify path "$2" "$3" --graph "$1/out/graph.json" ;;
+  deps)    [ $# -eq 2 ] || die "usage: deps OUT_DIR FILE|FUNCTION"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
+  tests)   [ $# -ge 2 ] || die "usage: tests OUT_DIR FUNCTION [HOPS]"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
   wheelhouse)
     [ $# -eq 3 ] || die "usage: wheelhouse DIR PLATFORM PYVER   (e.g. wheels win_amd64 3.11)"
     py=$(venv_py); [ -n "$py" ] || py=$(find_python) || die "Python 3.10+ needed to download wheels"
     mkdir -p "$1" && cp "$WHEEL" "$1/"
     $py -m pip download --disable-pip-version-check --only-binary=:all: --platform "$2" --python-version "$3" -d "$1" "$WHEEL" \
       && echo "wheelhouse ready: $1 (copy it to resources/vendor/graphify/wheels on the offline machine, then run setup)" ;;
-  *) die "unknown command '$CMD' (setup|build|query|explain|path|wheelhouse|version)" ;;
+  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|wheelhouse|version)" ;;
 esac

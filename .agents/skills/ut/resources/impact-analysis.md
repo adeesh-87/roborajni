@@ -10,8 +10,13 @@ awk -F'\t' '$3=="F"' "$KB_DIR/codemap/calls.tsv"      # callers of F: tests (TES
 awk -F'\t' '$2=="F"' "$KB_DIR/codemap/functions.tsv"  # where F is defined: real source AND mocks/stubs
 awk -F'\t' '$1 ~ /S$/ && $2=="F"' "$KB_DIR/codemap/calls.tsv"   # what F calls: dependencies to mock
 ```
-Code graph (if `KB_DIR/graphify` exists): `"$SKILL_DIR/resources/scripts/graphify.sh" explain "$KB_DIR/graphify" "F"`
-shows callers and callees across the scanned code; `path` shows how F is reached from an entry point.
+Code graph (if `KB_DIR/graphify` exists; rebuild it first if the code changed):
+```sh
+G="$SKILL_DIR/resources/scripts/graphify.sh"
+"$G" tests   "$KB_DIR/graphify" F      # tests that reach F (directly or through callers)
+"$G" deps    "$KB_DIR/graphify" F      # what F calls outside its file: mocks/stubs it needs
+"$G" explain "$KB_DIR/graphify" F      # all callers and callees
+```
 Then confirm with grep (macros and function pointers are invisible to both):
 ```sh
 grep -rnw 'F' <test paths> | head -30                 # tests that call or mention F
