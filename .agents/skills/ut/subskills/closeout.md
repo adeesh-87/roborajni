@@ -32,8 +32,9 @@ Set `Current phase: 9 (done)` and tick phase 9. Add a Log line.
 1. Merge duplicate lines in section 7 (Learnings). Keep them short, with a source.
 2. Move learnings that describe a convention into section 3 or 4, build facts into section 5,
    module logic into section 6.
-3. Re-run the code map so it includes the new tests and mocks:
-   `"$SKILL_DIR/resources/scripts/codemap.sh" "$KB_DIR/codemap" <code paths> <test paths> <mock paths>`.
+3. Rebuild the code map (and the code graph, if `KB_DIR/graphify` exists) so they include the new tests and mocks:
+   `"$SKILL_DIR/resources/scripts/codemap.sh" "$KB_DIR/codemap" <code paths> <test paths> <mock paths>`
+   `"$SKILL_DIR/resources/scripts/graphify.sh" build "$KB_DIR/graphify" <code paths> <test paths> <mock paths>`
    Update section 2 (code map table) with new test and mock files.
 4. Set `Last updated` in the KB and in `resources/kb/INDEX.md`.
 5. Tell the user the KB lives in the skill folder: keep `resources/kb/` when they update the skill.

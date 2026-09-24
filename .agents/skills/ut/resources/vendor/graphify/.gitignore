@@ -1,0 +1,3 @@
+# created by scripts/graphify.sh setup (platform specific, never commit)
+.venv/
+wheels/

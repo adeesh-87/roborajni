@@ -5,8 +5,10 @@ Do not write tests. Write short, factual module notes.
 
 ## Read
 1. <KB_DIR>/kb.md sections 0, 2, 3 (identity, code map table, test conventions)
-2. <KB_DIR>/codemap/summary.md (functions, calls, external dependencies; a heuristic map, verify in code)
-3. The source files of these modules: <MODULES / PATHS>
+2. <KB_DIR>/graphify/out/GRAPH_REPORT.md and, for questions, `graphify.sh explain|query|path <KB_DIR>/graphify ...`
+   (run from <SKILL_DIR>/resources/scripts/)
+3. <KB_DIR>/codemap/summary.md (functions, calls, external dependencies; a heuristic map, verify in code)
+4. The source files of these modules: <MODULES / PATHS>
 
 ## Write one file per module: <KB_DIR>/decompositions/<module>.md
 Keep each file under 120 lines. Use this structure:
