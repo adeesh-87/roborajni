@@ -4,6 +4,13 @@ Use for every row in context.md 3.1. Output: one or more rows in context.md 3.2.
 `F` = function or item name, `S` = its source file, `H` = its header.
 
 ## 1. Find what touches F
+Fast path: the code map (regenerate first if the code changed: see knowledge.md Step 3).
+```sh
+awk -F'\t' '$3=="F"' "$KB_DIR/codemap/calls.tsv"      # callers of F: tests (TEST(...) names), mocks, production code
+awk -F'\t' '$2=="F"' "$KB_DIR/codemap/functions.tsv"  # where F is defined: real source AND mocks/stubs
+awk -F'\t' '$1 ~ /S$/ && $2=="F"' "$KB_DIR/codemap/calls.tsv"   # what F calls: dependencies to mock
+```
+Then confirm with grep (macros and function pointers are invisible to the code map):
 ```sh
 grep -rnw 'F' <test paths> | head -30                 # tests that call or mention F
 grep -rnw 'F' <mock paths> | head -20                 # mocks/stubs that define or fake F

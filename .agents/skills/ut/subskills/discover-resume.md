@@ -8,8 +8,9 @@ Goal: turn what an earlier session left behind into `Candidate work` in context.
    - `git status --short` and `git log --oneline -10` — did files change since the last Log date?
    - For each task marked IN_PROGRESS: is an executor still running? Ask the user.
      If not, set it back to TODO and note it in Log.
-   - In parallel mode: `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" list`.
-     Locks of dead executors: ask the user, then `release-all <ID>`.
+   - In parallel mode: `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`.
+     For each STALE owner: tell the user who, since when, which locks. Only with their approval:
+     `lock.sh "$TASK/locks" reap <ID>`, and set that owner's IN_PROGRESS tasks back to TODO.
 4. Build the list:
    - Tasks TODO / PARTIAL / BLOCKED → candidate rows (keep their task file).
    - Each `Next steps` bullet and each open issue → candidate row.

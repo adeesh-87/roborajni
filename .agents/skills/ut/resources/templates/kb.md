@@ -1,10 +1,22 @@
-# Codebase Knowledge Base
+# Codebase Knowledge Base: <codebase-id>
 
+> THIS FILE IS ONLY ABOUT THE CODEBASE BELOW. Do not use it for any other repository.
 > Durable knowledge, reused by later tasks. Short facts, each with a source (file:line or person).
+> Facts that are true only on one branch: prefix them with `[branch <name>]`.
 > Last updated: YYYY-MM-DD by <task folder / executor id>
 
+## 0. Codebase identity
+| Key | Value |
+|-----|-------|
+| id (from kb-id.sh) | |
+| Remote (origin) | |
+| Roots seen | |
+| Components / sub-projects covered | |
+| Code map | codemap/summary.md (generated YYYY-MM-DD for paths ...) |
+
 ## 1. External knowledge sources
-Documents, decompositions and maps made by people or other tools. Link, do not copy.
+Documents, decompositions and maps made by people or other tools (including this KB's codemap/ and
+decompositions/ folders). Link, do not copy.
 | Path / URL | Made by (tool / person) | Covers | Trust (high/med/low) | Notes |
 |------------|-------------------------|--------|----------------------|-------|
 

@@ -3,8 +3,9 @@
 Goal: prove the final state, record it, and leave the task folder and KB ready for the future.
 
 ## Step 1 — Final verification
-1. Parallel mode: `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" list`. Only your own
-   locks may remain. Others → ask the user whether those executors are still running.
+1. Parallel mode: `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`. Only your own
+   locks may remain. Others → ask the user whether those executors are still running (STALE ones
+   are reported as such; `reap` only with approval).
 2. Clean build and run all tests (commands from status.md section 3):
    ```sh
    <clean> ; <build> > "$TASK/logs/final-build.log" 2>&1; echo "exit=$?"
@@ -31,8 +32,11 @@ Set `Current phase: 9 (done)` and tick phase 9. Add a Log line.
 1. Merge duplicate lines in section 7 (Learnings). Keep them short, with a source.
 2. Move learnings that describe a convention into section 3 or 4, build facts into section 5,
    module logic into section 6.
-3. Update section 2 (code map) with new test and mock files.
-4. Set `Last updated`.
+3. Re-run the code map so it includes the new tests and mocks:
+   `"$SKILL_DIR/resources/scripts/codemap.sh" "$KB_DIR/codemap" <code paths> <test paths> <mock paths>`.
+   Update section 2 (code map table) with new test and mock files.
+4. Set `Last updated` in the KB and in `resources/kb/INDEX.md`.
+5. Tell the user the KB lives in the skill folder: keep `resources/kb/` when they update the skill.
 
 ## Step 4 — Report to the user
 Give: the final summary numbers, files changed (grouped: tests, mocks, build), open issues,

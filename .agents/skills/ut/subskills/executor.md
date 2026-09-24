@@ -14,7 +14,7 @@ files and KB up to date so anyone can continue.
    LOCK="$SKILL_DIR/resources/scripts/lock.sh"; LD="$TASK/locks"; ME=E1
    ```
    `Permission denied` → run `chmod +x "$SKILL_DIR/resources/scripts/lock.sh"` once. The script needs
-   bash (on Windows: Git Bash or WSL). Test it: `"$LOCK" "$LD" list` must print `(no locks)` or a list.
+   bash (on Windows: Git Bash or WSL). Test it: `"$LOCK" "$LD" status` must print a table.
 5. Add or update your row in status.md section 6 (Executors). In parallel mode lock status.md first (see 2).
 
 ## 1. Lock rules (parallel mode only)
@@ -26,8 +26,17 @@ files and KB up to date so anyone can continue.
 - Leaf locks: while you hold status.md, KB, context.md or the build paths, do NOT acquire or wait
   for any other lock. Take them last, hold them briefly, release them. This keeps waiting deadlock-free.
 - Locks only say "busy now". Results (task done, checkpoint passed) are written in status.md.
-- `acquire` exit 1 means someone else holds it. The output says who.
-- A lock older than 2 hours whose owner seems dead: ask the user, then `"$LOCK" "$LD" break <path>`.
+- Every lock.sh call with your ID is a heartbeat. If you are silent longer than `stale_after`
+  (default 30 min, set in `$TASK/locks/config`) other executors see you as STALE.
+  Before anything long (full build, whole test run, coverage) declare it:
+  `"$LOCK" "$LD" alive $ME <seconds, about 2x the expected time> "T03 full build"`.
+- Exit codes of `acquire` / `wait`: `0` got all; `1` held by an ACTIVE or BUSY executor: pick other
+  work or wait; `3` held only by STALE owners: see below.
+- Any output line `STALE-WARNING: owner E2 ...` or exit code 3: STOP and tell the user exactly that line,
+  e.g. "E2 was last seen 2h ago and still holds 3 locks. Is E2 still running? May I remove its locks?"
+  Only after the user says yes: `"$LOCK" "$LD" reap E2`, then set E2's IN_PROGRESS tasks in status.md
+  back to TODO with a Log line. Never reap on your own. Never use `reap --force` or `break` unless
+  the user explicitly asks.
 
 | Action | Command |
 |--------|---------|
@@ -36,7 +45,8 @@ files and KB up to date so anyone can continue.
 | Wait for a shared file | `"$LOCK" "$LD" wait $ME 300 "$TASK/status.md"` |
 | Release one path | `"$LOCK" "$LD" release $ME <path>` |
 | Release everything | `"$LOCK" "$LD" release-all $ME` |
-| See all locks | `"$LOCK" "$LD" list` |
+| Heartbeat / declare long work | `"$LOCK" "$LD" alive $ME 3600 "T03 coverage run"` |
+| Who holds what, who is stale | `"$LOCK" "$LD" status` |
 
 ## 2. Editing shared files (status.md, KB, context.md)
 Parallel mode: `wait` for the lock → re-read the section (another executor may have changed it)
@@ -58,6 +68,7 @@ pick another task. If every ready task is blocked, wait for the first one, all p
 After claiming, re-read the task's Status in status.md: if it is no longer TODO, release-all and pick again.
 
 **3.3 Mark started.** status.md: Status = IN_PROGRESS, Owner = ME. Task file: same. Log line.
+Parallel: `"$LOCK" "$LD" alive $ME 0 "Tnn <title>"` so `status` shows what you are doing.
 
 **3.4 Do the work.** Load `resources/playbooks/<Type>.md` for the task's Type and follow it.
 Read only the task's Inputs. Imitate the existing test named in Inputs.
@@ -65,7 +76,8 @@ If you must write a path that is not in Touches: parallel → try `acquire` it; 
 write down what you need in the task Result and go to 3.6 with PARTIAL.
 
 **3.5 Build and check.**
-Parallel: `wait $ME 1800` on every path in status.md "Paths to lock while building or running"
+Parallel: `alive $ME <2x build+run seconds> "Tnn build"`, then `wait $ME 1800` on every path in
+status.md "Paths to lock while building or running"
 (replace `<EXEC_ID>` with ME). Build, run the task's tests with the single-test command, then
 release those paths right away.
 ```sh

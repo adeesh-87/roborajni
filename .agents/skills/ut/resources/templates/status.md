@@ -27,7 +27,7 @@
 | Test deletion allowed | ask each time |
 | Commit policy | never, user commits |
 | Coding standard for tests | |
-| KB path | |
+| KB path | `<SKILL_DIR>/resources/kb/<codebase-id>/kb.md` (set in phase 2) |
 | Parallel executors | no / yes, ids |
 | Resources to load | |
 | Discovery mode | resume / diff / ask |

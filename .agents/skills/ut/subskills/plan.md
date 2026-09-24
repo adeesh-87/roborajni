@@ -56,6 +56,10 @@ Show the task table. Ask:
    If yes: "How many, and which IDs? [E1, E2, E3]" — record in Config `Parallel executors`.
 3. If parallel and the build folder is shared: "Builds will run one at a time (locked). Can each
    executor use its own build folder instead? [no]" — update status.md section 3 if yes.
+4. If parallel: set the stale time. An executor that is silent longer than this is reported as STALE.
+   Use about 2x the longest full build + test run, at least 30 minutes:
+   `echo "stale_after=<seconds>" > "$TASK/locks/config"`. Tell the user they can watch the executors live
+   in a terminal with `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" watch 10`.
 Write `Plan approved by user on <date>`.
 
 ## Step 6 — Hand over

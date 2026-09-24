@@ -5,7 +5,8 @@ New tests for functions or behaviour that have none. Read `resources/test-design
 2. Open the test file to imitate (task Inputs). Decide: add to an existing test file or create one?
    Follow KB section 3: usually one test file per source file.
 3. Write the case table (test-design.md) into the task file under Steps. Keep it short.
-4. List the dependencies the function calls. For each: does a mock/stub already exist?
+4. List the dependencies the function calls (code map: `grep -A40 '^### <file>' "$KB_DIR/codemap/summary.md"`,
+   columns "Calls" and "External calls"; confirm in the code). For each: does a mock/stub already exist?
    - Yes → use it as other tests do.
    - No → if it is in Touches, create it following the mock style in KB; otherwise record as
      needed work and mark the task PARTIAL at the end.

@@ -12,7 +12,8 @@ Never load two sub-skills at the same time.
 ## Names used in all ut files
 - `SKILL_DIR` = absolute path of the folder that holds this SKILL.md.
 - `TASK` = the task folder the user gives you.
-- `KB` = the kb.md path written in status.md Config.
+- `KB` = the kb.md path written in status.md Config, normally `$SKILL_DIR/resources/kb/<codebase-id>/kb.md`.
+  `KB_DIR` = its folder. A KB belongs to ONE codebase: never use another codebase's KB folder.
 - Ask = ask the user and WAIT for the answer. Never invent an answer.
 - Record = write it into the named file NOW, before doing anything else.
 - In shell commands, write the real absolute paths for `$TASK`, `$SKILL_DIR`, `$KB`
@@ -72,8 +73,10 @@ Record the choice in Config `Discovery mode`.
 ## Step R — Resume
 1. Read TASK/status.md sections `Config`, `Phase tracker`, `Next steps`, `Open issues` only.
 2. Tell the user in 3–5 lines: current phase, what is done, what is next.
-3. If the user says they are an **executor** (e.g. "executor E2"), load `subskills/executor.md` now.
-4. Otherwise continue at the first unticked phase in the table above.
+3. If Config says parallel executors: run `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`.
+   Report every STALE owner to the user. Remove its locks only if the user approves (`reap <ID>`).
+4. If the user says they are an **executor** (e.g. "executor E2"), load `subskills/executor.md` now.
+5. Otherwise continue at the first unticked phase in the table above.
    If phases 1–7 are ticked and new work is requested, go back to phase 3 and pick a discovery file.
 
 ## Resource files (loaded by sub-skills, listed in Config `Resources to load`)
@@ -88,5 +91,7 @@ Record the choice in Config `Discovery mode`.
 | CMake, Make, Ceedling, scripts, CI files | `resources/tools/build-systems.md` |
 | Writing any test | `resources/test-design.md` |
 | Diff or user-described change analysis | `resources/impact-analysis.md` |
+| Codebase id / KB folder (phase 2) | `resources/scripts/kb-id.sh` (run it) |
+| Code map of functions, calls, dependencies | `resources/scripts/codemap.sh` (run it; read its output in `KB_DIR/codemap/`) |
 | A task of type `<type>` (executor only) | `resources/playbooks/<type>.md` |
-| Parallel executors | `resources/scripts/lock.sh` (run it, do not read it) |
+| Parallel executors | `resources/scripts/lock.sh` (run it, do not read it; `status` shows who holds what) |

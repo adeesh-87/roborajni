@@ -47,8 +47,8 @@ Round 4 — rules
 2. May I delete tests or mocks? [ask each time]
 3. Commit policy [never — you commit]
 4. Coding standard or style rules for test code? [same as existing tests]
-5. Where should the knowledge base live? [TASK/kb.md]. Tip: a shared path such as
-   `<repo>/.agents/ut-kb.md` lets later tasks reuse it.
+5. The knowledge base is kept per codebase inside this skill (`resources/kb/<codebase-id>/`), so later
+   tasks on the same repo reuse it. OK? [yes] (phase 2 finds or creates it)
 
 ## C. Fill `Resources to load`
 Write the resource file names that match Config (see the table in SKILL.md). Always add
