@@ -92,6 +92,7 @@ Record the choice in Config `Discovery mode`.
 | Writing any test | `resources/test-design.md` |
 | Diff or user-described change analysis | `resources/impact-analysis.md` |
 | Codebase id / KB folder (phase 2) | `resources/scripts/kb-id.sh` (run it) |
-| Code map of functions, calls, dependencies | `resources/scripts/codemap.sh` (run it; read its output in `KB_DIR/codemap/`) |
+| Code graph: deps (mock candidates), tests reaching a function, callers, call chains | `resources/scripts/graphify.sh` (bundled Graphify + C/C++ fixes; run it; output in `KB_DIR/graphify/`) |
+| Code map: fallback without Python, quick per-file tables | `resources/scripts/codemap.sh` (run it; output in `KB_DIR/codemap/`) |
 | A task of type `<type>` (executor only) | `resources/playbooks/<type>.md` |
 | Parallel executors | `resources/scripts/lock.sh` (run it, do not read it; `status` shows who holds what) |

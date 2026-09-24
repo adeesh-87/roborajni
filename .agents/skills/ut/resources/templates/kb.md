@@ -12,6 +12,7 @@
 | Remote (origin) | |
 | Roots seen | |
 | Components / sub-projects covered | |
+| Code graph | graphify/out/GRAPH_REPORT.md, graph.json (built YYYY-MM-DD for paths ...) |
 | Code map | codemap/summary.md (generated YYYY-MM-DD for paths ...) |
 
 ## 1. External knowledge sources

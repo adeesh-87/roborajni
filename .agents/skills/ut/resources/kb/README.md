@@ -6,6 +6,7 @@ kb/
   INDEX.md                 one row per codebase: id, remote, where it was seen
   <codebase-id>/
     kb.md                  durable knowledge (conventions, module notes, build quirks, learnings)
+    graphify/              output of scripts/graphify.sh build: out/graph.json, out/GRAPH_REPORT.md
     codemap/               output of scripts/codemap.sh (regenerate when code changes a lot)
     decompositions/        module notes written by a stronger model (optional)
 ```

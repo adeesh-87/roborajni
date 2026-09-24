@@ -53,6 +53,7 @@ Run every command from `Run from`. Write commands exactly, copy-paste ready.
 | Build tests | | | | |
 | Run all tests | | | | |
 | Run one group / test | | | | |
+| Compile DB (test build) | path to compile_commands.json, or none | | | |
 | Coverage build | | | | |
 | Coverage report | | | | |
 | Coverage report output path | | | | |

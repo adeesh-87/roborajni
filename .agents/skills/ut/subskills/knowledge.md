@@ -39,8 +39,44 @@ Also check yourself: `ls AGENTS.md CLAUDE.md README* docs doc "$KB_DIR/decomposi
 For each source: add a row to KB section 1, read only headings and the parts about in-scope modules,
 write at most 10 lines per module into KB section 6, each ending with `(source: <path>)`. Link, never copy.
 
-## Step 3 — Code map (always, it is cheap)
-Run the bundled mapper on the in-scope code AND its tests and mocks (bash + awk only, no install needed):
+## Step 3 — Knowledge graph with Graphify (first choice when no decomposition exists)
+Do this step when Step 2 found no decomposition of the in-scope code. If one exists, ask
+"Also build a code graph? It takes a minute and helps navigation. [yes]".
+The skill bundles a pinned Graphify (`resources/vendor/graphify/`) plus C/C++ fixes (`graphify_ut.py`).
+Everything runs locally; the wrapper removes LLM keys, so nothing leaves the machine.
+```sh
+G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
+"$G" setup        # once per machine: needs Python 3.10+ and a package index (or an offline wheelhouse)
+# with the compile DB recorded in status.md section 3 (best):
+"$G" build --cdb <compile_commands.json> "$GD" <code paths> <test paths> <mock paths>
+# without one:
+"$G" build "$GD" <code paths> <test paths> <mock paths>
+```
+- `setup` fails (no Python 3.10+, no network, no index): tell the user the exact error and point to
+  `resources/vendor/graphify/README.md` (offline wheelhouse). Use Step 3b instead. Record in KB section 5.
+- Output lines to check: `preprocessed with compile flags: N translation units` (compile DB used) and
+  `augmented: ...` (fixes applied). `not preprocessed` lines and syntax-error warnings name files that are
+  only partly in the graph: record them in KB section 5.
+- Without a compile DB, macros are not expanded and BOTH sides of every `#if` are in the graph.
+What the graph gives you (paths are repo-relative, lines are original source lines):
+```sh
+"$G" deps    "$GD" src/sensor.c          # what a file or function calls outside itself: mock/stub candidates
+"$G" tests   "$GD" sensor_read           # which TEST blocks / test functions reach it (3 call hops)
+"$G" explain "$GD" "sensor_read"         # definition, callers, callees
+"$G" path    "$GD" "app_main" "sensor_read"   # call chain from A to B
+"$G" query   "$GD" "what calls sensor_read" --budget 800
+```
+`deps` kinds: `function` (declared in a repo header: mock or stub it), `pointer` (called through a variable or
+struct member: set it in the test), `macro`, `in-scope code` (another scanned file, often an existing mock),
+`library` (system/C library, usually not mocked), `test-framework`.
+Functions carry `static: true` when static (also via `STATIC`/`PRIVATE` macros). Every `TEST(...)`, `TEST_F(...)`,
+`TEST_GROUP(...)` block is its own node. Known limits: calls hidden in macros are only seen with a compile DB;
+function pointers are reported by the expression used (e.g. `hooks->allocate`), not by the function behind them.
+Read `$GD/out/GRAPH_REPORT.md` (Graphify's overview of main modules and most connected functions). Add a row
+for the graph to KB section 1 and 3-5 lines to KB section 6.
+
+## Step 3b — Code map (fallback, and quick per-file tables)
+Run it when Graphify could not be set up; otherwise it is optional (it needs only bash + awk):
 ```sh
 "$SKILL_DIR/resources/scripts/codemap.sh" "$KB_DIR/codemap" <code paths> <test paths> <mock paths>
 ```
@@ -49,30 +85,31 @@ It writes `summary.md` (per file: functions, calls, external dependencies = mock
 Read only what you need, e.g. one file's part: `grep -A40 '^### src/sensor.c' "$KB_DIR/codemap/summary.md"`.
 Useful queries:
 ```sh
-awk -F'\t' '$3=="sensor_read"' "$KB_DIR/codemap/calls.tsv"            # who calls sensor_read (tests too)
+awk -F'\t' '$3=="sensor_read"' "$KB_DIR/codemap/calls.tsv"            # who calls sensor_read, incl. each TEST(...)
 awk -F'\t' '$5!="external" && $5!="macro" && $1!=$5 {print $1" -> "$5}' "$KB_DIR/codemap/calls.tsv" | sort | uniq -c   # file dependencies
 ```
-Record in KB section 0 `Code map` the date and paths. Re-run it when the code changed a lot (it takes seconds).
+Record in KB section 0 the date, paths and mode (compile DB or not) of the graph and/or code map. Rebuild when
+the code changed a lot (seconds to a minute).
 
 ## Step 4 — Deeper decomposition when none exists
 If Step 2 found no module-level notes for the in-scope code, count the work:
 `wc -l < "$KB_DIR/codemap/functions.tsv"`.
 Ask (recommend 2 when more than ~150 functions, or the code has state machines, RTOS/ISR logic,
 protocol parsing or complex error handling):
-"No explanation of this code exists yet. Options:
- 1) Continue with the code map only; I learn the logic while working. [default for small scopes]
+"No explanation of this code exists yet. I built a code graph and a code map. Options:
+ 1) Continue with those only; I learn the logic while working. [default for small scopes]
  2) You run a stronger model once with a prepared request; it writes module notes into the KB that I
     and later tasks reuse. I can continue meanwhile and pick the notes up when they appear.
- 3) You have a tool that can produce this (Doxygen with call graphs, cscope, clangd index, Understand...):
-    give me the output path.
+ 3) You have another tool's output (Doxygen with call graphs, cscope, clangd index, Understand...):
+    give me the path.
  4) Skip."
 Option 2: copy `resources/templates/decompose-codebase.md` to `TASK/decompose-codebase.md`, replace
 `<KB_DIR>` and `<MODULES / PATHS>`, and tell the user which file to give to the stronger model.
 Add to status.md `Next steps`: "read KB decompositions/ when present". Do not wait unless the user asks.
 
 ## Step 5 — Code map table and conventions
-1. Fill KB section 2 from the code map: one row per module, pairing each source file with its test and
-   mock files (use the file-dependency query). A source file with no test gets `no tests`.
+1. Fill KB section 2 from the graph (`deps` per source file, `tests` for key functions) or the code map:
+   one row per module, pairing each source file with its test and mock files. A source file with no test gets `no tests`.
 2. Pick samples: `git log -n 30 --name-only --pretty=format: -- <test paths> | sort | uniq -c | sort -rn | head`.
    Read 3 test files (different modules, recently edited), 1–2 mock/stub files and the file that registers
    tests in the build (CMakeLists.txt, Makefile, project.yml, Parasoft project).

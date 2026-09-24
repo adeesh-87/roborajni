@@ -47,6 +47,18 @@ A crash (segfault, abort) with no summary → context.md section 4 as "run crash
 Find and verify the command to run one group or one test (filter flag from the framework file).
 Executors use it for fast feedback. Record it.
 
+## Step 5b — Compile database of the TEST build (makes the code graph accurate)
+A `compile_commands.json` lists the exact compiler flags of every file. The code graph uses it to expand
+macros and keep only the active `#if` branches, exactly as the test build sees them.
+1. Look for one: `find . -name compile_commands.json -not -path './.git/*' | head`
+   It must come from the build that compiles the TESTS (host build), not the target firmware build.
+2. None found:
+   - CMake: add `-DCMAKE_EXPORT_COMPILE_COMMANDS=ON` to the configure command; it appears in the build folder.
+   - Make or scripts: `bear -- <build command>` writes it in the current folder (if `bear` is installed; ask).
+   - IAR, Keil, Parasoft project builds, other IDEs: usually not available. Skip this step.
+   Ask before changing the build command. Never commit the generated file unless the user wants it.
+3. Record its absolute path in status.md section 3, row `Compile DB (test build)`. Write `none` if unavailable.
+
 ## Step 6 — Coverage commands (only if Config `Coverage wanted` = yes)
 Do NOT generate the report yet; phase 6 does that. Only record in section 3 what is known:
 coverage build command, report command, report output path. Mark unknown ones `unknown`.
