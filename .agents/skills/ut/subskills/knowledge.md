@@ -47,6 +47,7 @@ Everything runs locally; the wrapper removes LLM keys, so nothing leaves the mac
 ```sh
 G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
 "$G" setup        # once per machine: needs Python 3.10+ and a package index (or an offline wheelhouse)
+"$G" selftest     # once per machine: checks the C/C++ fixes with the local compiler; report any FAIL to the user
 # with the compile DB recorded in status.md section 3 (best):
 "$G" build --cdb <compile_commands.json> "$GD" <code paths> <test paths> <mock paths>
 # without one:
@@ -66,14 +67,23 @@ What the graph gives you (paths are repo-relative, lines are original source lin
 "$G" path    "$GD" "app_main" "sensor_read"   # call chain from A to B
 "$G" query   "$GD" "what calls sensor_read" --budget 800
 ```
-`deps` kinds: `function` (declared in a repo header: mock or stub it), `pointer` (called through a variable or
-struct member: set it in the test), `macro`, `in-scope code` (another scanned file, often an existing mock),
-`library` (system/C library, usually not mocked), `test-framework`.
-Functions carry `static: true` when static (also via `STATIC`/`PRIVATE` macros). Every `TEST(...)`, `TEST_F(...)`,
-`TEST_GROUP(...)` block is its own node. Known limits: calls hidden in macros are only seen with a compile DB;
-function pointers are reported by the expression used (e.g. `hooks->allocate`), not by the function behind them.
-Read `$GD/out/GRAPH_REPORT.md` (Graphify's overview of main modules and most connected functions). Add a row
-for the graph to KB section 1 and 3-5 lines to KB section 6.
+`deps` kinds, most important first:
+- `function`: declared in a repo header, defined outside the scan: mock or stub it.
+- `interface`: C++ pure virtual method: mock the interface (gMock / fake class); `implemented by` names existing mocks.
+- `pointer`: called through a variable or struct member (callbacks, driver ops tables, hooks); `may call` lists the
+  functions stored in it (from initializers, assignments, or a registration call such as `set_callback(fn)`).
+  In a test, set the pointer to a fake, or call the target directly.
+- `macro`, `in-scope code` (another scanned file, often an existing mock), `library` (C/C++ library, usually
+  not mocked), `test-framework`.
+Also in the graph: `static: true` on static functions (also via `STATIC`/`PRIVATE` macros); C++ methods named
+`Class::method()` at their definition (`declared_at` = header line); `obj.method()` calls resolved by the declared
+type of `obj` (local, parameter or class field, incl. base classes); every `TEST(...)`, `TEST_F(...)`,
+`TEST_GROUP(...)` block is its own node. `tests` follows calls through function pointers too.
+Known limits: without a compile DB, macros are not expanded and both sides of every `#if` are present; a pointer
+filled at run time from data (not from a function name) has no `may call`; templates and `auto` receivers are
+only resolved when the method name is unique.
+Read `$GD/out/GRAPH_REPORT.md` (overview of main modules and most connected functions, regenerated after the
+fixes). Add a row for the graph to KB section 1 and 3-5 lines to KB section 6.
 
 ## Step 3b — Code map (fallback, and quick per-file tables)
 Run it when Graphify could not be set up; otherwise it is optional (it needs only bash + awk):

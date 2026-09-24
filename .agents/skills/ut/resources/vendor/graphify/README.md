@@ -29,11 +29,19 @@ LLM API keys from Graphify's environment, so no code or names are sent to any mo
 - **mirror**: copies only the in-scope files; with `--cdb compile_commands.json` it preprocesses each source with
   its real flags (macros expanded, inactive `#if` branches removed, system/third-party header text dropped) and
   keeps a line map back to the original files.
+  Each in-scope header's text is kept in ONE translation unit (its own source file first), so large C++ code
+  bases are not parsed once per includer (GoogleTest: 118k -> 18k nodes, 4.5 min -> 45 s). Units are preprocessed
+  in parallel (`UT_JOBS` = number of workers).
 - **augment** (after `graphify update`): original files/lines restored, `static` flags, external callees as nodes
   (`kind` function / pointer / macro / library / test-framework, `declared_in`), one node per
-  `TEST`/`TEST_F`/`TEST_GROUP`/... block, duplicates from several translation units merged, recursion kept.
+  `TEST`/`TEST_F`/`TEST_GROUP`/... block, duplicates merged, recursion kept;
+  C++: methods qualified as `Class::method()` at their definition, `virtual` / `pure_virtual` flags, `obj.m()`
+  resolved by the declared type of `obj` (incl. base classes);
+  C: function pointers bound to the functions stored in them (designated and positional struct initializers,
+  assignments, callbacks passed to a registration function), so call chains continue through them.
+- Graphify then re-clusters locally so `GRAPH_REPORT.md` reflects the fixes (`graph.html` skipped above 5000 nodes).
 - **deps** / **tests**: the two questions unit-test work asks most (mock candidates; tests reaching a function).
-Graphify's own `GRAPH_REPORT.md` and `graph.html` are produced before the fixes; `graph.json` has them.
+- **selftest**: bundled fixture (`scripts/selftest/`) with known answers, built with the local compiler.
 
 To upgrade: replace the wheel, update the version in `scripts/graphify.sh` (`GRAPHIFY_VERSION`), delete `.venv/`,
 run `setup`, and re-test on a known codebase.

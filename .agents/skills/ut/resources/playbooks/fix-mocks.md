@@ -2,6 +2,8 @@
 Create, update or delete mocks, stubs or fakes. Load the framework tool file for the exact syntax.
 
 0. Which mocks exist and which are missing for a file: `"$SKILL_DIR/resources/scripts/graphify.sh" deps "$KB_DIR/graphify" <source file>`.
+   `interface ... implemented by: MockX` = a C++ mock exists; `pointer ... may call: f` = the test can replace the
+   pointer with a fake; `in-scope code` in a mocks folder = a link-time mock exists.
 1. Find how this repo mocks (KB section 3 "Mock / stub style"): framework mocks (CppUMock, gMock,
    CMock, Parasoft stubs), hand-written stubs, FFF fakes, link-time substitution or function pointers.
    Use the same way. Never mix a second style into a file.

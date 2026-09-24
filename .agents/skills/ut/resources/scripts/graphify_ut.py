@@ -21,7 +21,7 @@ Run with the Graphify venv python (graphify.sh does this). Two steps:
       - duplicate nodes (same function seen from several translation units) merged
 
   deps  GRAPH_JSON FILE|FUNCTION        what it calls outside itself (mock/stub candidates first)
-  tests GRAPH_JSON FUNCTION [HOPS=3]    test blocks that reach FUNCTION through calls
+  tests GRAPH_JSON FUNCTION [HOPS=4]    test blocks that reach FUNCTION through calls (incl. via function pointers)
 """
 import bisect, json, os, re, shlex, shutil, subprocess, sys
 
@@ -96,7 +96,9 @@ def pp_command(entry, src):
 MARK = re.compile(r'^#\s*(?:line\s+)?(\d+)\s+"((?:[^"\\]|\\.)*)"')
 
 
-def preprocess(entry, src, root, scope, dst):
+def preprocess(entry, src, root, scope):
+    """-> ((segments, seen), error). segments = [[file_rel, first_orig_line, [lines]], ...] for in-scope text;
+    seen = every in-scope file the preprocessor entered (also macro-only headers that leave no text)"""
     cmd = pp_command(entry, src)
     if cmd is None:
         return None, 'unsupported compiler ' + entry.get('command', '')[:40]
@@ -106,29 +108,52 @@ def preprocess(entry, src, root, scope, dst):
         return None, str(e)
     if r.returncode != 0:
         return None, (r.stderr.strip().splitlines() or ['failed'])[-1][:200]
-    runs, out_lines, cur, line, seen = [], [], None, 0, set()
-    for raw in r.stdout.splitlines():
-        m = MARK.match(raw)
-        if m:
-            line = int(m.group(1))
-            f = m.group(2).encode().decode('unicode_escape')
-            f = os.path.realpath(os.path.join(entry['directory'], f)) if not f.startswith('<') else f
-            cur = norm(os.path.relpath(f, root)) if in_scope(f, scope) else None
-            if cur:
-                seen.add(cur)
-            continue
+    segs, cur, line, cache, seen = [], None, 0, {}, set()
+    seg = None
+    for raw in r.stdout.split('\n'):
+        if raw[:1] == '#':
+            m = MARK.match(raw)
+            if m:
+                line = int(m.group(1))
+                key = m.group(2)
+                if key not in cache:          # resolving paths is the slow part: once per distinct marker
+                    f = key.encode().decode('unicode_escape')
+                    f = os.path.realpath(os.path.join(entry['directory'], f)) if not f.startswith('<') else f
+                    cache[key] = norm(os.path.relpath(f, root)) if in_scope(f, scope) else None
+                cur, seg = cache[key], None
+                if cur:
+                    seen.add(cur)
+                continue
         if cur is not None:
-            out_lines.append(raw)
-            n = len(out_lines)
-            if runs and runs[-1][2] == cur and runs[-1][0] + runs[-1][1] == n and runs[-1][3] + runs[-1][1] == line:
-                runs[-1][1] += 1
-            else:
-                runs.append([n, 1, cur, line])
+            if seg is None or seg[0] != cur or seg[1] + len(seg[2]) != line:
+                seg = [cur, line, []]
+                segs.append(seg)
+            seg[2].append(raw)
         line += 1
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    with open(dst, 'w', encoding='utf-8') as fh:
-        fh.write('\n'.join(out_lines) + '\n')
-    return (runs, seen), None
+    return (segs, seen), None
+
+
+def owners(tu_segs):
+    """each in-scope file's text is kept in ONE translation unit: itself if it is a TU, else the TU with the
+    same stem (x.h -> x.c), else the first non-test TU that includes it, else the first TU"""
+    tus = sorted(tu_segs)
+    stem = lambda f: os.path.splitext(os.path.basename(f))[0].lower()
+    is_test = lambda f: bool(re.search(r'(^|/)(test|tests|unittest|ut)/|test', f, re.I))
+    inc = {}
+    for tu in tus:
+        for f, _, _ in tu_segs[tu]:
+            inc.setdefault(f, [])
+            if tu not in inc[f]:
+                inc[f].append(tu)
+    own = {}
+    for f, users in inc.items():
+        if f in tu_segs:
+            own[f] = f
+            continue
+        same = [t for t in users if stem(t) == stem(f)]
+        prod = [t for t in users if not is_test(t)]
+        own[f] = (same or prod or users)[0]
+    return own
 
 
 def in_scope(f, scope):
@@ -158,23 +183,45 @@ def cmd_mirror(argv):
         for e in json.load(open(cdb, encoding='utf-8')):
             p = os.path.realpath(os.path.join(e['directory'], e['file']))
             entries.setdefault(p, e)
-    linemap, covered, plain, failed = {}, set(), [], []
+    linemap, covered, plain, failed, jobs = {}, set(), [], [], []
     for f in files:
         rel = norm(os.path.relpath(f, root))
         if rel.startswith('..'):
             die(f'{f} is outside the repository root {root}')
         if f in entries and os.path.splitext(f)[1].lower() in SRC_EXTS:
-            res, err = preprocess(entries[f], f, root, scope, os.path.join(scan, rel))
-            if res:
-                linemap[rel], seen = res
-                covered |= seen
-                continue
+            jobs.append((f, rel))
+        else:
+            plain.append((f, rel))
+    from concurrent.futures import ThreadPoolExecutor
+    workers = int(os.environ.get('UT_JOBS') or os.cpu_count() or 4)
+    with ThreadPoolExecutor(max_workers=max(1, workers)) as pool:
+        results = list(pool.map(lambda j: preprocess(entries[j[0]], j[0], root, scope), jobs))
+    tu_segs = {}
+    for (f, rel), (res, err) in zip(jobs, results):
+        if res is not None:
+            tu_segs[rel] = res[0]
+            covered |= res[1]
+        else:
             failed.append(f'{rel}: {err}')
-        plain.append((f, rel))
+            plain.append((f, rel))
+    own = owners(tu_segs)
+    for tu, segs in tu_segs.items():
+        out_lines, runs = [], []
+        for f, start, lines in segs:
+            if own.get(f) != tu:
+                continue   # this header's text lives in another translation unit
+            runs.append([len(out_lines) + 1, len(lines), f, start])
+            out_lines.extend(lines)
+            covered.add(f)
+        dst = os.path.join(scan, tu)
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        with open(dst, 'w', encoding='utf-8') as fh:
+            fh.write('\n'.join(out_lines) + '\n')
+        linemap[tu] = runs
     n_plain = 0
     for f, rel in plain:
-        if rel in covered and os.path.splitext(f)[1].lower() not in SRC_EXTS:
-            continue   # header already seen (preprocessed) inside a translation unit
+        if rel in covered:
+            continue   # already preprocessed inside a translation unit (headers, or .c/.cc files #included by another unit)
         dst = os.path.join(scan, rel)
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copy2(f, dst); n_plain += 1
@@ -224,6 +271,9 @@ def func_name(defn, src):
 
 
 _IS_C = {}
+NOT_CALLS = {'static_cast', 'reinterpret_cast', 'const_cast', 'dynamic_cast', 'sizeof', 'alignof', 'decltype',
+             'typeid', 'noexcept', 'static_assert', '_Static_assert', 'defined', '__builtin_expect',
+             '__builtin_offsetof', 'offsetof', 'va_start', 'va_end', 'va_arg'}
 
 
 def body_is_c(src):
@@ -240,10 +290,28 @@ def callees(body, src):
         if fn.type == 'template_function':
             fn = fn.child_by_field_name('name') or fn
         if fn.type in ('identifier', 'qualified_identifier'):
-            yield txt(fn, src), n.start_point[0] + 1
-        elif fn.type == 'field_expression' and body_is_c(src):
-            # C: calls through struct members (hooks, driver tables) are function pointers
-            yield txt(fn, src).replace(' ', ''), n.start_point[0] + 1
+            name = txt(fn, src)
+            if name not in NOT_CALLS and not name.startswith('std::'):
+                yield name, n.start_point[0] + 1
+        elif fn.type == 'field_expression':
+            if body_is_c(src):
+                # C: calls through struct members (hooks, driver tables) are function pointers
+                yield txt(fn, src).replace(' ', ''), n.start_point[0] + 1
+            else:
+                # C++: obj.method() / ptr->method(): resolved later by the receiver's declared type
+                f = fn.child_by_field_name('field')
+                if f is not None:
+                    rec = fn.child_by_field_name('argument')
+                    r = ''
+                    if rec is not None and rec.type == 'identifier':
+                        r = txt(rec, src)
+                    elif rec is not None and rec.type == 'field_expression' and \
+                            rec.child_by_field_name('argument') is not None and \
+                            txt(rec.child_by_field_name('argument'), src) == 'this':
+                        r = txt(rec.child_by_field_name('field'), src)
+                    elif rec is not None and rec.type == 'this':
+                        r = 'this'
+                    yield f'member:{txt(f, src)}|{r}', n.start_point[0] + 1
 
 
 def variables(root, src):
@@ -266,23 +334,214 @@ def variables(root, src):
     return out
 
 
+def innermost_name(d, src):
+    """identifier inside a (pointer/function/array/parenthesized/init) declarator"""
+    while d is not None and d.type not in ('identifier', 'field_identifier', 'qualified_identifier',
+                                           'destructor_name', 'operator_name', 'type_identifier'):
+        nxt = d.child_by_field_name('declarator')
+        if nxt is None:
+            nxt = next((c for c in d.named_children if c.type not in ('parameter_list', 'type_qualifier')), None)
+        d = nxt
+    return d
+
+
+def enclosing_class(n, src):
+    p = n.parent
+    while p is not None:
+        if p.type in ('class_specifier', 'struct_specifier'):
+            nm = p.child_by_field_name('name')
+            return txt(nm, src) if nm is not None else None
+        if p.type == 'function_definition':
+            return None
+        p = p.parent
+    return None
+
+
+TYPE_WORDS = {'const', 'volatile', 'struct', 'class', 'union', 'enum', 'unsigned', 'signed', 'typename', 'mutable', 'static', 'auto'}
+
+
+def base_type(ty, src):
+    """`const fw::Clock&` -> Clock, `std::unique_ptr<IBus>` -> IBus (pointee of smart pointers), None for auto"""
+    if ty is None:
+        return None
+    t = txt(ty, src)
+    m = re.search(r'(?:unique_ptr|shared_ptr|weak_ptr|reference_wrapper)\s*<\s*([\w:]+)', t)
+    if m:
+        t = m.group(1)
+    t = re.sub(r'<.*>', '', t)
+    t = t.split('::')[-1]
+    words = [w for w in re.findall(r'[A-Za-z_]\w*', t) if w not in TYPE_WORDS]
+    return words[-1] if words else None
+
+
+def declared_types(node, src):
+    """name -> base type for parameters and declarations below node"""
+    out = {}
+    for d in walk(node):
+        if d.type in ('parameter_declaration', 'optional_parameter_declaration', 'declaration'):
+            bt = base_type(d.child_by_field_name('type'), src)
+            if not bt:
+                continue
+            if d.type == 'declaration':
+                decls = [c for c in d.named_children if c.type in ('identifier', 'init_declarator', 'pointer_declarator',
+                                                                    'reference_declarator', 'array_declarator')]
+            else:
+                decls = [d.child_by_field_name('declarator')]
+            for dc in decls:
+                nm = innermost_name(dc, src)
+                if nm is not None and nm.type == 'identifier':
+                    out[txt(nm, src)] = bt
+    return out
+
+
+def ptr_key(expr, src):
+    """key under which a function pointer is stored/called: ('field', name) or ('var', name)"""
+    e = expr
+    while e is not None and e.type in ('parenthesized_expression', 'pointer_expression', 'subscript_expression'):
+        e = e.child_by_field_name('argument') or e.named_children[0] if e.named_children else None
+    if e is None:
+        return None
+    if e.type == 'field_expression':
+        f = e.child_by_field_name('field')
+        return ('field', txt(f, src)) if f is not None else None
+    if e.type == 'identifier':
+        return ('var', txt(e, src))
+    return None
+
+
+def value_ident(v, src):
+    """function name used as a value: f, &f, (cast)f"""
+    while v is not None and v.type in ('pointer_expression', 'cast_expression', 'parenthesized_expression'):
+        v = v.child_by_field_name('argument') or v.child_by_field_name('value') or \
+            (v.named_children[-1] if v.named_children else None)
+    if v is not None and v.type in ('identifier', 'qualified_identifier'):
+        return txt(v, src)
+    return None
+
+
 def analyse(path, parser, is_c=None):
+    """functions (+calls), variables, and facts for C++ methods and function pointers"""
     src = open(path, 'rb').read()
     _IS_C[id(src)] = path.endswith('.c') if is_c is None else is_c
     tree = parser.parse(src)
     funcs = []
+    x = {'methods': {}, 'bindings': [], 'structs': {}, 'params': {}, 'stores': {}, 'args': [], 'fnptr_fields': set(), 'positional': [], 'class_fields': {}}
     for n in walk(tree.root_node):
-        if n.type != 'function_definition':
+        t = n.type
+        if t == 'function_definition':
+            name, decl = func_name(n, src)
+            if not name:
+                continue
+            cls = enclosing_class(n, src)
+            if cls and '::' not in name:
+                name = f'{cls}::{name}'
+            head = src[n.start_byte:decl.start_byte if decl is not None else n.start_byte].decode('utf-8', 'replace')
+            body = n.child_by_field_name('body')
+            funcs.append({'name': name, 'line': n.start_point[0] + 1, 'end': n.end_point[0] + 1,
+                          'static': bool(re.search(r'\b(static|STATIC|PRIVATE)\b', head)),
+                          'calls': list(callees(body, src)) if body is not None else [],
+                          'locals': declared_types(n, src) if not _IS_C.get(id(src), True) else {}})
+            params = []
+            plist = decl.child_by_field_name('parameters') if decl is not None else None
+            for pd in (plist.named_children if plist is not None else []):
+                nm = innermost_name(pd.child_by_field_name('declarator'), src) if pd.type == 'parameter_declaration' else None
+                params.append(txt(nm, src) if nm is not None else None)
+            x['params'][name] = params
+            if body is not None:
+                for a in walk(body):
+                    if a.type == 'assignment_expression':
+                        k = ptr_key(a.child_by_field_name('left'), src)
+                        v = value_ident(a.child_by_field_name('right'), src)
+                        if k and v in params:
+                            x['stores'].setdefault(name, []).append((k, params.index(v), a.start_point[0] + 1))
+                    elif a.type == 'call_expression':
+                        fn = a.child_by_field_name('function'); args = a.child_by_field_name('arguments')
+                        if fn is not None and fn.type == 'identifier' and args is not None:
+                            for i, arg in enumerate(args.named_children):
+                                v = value_ident(arg, src)
+                                if v:
+                                    x['args'].append((txt(fn, src), i, v, a.start_point[0] + 1))
+        elif t == 'field_declaration':
+            cls = enclosing_class(n, src)
+            d = n.child_by_field_name('declarator')
+            if cls and d is not None and d.type != 'function_declarator':
+                nm = innermost_name(d, src)
+                bt = base_type(n.child_by_field_name('type'), src)
+                if nm is not None and bt:
+                    x['class_fields'].setdefault(cls, {})[txt(nm, src)] = bt
+            if cls and d is not None and d.type == 'function_declarator':
+                nm = innermost_name(d, src)
+                text = txt(n, src)
+                if nm is not None:
+                    x['methods'][f'{cls}::{txt(nm, src)}'] = {
+                        'virtual': bool(re.search(r'\bvirtual\b', text)) or bool(re.search(r'\boverride\b', text)),
+                        'pure': bool(re.search(r'=\s*0\s*;?\s*$', text))}
+        elif t == 'struct_specifier' and n.child_by_field_name('body') is not None:
+            fields = []
+            for fd in n.child_by_field_name('body').named_children:
+                if fd.type == 'field_declaration':
+                    fdecl = fd.child_by_field_name('declarator')
+                    nm = innermost_name(fdecl, src)
+                    fields.append(txt(nm, src) if nm is not None else None)
+                    if nm is not None and fdecl is not None and any(c.type == 'function_declarator' for c in walk(fdecl)):
+                        x['fnptr_fields'].add(txt(nm, src))
+            names = []
+            if n.child_by_field_name('name') is not None:
+                names.append(txt(n.child_by_field_name('name'), src))
+            if n.parent is not None and n.parent.type == 'type_definition':
+                td = innermost_name(n.parent.child_by_field_name('declarator'), src)
+                if td is not None:
+                    names.append(txt(td, src))
+            for nm in names:
+                x['structs'][nm] = fields
+        elif t == 'assignment_expression':
+            k = ptr_key(n.child_by_field_name('left'), src)
+            v = value_ident(n.child_by_field_name('right'), src)
+            if k and v:
+                x['bindings'].append((k, v, n.start_point[0] + 1))
+        elif t == 'init_declarator':
+            decl, val = n.child_by_field_name('declarator'), n.child_by_field_name('value')
+            nm = innermost_name(decl, src)
+            if nm is None or val is None:
+                continue
+            ty = n.parent.child_by_field_name('type') if n.parent is not None else None
+            tyname = None
+            if ty is not None:
+                tn = ty.child_by_field_name('name') if ty.type == 'struct_specifier' else ty
+                tyname = txt(tn, src) if tn is not None else None
+            if val.type == 'initializer_list':
+                is_array = any(c.type == 'array_declarator' for c in walk(decl))
+                elems = val.named_children if is_array else [val]
+                for el in elems:
+                    if el.type == 'initializer_list':
+                        init_bindings(el, tyname, x, src)
+                    elif is_array:
+                        v = value_ident(el, src)
+                        if v:
+                            x['bindings'].append((('var', txt(nm, src)), v, el.start_point[0] + 1))
+            else:
+                v = value_ident(val, src)
+                if v:
+                    x['bindings'].append((('var', txt(nm, src)), v, n.start_point[0] + 1))
+    return funcs, variables(tree.root_node, src), x
+
+
+def init_bindings(lst, tyname, x, src):
+    """{ .open = f, ... } or positional { f, g } for a struct whose field order is known"""
+    pos = 0
+    for el in lst.named_children:
+        if el.type == 'initializer_pair':
+            des = el.child_by_field_name('designator')
+            des = des if des is not None else el.named_children[0]
+            field = txt(des, src).lstrip('.').strip() if des is not None else None
+            v = value_ident(el.child_by_field_name('value'), src)
+            if field and v:
+                x['bindings'].append((('field', field), v, el.start_point[0] + 1))
             continue
-        name, decl = func_name(n, src)
-        if not name:
-            continue
-        head = src[n.start_byte:decl.start_byte if decl is not None else n.start_byte].decode('utf-8', 'replace')
-        body = n.child_by_field_name('body')
-        funcs.append({'name': name, 'line': n.start_point[0] + 1, 'end': n.end_point[0] + 1,
-                      'static': bool(re.search(r'\b(static|STATIC|PRIVATE)\b', head)),
-                      'calls': list(callees(body, src)) if body is not None else []})
-    return funcs, variables(tree.root_node, src)
+        v = value_ident(el, src)
+        if v and tyname:
+            x['positional'].append((tyname, pos, v, el.start_point[0] + 1))   # field order resolved later
+        pos += 1
 
 
 # --------------------------------------------------------------------------- augment
@@ -384,18 +643,8 @@ def cmd_augment(argv):
         m = LOC.search(x.get('source_location') or '')
         return int(m.group(1)) if m else None
 
-    by_fileline, by_label = {}, {}
-    for n in nodes:
-        if n.get('_callable'):
-            by_fileline.setdefault((n.get('source_file'), loc(n)), n)
-            by_label.setdefault(n['label'][:-2] if n['label'].endswith('()') else n['label'], []).append(n)
-    tmpl = next((n for n in nodes if n.get('_callable')), {'community': 0, 'community_name': ''})
-    community_of = {}
-    for n in nodes:
-        community_of.setdefault(n.get('source_file'), (n.get('community', 0), n.get('community_name', '')))
-
     # 1. parse the mirror (active code) -> static flags + calls
-    scan_funcs, pointer_vars = {}, {}
+    scan_funcs, pointer_vars, facts = {}, {}, {}
     for d, _, files in os.walk(scan):
         for fn in files:
             p = os.path.join(d, fn)
@@ -403,9 +652,52 @@ def cmd_augment(argv):
             ext = os.path.splitext(fn)[1].lower()
             if ext not in EXTS:
                 continue
-            funcs, vars_ = analyse(p, pc if ext == '.c' else pcpp)
+            funcs, vars_, facts[rel] = analyse(p, pc if ext == '.c' else pcpp)
             scan_funcs[rel], pointer_vars[rel] = funcs, vars_
 
+    declared_methods = set()
+    for fx in facts.values():
+        declared_methods |= set(fx['methods'])
+    for funcs in scan_funcs.values():
+        declared_methods |= {f['name'] for f in funcs if '::' in f['name']}
+
+    # C++: Graphify names methods by their bare name (`emit`, `.write()`); qualify them as Class::name()
+    byid = {n['id']: n for n in nodes}
+    called = {e['target'] for e in links if e.get('relation') == 'calls'} | \
+             {n['id'] for n in nodes if re.search(r'\(\)$', n['label'])}
+    for e in links:
+        if e.get('relation') in ('defines', 'method'):
+            c, m = byid.get(e['source']), byid.get(e['target'])
+            bare = m['label'].lstrip('.') if m else ''
+            bare = bare[:-2] if bare.endswith('()') else bare
+            if c and m and '::' not in m['label'] and '.' not in c['label'] and not c['label'].endswith('()') \
+                    and (m.get('_callable') or m['id'] in called or f"{c['label']}::{bare}" in declared_methods):
+                m['short_label'] = bare
+                m['label'] = f"{c['label']}::{bare}()"
+                m['norm_label'] = m['label'].lower()
+                m['_callable'] = True
+
+    by_fileline, by_label = {}, {}
+    for n in nodes:
+        if n.get('_callable'):
+            by_fileline.setdefault((n.get('source_file'), loc(n)), n)
+            key = n['label'][:-2] if n['label'].endswith('()') else n['label']
+            by_label.setdefault(key, []).append(n)
+            if '::' in key:
+                by_label.setdefault(key.split('::')[-1], []).append(n)
+    tmpl = next((n for n in nodes if n.get('_callable')), {'community': 0, 'community_name': ''})
+    community_of = {}
+    for n in nodes:
+        community_of.setdefault(n.get('source_file'), (n.get('community', 0), n.get('community_name', '')))
+
+    class_fields = {}
+    for fx in facts.values():
+        for c, flds in fx['class_fields'].items():
+            class_fields.setdefault(c, {}).update(flds)
+    bases = {}
+    for e in links:
+        if e.get('relation') == 'inherits' and e['source'] in byid and e['target'] in byid:
+            bases.setdefault(byid[e['source']]['label'], []).append(byid[e['target']]['label'].split('::')[-1])
     new_nodes, new_edges, ext_calls = [], [], []
     existing = {(e['source'], e['target'], e['relation']) for e in links}
 
@@ -415,7 +707,41 @@ def cmd_augment(argv):
         same = [c for c in cands if c.get('source_file') == prefer_file]
         return (same or cands or [None])[0]
 
-    def add_call(src_node, callee, rel, line, vars_):
+    def member_targets(callee, f):
+        """obj.m() -> [Class::m node] using the receiver's declared type (local, parameter or class field),
+        walking base classes; without a known type only a method name that exists in ONE class is linked"""
+        m, _, rec = callee[7:].partition('|')
+        cls = f['name'].rsplit('::', 1)[0] if f and '::' in f['name'] else None
+        ty = None
+        if rec == 'this':
+            ty = cls
+        elif rec and f:
+            ty = f.get('locals', {}).get(rec) or class_fields.get(cls, {}).get(rec)
+        if ty:
+            todo, seen_t = [ty], set()
+            while todo:
+                t = todo.pop(0)
+                if t in seen_t:
+                    continue
+                seen_t.add(t)
+                hit = by_label.get(f'{t}::{m}')
+                if hit:
+                    return hit[:1], 'EXTRACTED'
+                todo += bases.get(t, [])
+            return [], None
+        cands = [c for c in by_label.get(m, []) if '::' in c['label']]
+        return (cands[:1], 'INFERRED') if len({c['label'] for c in cands}) == 1 else ([], None)
+
+    def add_call(src_node, callee, rel, line, vars_, f=None):
+        if callee.startswith('member:'):
+            cands, conf = member_targets(callee, f)
+            for c in cands:
+                key = (src_node['id'], c['id'], 'calls')
+                if key not in existing:
+                    existing.add(key)
+                    e = edge(src_node['id'], c['id'], rel, line); e['confidence'] = conf
+                    new_edges.append(e)
+            return
         tgt = resolve(callee, rel)
         if tgt is not None:
             key = (src_node['id'], tgt['id'], 'calls')
@@ -430,18 +756,29 @@ def cmd_augment(argv):
                 'confidence_score': 1.0, 'context': 'call', 'source_file': rel,
                 'source_location': f'L{line}', 'weight': 1.0}
 
-    n_static = 0
+    n_static, def_site = 0, {}
     for rel, funcs in scan_funcs.items():
         for f in funcs:
             node = by_fileline.get((rel, f['line']))
             if node is None:
-                cands = [c for c in by_label.get(f['name'], []) if c.get('source_file') == rel]
+                cands = [c for c in by_label.get(f['name'], []) if c.get('source_file') == rel
+                         and (c['label'][:-2] == f['name'] or '::' not in f['name'])]
+                if not cands and '::' in f['name']:   # method defined here, declared in its class header
+                    cands = [c for c in by_label.get(f['name'], []) if c['label'][:-2] == f['name']]
                 node = cands[0] if len(cands) == 1 else None
             if node is None:
                 continue
+            if '::' in f['name'] and loc(node) != f['line']:
+                def_site[node['id']] = (rel, f['line'])
             node['static'] = f['static']; n_static += f['static']
             for callee, line in f['calls']:
-                add_call(node, callee, rel, line, pointer_vars[rel])
+                add_call(node, callee, rel, line, pointer_vars[rel], f)
+
+    for rel, fx in facts.items():
+        for qual, info in fx['methods'].items():
+            for c in by_label.get(qual, []):
+                c['virtual'] = c.get('virtual') or info['virtual']
+                c['pure_virtual'] = c.get('pure_virtual') or info['pure']
 
     # 2. remap to original files/lines (preprocessed mode)
     for x in nodes + links + new_edges:
@@ -452,6 +789,13 @@ def cmd_augment(argv):
             of, ol = lm.to_orig(f, l)
             x['source_file'], x['source_location'] = of, f'L{ol}'
     ext_calls = [(s, c, *lm.to_orig(r, l), p) for (s, c, r, l, p) in ext_calls]
+    # methods defined outside their class: node moves to the definition, declaration kept
+    for nid, (rel, line) in def_site.items():
+        n = byid[nid]
+        n['declared_at'] = f"{n.get('source_file')}:{n.get('source_location')}"
+        of, ol = lm.to_orig(rel, line)
+        n['source_file'], n['source_location'] = of, f'L{ol}'
+
 
     # 3. test blocks: one node per TEST(...) block, parsed from the ORIGINAL test file
     drop = set()
@@ -470,7 +814,7 @@ def cmd_augment(argv):
             if n.get('source_file') == rel and n.get('_callable') and re.fullmatch(r'[A-Z][A-Z0-9_]*\(\)', n['label']) \
                     and n['label'][:-2] in TEST_MACROS:
                 drop.add(n['id'])
-        funcs, vars_ = analyse(path, pcpp)
+        funcs, vars_, _ = analyse(path, pcpp)
         made = {n['id'] for n in new_nodes}
         for f in funcs:
             if f['name'] not in TEST_MACROS:
@@ -489,6 +833,12 @@ def cmd_augment(argv):
             made.add(node['id'])
             new_nodes.append(node)
             for callee, line in f['calls']:
+                if callee.startswith('member:'):
+                    cands, conf = member_targets(callee, f)
+                    for c in [c for c in cands if c['id'] not in drop]:
+                        e = edge(node['id'], c['id'], rel, line); e['confidence'] = conf
+                        new_edges.append(e)
+                    continue
                 if callee in TEST_MACROS or (re.fullmatch(r'[A-Z][A-Z0-9_]*', callee) and not resolve(callee, rel)):
                     continue   # assertion / framework macros
                 tgt = resolve(callee, rel)
@@ -505,9 +855,11 @@ def cmd_augment(argv):
     # 4. external nodes
     decl, macros = header_index(root, {c for _, c, _, _, _ in ext_calls}, pcpp)
     ext_nodes = {}
+    all_vars = set().union(*pointer_vars.values()) if pointer_vars else set()
     for src_node, callee, rel, line, is_ptr in ext_calls:
         if src_node['id'] in drop:
             continue
+        is_ptr = is_ptr or callee in all_vars
         member = '.' in callee or '->' in callee
         declared = None if member else (decl.get(callee) or decl.get(callee.split('::')[-1]))
         from_expansion = callee.split('.')[-1].split('->')[-1] not in (read_line(root, rel, line) or callee)
@@ -530,10 +882,57 @@ def cmd_augment(argv):
             keep_links.append(edge(src_node['id'], nid, rel, line))
     nodes += ext_nodes.values()
 
+    # 4b. function pointers: bind each pointer call to the functions stored in that pointer
+    known = {k for k, v in by_label.items() if v}
+    fnptr_fields = set().union(*(fx['fnptr_fields'] for fx in facts.values())) if facts else set()
+    structs = {}
+    for fx in facts.values():
+        for k, v in fx['structs'].items():
+            structs.setdefault(k, v)
+    for fx in facts.values():   # positional { f, g } initializers: struct may be defined in another unit
+        for tyname, pos, fn, line in fx['positional']:
+            fl = structs.get(tyname)
+            if fl and pos < len(fl) and fl[pos]:
+                fx['bindings'].append((('field', fl[pos]), fn, line))
+    binds = {}
+    for rel, fx in facts.items():
+        for key, fn, line in fx['bindings']:
+            # a known function, or anything stored in a function-pointer field (e.g. malloc into .allocate)
+            if fn in known or (key[0] == 'field' and key[1] in fnptr_fields):
+                binds.setdefault(key, set()).add((fn, *lm.to_orig(rel, line)))
+        for callee, idx, fn, line in fx['args']:          # register_cb(my_handler) -> stored param
+            if fn not in known:
+                continue
+            for rel2, fx2 in facts.items():
+                for key, pidx, _ in fx2['stores'].get(callee, []):
+                    if pidx == idx:
+                        binds.setdefault(key, set()).add((fn, *lm.to_orig(rel, line)))
+    n_bound = 0
+    for n in ext_nodes.values():
+        if n['kind'] != 'pointer':
+            continue
+        expr = n['label'][:-2]
+        key = ('field', re.split(r'\.|->', expr)[-1]) if ('.' in expr or '->' in expr) else ('var', expr)
+        targets = sorted(binds.get(key, ()))
+        if not targets:
+            continue
+        grouped = {}
+        for fn, f, l in targets:
+            grouped.setdefault(fn, []).append(f'{f}:L{l}')
+        n['targets'] = [f"{fn} (bound at {', '.join(sites[:3])}{' ...' if len(sites) > 3 else ''})"
+                        for fn, sites in grouped.items()]
+        for fn, f, l in targets:
+            tgt = resolve(fn, f)
+            if tgt is not None and (n['id'], tgt['id'], 'calls') not in existing:
+                existing.add((n['id'], tgt['id'], 'calls'))
+                e = edge(n['id'], tgt['id'], f, l); e['confidence'] = 'INFERRED'; e['context'] = 'pointer-target'
+                keep_links.append(e); n_bound += 1
+
     # 5. merge duplicates (same function reached from several translation units)
     canon, merged = {}, {}
+    nodes.sort(key=lambda n: 0 if n.get('declared_at') else 1)
     for n in nodes:
-        k = (n.get('source_file'), n['label'], n.get('source_location'))
+        k = (n['label'], n.get('declared_at') or f"{n.get('source_file')}:{n.get('source_location')}")
         if n.get('source_file') and k in canon:
             merged[n['id']] = canon[k]
         else:
@@ -553,7 +952,9 @@ def cmd_augment(argv):
     for n in ext_nodes.values():
         kinds[n['kind']] = kinds.get(n['kind'], 0) + 1
     n_static = sum(1 for n in nodes if n.get('static'))
-    print(f"augmented: {n_static} static functions marked, {len(new_nodes)} test blocks, "
+    n_virt = sum(1 for n in nodes if n.get('pure_virtual'))
+    print(f"augmented: {n_static} static functions marked, {n_virt} pure virtual methods, "
+          f"{n_bound} function-pointer targets bound, {len(new_nodes)} test blocks, "
           f"{len(ext_nodes)} external callees {kinds}, {len(merged)} duplicate nodes merged, "
           f"{'lines mapped to original sources' if lm.m else 'plain mode (no compile DB)'}")
 
@@ -606,10 +1007,20 @@ def cmd_deps(argv):
             if tg.get('source_file') in files and tg.get('type') != 'external':
                 continue   # call inside the same file: not a dependency
             where = tg.get('declared_in') if tg.get('type') == 'external' else f"defined in {tg.get('source_file')}:{tg.get('source_location')}"
-            kind = tg.get('kind', 'function') if tg.get('type') == 'external' else 'in-scope code'
+            if tg.get('targets'):
+                where += '; may call: ' + ', '.join(tg['targets'][:4])
+            kind = (tg.get('kind', 'function') if tg.get('type') == 'external'
+                    else 'interface' if tg.get('pure_virtual') else 'in-scope code')
+            if kind == 'interface':
+                iface = tg['label'].rsplit('::', 1)[0]
+                impl = sorted({f"{ids[e['source']]['label']} ({ids[e['source']].get('source_file')})" for e in g['links']
+                               if e.get('relation') == 'inherits' and e['target'] in ids and e['source'] in ids
+                               and ids[e['target']]['label'].split('::')[-1] == iface})
+                where = (f"pure virtual, declared in {tg.get('source_file')}:{tg.get('source_location')}: mock the interface"
+                         + (f"; implemented by: {', '.join(impl)}" if impl else '; no implementation or mock found'))
             r = rows.setdefault(tg['label'], [kind, where, []])
             r[2].append(f"{n['label']} @ {e.get('source_file')}:{e.get('source_location')}")
-    order = ['function', 'pointer', 'macro', 'in-scope code', 'library', 'test-framework']
+    order = ['function', 'interface', 'pointer', 'macro', 'in-scope code', 'library', 'test-framework']
     print(f"# dependencies of {t}  (mock/stub candidates first; 'in-scope code' = another scanned file, often an existing mock)")
     for kind in order:
         items = sorted((k, v) for k, v in rows.items() if v[0] == kind)
@@ -623,9 +1034,9 @@ def cmd_deps(argv):
 def cmd_tests(argv):
     """tests GRAPH FUNCTION [MAX_HOPS] : test blocks that reach FUNCTION through calls"""
     if len(argv) not in (2, 3):
-        die('usage: tests GRAPH_JSON FUNCTION [MAX_HOPS=3]')
+        die('usage: tests GRAPH_JSON FUNCTION [MAX_HOPS=4]')
     g, ids, _, inc = load(argv[0])
-    hops = int(argv[2]) if len(argv) == 3 else 3
+    hops = int(argv[2]) if len(argv) == 3 else 4
     starts = find(ids, argv[1])
     if not starts:
         die(f'function not found: {argv[1]}')
@@ -655,8 +1066,79 @@ def cmd_tests(argv):
         print(f"{d} hop(s) [{what}]: {n['label']}  {n.get('source_file')}:{n.get('source_location')}   via {' <- '.join(chain)}")
 
 
+# --------------------------------------------------------------------------- self-test
+def cmd_mkcdb(argv):
+    """mkcdb FIXTURE_DIR: write compile_commands.json for the self-test fixture with local compilers"""
+    fx = os.path.realpath(argv[0])
+    cc = next((c for c in [os.environ.get('CC'), 'cc', 'gcc', 'clang'] if c and shutil.which(c)), None)
+    cxx = next((c for c in [os.environ.get('CXX'), 'c++', 'g++', 'clang++'] if c and shutil.which(c)), None)
+    if not cc or not cxx:
+        print('no C/C++ compiler found (set CC and CXX): self-test runs WITHOUT a compile DB')
+        sys.exit(3)
+    inc = ['-Iconfig', '-Ihal', '-Ilib/crc', '-Isrc', '-Itests']
+    entries = []
+    for d, _, files in os.walk(fx):
+        for n in sorted(files):
+            ext = os.path.splitext(n)[1]
+            if ext in ('.c', '.cpp'):
+                f = os.path.relpath(os.path.join(d, n), fx).replace(os.sep, '/')
+                comp = cc if ext == '.c' else cxx
+                entries.append({'directory': fx, 'file': f,
+                                'arguments': [comp] + inc + (['-std=c++17'] if ext == '.cpp' else []) + ['-c', f, '-o', f + '.o']})
+    json.dump(entries, open(os.path.join(fx, 'compile_commands.json'), 'w'), indent=1)
+    print(f'compile DB for self-test: {cc} / {cxx}')
+
+
+def cmd_check(argv):
+    """check GRAPH_JSON [plain]: verify the self-test fixture's known answers"""
+    g, ids, out, inc = load(argv[0])
+    plain = len(argv) > 1 and argv[1] == 'plain'
+    by = {}
+    for n in g['nodes']:
+        by.setdefault(n['label'], []).append(n)
+    def node(label):
+        return (by.get(label) or [{}])[0]
+    def calls(a, b):
+        return any(ids[e['target']]['label'] == b for e in out.get(node(a).get('id'), []))
+    results = []
+    def check(name, ok, mode_ok=True):
+        if mode_ok:
+            results.append((name, bool(ok)))
+    check('STATIC helper marked static', node('uart_wait_ready()').get('static') is True)
+    check('crc16 is an external function declared in lib/crc/crc.h',
+          node('crc16()').get('kind') == 'function' and node('crc16()').get('declared_in') == 'lib/crc/crc.h')
+    check('proto_frame_done -> crc16 at original line 11',
+          any(ids[e['target']]['label'] == 'crc16()' and e.get('source_location') == 'L11'
+              for e in out.get(node('proto_frame_done()').get('id'), [])))
+    check('only the active #if variant: uart_flush -> hal_dma_start, not uart_send',
+          calls('uart_flush()', 'hal_dma_start()') and not calls('uart_flush()', 'uart_send()'), not plain)
+    check('FW_ASSERT expanded to fw_assert_failed', calls('uart_send()', 'fw_assert_failed()'), not plain)
+    check('designated initializer: s_ops->write may call uart_write', calls('s_ops->write()', 'uart_write()'))
+    check('positional initializer: s_events.on_error may call drv_on_error', calls('s_events.on_error()', 'drv_on_error()'))
+    check('registered callback: s_cb may call drv_uart_cb', calls('s_cb()', 'drv_uart_cb()'))
+    check('C++ interface method is pure virtual', node('IBus::write()').get('pure_virtual') is True, not plain)
+    check('Logger::emit defined in src/logger.cpp and calls IBus::write',
+          node('Logger::emit()').get('source_file') == 'src/logger.cpp' and calls('Logger::emit()', 'IBus::write()'), not plain)
+    check('TEST block node calls proto_feed', calls('TEST(Proto, Feed_StartByte_ReturnsZero)', 'proto_feed()'))
+    check('TEST block reaches Logger::log through a typed local', calls('TEST(Logger, Log_Writes)', 'Logger::log()'))
+    check('no node points outside the repository',
+          not any((n.get('source_file') or '').startswith(('/', '..')) for n in g['nodes']))
+    width = max(len(n) for n, _ in results)
+    for name, ok in results:
+        print(f"  {'PASS' if ok else 'FAIL'}  {name}")
+    bad = sum(1 for _, ok in results if not ok)
+    print(f"self-test: {len(results) - bad}/{len(results)} passed" + (' (plain mode: no compile DB)' if plain else ''))
+    sys.exit(1 if bad else 0)
+
+
 if __name__ == '__main__':
-    cmds = {'mirror': cmd_mirror, 'augment': cmd_augment, 'deps': cmd_deps, 'tests': cmd_tests}
+    try:   # `... | head` must not print a traceback
+        import signal
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (AttributeError, ValueError):
+        pass
+    cmds = {'mirror': cmd_mirror, 'augment': cmd_augment, 'deps': cmd_deps, 'tests': cmd_tests,
+            'mkcdb': cmd_mkcdb, 'check': cmd_check}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__); sys.exit(2)
     cmds[sys.argv[1]](sys.argv[2:])

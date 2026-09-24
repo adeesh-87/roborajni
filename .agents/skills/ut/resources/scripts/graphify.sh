@@ -12,6 +12,7 @@
 #   graphify.sh path    OUT_DIR "A" "B"          shortest chain of calls/references from A to B
 #   graphify.sh deps    OUT_DIR FILE|FUNCTION    what it calls outside itself: mock/stub candidates first
 #   graphify.sh tests   OUT_DIR FUNCTION [HOPS]  which test blocks reach FUNCTION (default 3 call hops)
+#   graphify.sh selftest                         build a bundled fixture and check the C/C++ fixes on THIS machine
 #   graphify.sh wheelhouse DIR PLATFORM PYVER    download every wheel for an OFFLINE machine,
 #                                                e.g. win_amd64 3.11 | manylinux2014_x86_64 3.12 | macosx_11_0_arm64 3.12
 #   graphify.sh version
@@ -29,7 +30,7 @@ VENV="$VENDOR/.venv"
 WHEELS="$VENDOR/wheels"
 
 die() { echo "graphify.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,24p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,25p' "$0"; exit 2; }
 CMD=$1; shift
 
 venv_py() {
@@ -100,9 +101,19 @@ do_build() {
   grep -E 'warning|Rebuilt|error' "$out/build.log" | cut -c1-400
   [ $rc -eq 0 ] && [ -f "$out/out/graph.json" ] || { echo "graphify build FAILED (rc=$rc), see $out/build.log"; return 1; }
   # 3. C/C++ fixes: original lines, static flags, external callees, one node per TEST block
-  "$(venv_py)" "$HERE/graphify_ut.py" augment "$out/out/graph.json" "$out/scan" || echo "WARNING: augment step failed; graph is plain Graphify output"
+  if "$(venv_py)" "$HERE/graphify_ut.py" augment "$out/out/graph.json" "$out/scan"; then
+    # 4. re-cluster so GRAPH_REPORT.md / graph.html reflect the fixes (local; no LLM labelling)
+    local nodes viz=""
+    nodes=$("$(venv_py)" -c "import json,sys; print(len(json.load(open(sys.argv[1]))['nodes']))" "$out/out/graph.json")
+    [ "${nodes:-0}" -gt 5000 ] && viz="--no-viz"
+    ( cd "$out" && GRAPHIFY_OUT="$out/out" run_graphify cluster-only "$out/scan" --graph "$out/out/graph.json" --no-label $viz ) >> "$out/build.log" 2>&1 \
+      || echo "WARNING: report regeneration failed; GRAPH_REPORT.md is from before the fixes"
+    rm -rf "$out"/out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]    # Graphify's dated backups: useless, we rebuild
+  else
+    echo "WARNING: augment step failed; graph is plain Graphify output"
+  fi
   echo "graph:  $out/out/graph.json"
-  echo "report: $out/out/GRAPH_REPORT.md   (Graphify's own report, written before the fixes; view: $out/out/graph.html)"
+  echo "report: $out/out/GRAPH_REPORT.md${viz:+   (graph.html skipped: large graph)}"
 }
 
 case $CMD in
@@ -115,11 +126,21 @@ case $CMD in
   path)    [ $# -ge 3 ] || die "usage: path OUT_DIR A B"; ensure; run_graphify path "$2" "$3" --graph "$1/out/graph.json" ;;
   deps)    [ $# -eq 2 ] || die "usage: deps OUT_DIR FILE|FUNCTION"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
   tests)   [ $# -ge 2 ] || die "usage: tests OUT_DIR FUNCTION [HOPS]"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
+  selftest)
+    ensure
+    tmp=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/ut-selftest-$$"); mkdir -p "$tmp"
+    cp -r "$HERE/selftest/." "$tmp/fx"
+    if "$(venv_py)" "$HERE/graphify_ut.py" mkcdb "$tmp/fx"; then mode=""; cdbarg="--cdb $tmp/fx/compile_commands.json"
+    else mode=plain; cdbarg=""; fi
+    ( cd "$tmp/fx" && do_build $cdbarg "$tmp/g" src tests tests/mocks ) > "$tmp/selftest.log" 2>&1 || { cat "$tmp/selftest.log"; exit 1; }
+    grep -E 'preprocessed|not preprocessed|augmented|WARNING' "$tmp/selftest.log"
+    "$(venv_py)" "$HERE/graphify_ut.py" check "$tmp/g/out/graph.json" $mode; rc=$?
+    rm -rf "$tmp"; exit $rc ;;
   wheelhouse)
     [ $# -eq 3 ] || die "usage: wheelhouse DIR PLATFORM PYVER   (e.g. wheels win_amd64 3.11)"
     py=$(venv_py); [ -n "$py" ] || py=$(find_python) || die "Python 3.10+ needed to download wheels"
     mkdir -p "$1" && cp "$WHEEL" "$1/"
     $py -m pip download --disable-pip-version-check --only-binary=:all: --platform "$2" --python-version "$3" -d "$1" "$WHEEL" \
       && echo "wheelhouse ready: $1 (copy it to resources/vendor/graphify/wheels on the offline machine, then run setup)" ;;
-  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|wheelhouse|version)" ;;
+  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|selftest|wheelhouse|version)" ;;
 esac
