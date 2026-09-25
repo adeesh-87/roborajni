@@ -28,12 +28,29 @@ callees, references) for the orchestrator, a stronger model or a human. It keeps
 
 ## Views built on the index (any backend)
 - `flow` / `seq` / `scenarios` / `diagrams`: Mermaid text, see `resources/diagrams.md`. Size on cvaccel: a flowchart
-  is 1.0–1.6x the words of the function's card, a one-level sequence 0.8–2.5x. The executor prompt gets them only
-  for coverage tasks, functions with >= 4 decisions (flow) and functions with >= 2 mockable collaborators (seq),
-  within 900 words per prompt (`ut run --diagrams on|off` overrides).
+  is 1.0–1.6x the words of the function's card, a one-level sequence 0.8–2.5x. They are always generated into
+  `KB_DIR/diagrams/` and any agent can print one with `index.sh flow|seq`. The executor PROMPT does not include them
+  by default (profile `prompt_diagrams=off`); `ut run --diagrams auto` adds them for coverage tasks, functions with
+  >= 4 decisions (flow) and functions with >= 2 mockable collaborators (seq), within 900 words per prompt.
+  Why off: the A/B run below showed no gain for the extra words.
 - `cov-import`: lcov `.info`, a gcov build tree (`--gcov-dir`, best: exception arcs are removed), CTC++ `profile.txt`
   (`ctcpost -p`), or a neutral JSON. Counts go onto the flowchart edges; `uncovered` lists the gaps; `ut coverage`
   turns them into work items whose cases are exactly the missing outcomes.
 - `trace`: builds the tests with `-finstrument-functions` in a separate build tree, runs them, and writes one runtime
   sequence per TEST (virtual dispatch and callbacks as they really happened) plus the runtime reach shown in cards.
   Linux + glibc + binutils only.
+
+## A/B run: executor prompts with and without diagrams (cvaccel, Haiku 4.5 as the test writer)
+Same repository, same coverage gaps (gcov), same 7 tasks (1 add-tests, 6 raise-coverage), one run each.
+| | A: cards only | B: cards + diagrams (auto rule) |
+|---|---|---|
+| words per first prompt, coverage tasks (mean) | 2,450 | 2,816 (diagrams 124–821 words) |
+| attempts, all 7 tasks | 11 | 11 |
+| first-attempt success | 4 of 7 | 5 of 7 |
+| tasks DONE / PARTIAL | 6 / 1 | 7 / 0 |
+| targeted missing outcomes closed | 13 of 19 | 11 of 19 |
+| never-executed target functions now run | 3 of 3 | 3 of 3 |
+| decision outcomes hit after the run (before: 137 of 148) | 155 of 160 | 158 of 164 |
+One run on one codebase is a small sample: the differences are within what a second run could reverse, so the
+diagrams have not earned their tokens in prompts yet. Both variants failed a build on the same cause, a test calling a
+private method; cards now say `private (not callable from a test: reach it through a public caller)`.

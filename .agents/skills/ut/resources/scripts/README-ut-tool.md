@@ -26,8 +26,10 @@ $UT trace    --task .ut/2026-09-25-uart                     # runtime sequence p
 ```
 Code index: `ut kb` runs `index.sh detect` and uses `clang` when libclang parses the code cleanly, otherwise asks once
 between `gcc` and `graphify` when both work (`resources/index-backends.md`). Set `index_backend=<name>` in the profile
-to skip detection. Diagrams: the prompt gets a flowchart for coverage tasks and branchy functions (>= 4 decisions) and a
-sequence for functions with >= 2 mockable collaborators, at most 900 words; `diagrams=off` in the profile disables them.
+to skip detection. Diagrams are generated into `KB_DIR/diagrams/` (`diagrams=off` in the profile skips that). They are
+NOT put into executor prompts by default (`prompt_diagrams=off`, from the A/B run in `resources/index-backends.md`);
+`ut run --diagrams auto` adds a flowchart for coverage tasks and branchy functions (>= 4 decisions) and a sequence for
+functions with >= 2 mockable collaborators, at most 900 words; `--diagrams on` adds both for every function.
 `--answers answers.json` makes any phase non-interactive; `--yes` takes every default.
 
 The agent command receives the prompt on stdin (or use `{prompt}` for the file path). Default:

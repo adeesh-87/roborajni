@@ -209,6 +209,10 @@ class TU:
              'pure': (not lam) and c.kind.name == 'CXX_METHOD' and c.is_pure_virtual_method(),
              'sig': self.sig(c) if not lam else one_line(self.text(c).split('{')[0], 100),
              'params': self.params(c) if not lam else [], 'calls': [], 'returns': [], 'globals': {'read': set(), 'written': set()}}
+        if not lam and c.kind.name in ('CXX_METHOD', 'CONSTRUCTOR', 'DESTRUCTOR', 'FUNCTION_TEMPLATE', 'CONVERSION_FUNCTION'):
+            acc = c.canonical.access_specifier.name.lower()       # private/protected: tests must go through a public caller
+            if acc in ('private', 'protected'):
+                d['access'] = acc
         if not lam and c.semantic_parent is not None and c.semantic_parent.kind.name in CLASS_KINDS:
             p = c.semantic_parent
             d['owner_line'] = (self.rel(p.location.file.name), p.location.line) if p.location.file else None

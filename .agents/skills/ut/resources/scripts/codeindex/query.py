@@ -21,7 +21,8 @@ def decision_line(s):
 
 def card(ix, fid):
     n = ix.functions[fid]
-    L = [f"## {n['name']}  ({n['file']}:{n['line']}-{n['end']}){'  static' if n.get('static') else ''}"]
+    L = [f"## {n['name']}  ({n['file']}:{n['line']}-{n['end']}){'  static' if n.get('static') else ''}"
+         f"{'  ' + n['access'] + ' (not callable from a test: reach it through a public caller)' if n.get('access') else ''}"]
     if n.get('sig'):
         L.append(f"Signature: {n['sig']}")
     if n.get('params'):

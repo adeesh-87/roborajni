@@ -65,7 +65,8 @@ def diagrams_for(st, kb_dir, t, cards):
     from .plan import card_block
     """flowchart when branches matter (coverage task, >= 4 decisions); sequence when collaborators matter (mock task,
     >= 2 interface/external/pointer calls). Always generated fresh from the index (includes the last coverage run)."""
-    mode = st.get('diagrams') or st['profile'].get('diagrams', 'auto')
+    # default off: in the A/B run on cvaccel the diagrams did not improve results (resources/index-backends.md)
+    mode = st.get('diagrams') or st['profile'].get('prompt_diagrams', 'off')
     gd = os.path.join(kb_dir, 'index')
     if mode == 'off' or not os.path.exists(os.path.join(gd, 'index.json')):
         return []

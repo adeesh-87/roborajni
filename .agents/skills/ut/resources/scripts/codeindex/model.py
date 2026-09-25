@@ -132,7 +132,8 @@ class Index:
 
     def by_file(self, file):
         f = norm(file)
-        return sorted((i for i, n in self.functions.items() if n['file'] == f and n.get('kind') not in ('test', 'fixture')),
+        return sorted((i for i, n in self.functions.items() if n['file'] == f and n.get('kind') not in ('test', 'fixture')
+                       and '.lambda@' not in n['name']),                  # lambdas: in the index, not test targets
                       key=lambda i: self.functions[i]['line'])
 
     def tests(self):

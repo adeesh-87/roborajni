@@ -52,7 +52,7 @@ def discover_ask(st, root, gd, names):
         if os.path.exists(os.path.join(root, name)):
             rc, card = sh([script('index.sh'), 'card', gd, name], cwd=root)
             funcs = [m.group(1) for m in re.finditer(r'^## (\S+)\s+\([^)]*\)(.*)$', card, re.M)
-                     if 'static' not in m.group(2) and not m.group(1).endswith(('::' + m.group(1).split('::')[0], '::~' + m.group(1).split('::')[0]))]
+                     if not re.search(r'static|private|protected', m.group(2)) and not m.group(1).endswith(('::' + m.group(1).split('::')[0], '::~' + m.group(1).split('::')[0]))]
             expanded += [(f, name) for f in funcs] or [(name, name)]
         else:
             expanded.append((name, ''))

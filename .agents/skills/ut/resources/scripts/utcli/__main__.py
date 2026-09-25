@@ -329,7 +329,7 @@ def cmd_pilot(args):
         for h in re.finditer(r'^## (\S+)\s+\((\S+):(\d+)-(\d+)\)(.*?)$(.*?)(?=^## |\Z)', cards, re.M | re.S):
             name, file, a, b, flags, body = h.groups()
             nd = len(re.findall(r'^\s+L\d+', body, re.M)); ext = '[function' in body or '[pointer' in body
-            if 'static' in flags or 'Existing tests calling it directly: none' not in body:
+            if re.search(r'static|private|protected', flags) or 'Existing tests calling it directly: none' not in body:
                 continue
             cands.append((name, file, nd, ext))
     simple = sorted([c for c in cands if not c[3]], key=lambda c: c[2])[:1]

@@ -104,7 +104,7 @@ def profile(root):
     test_dirs = [t for t in tests if t not in mock_dirs]
     cmds = guess_commands(system, cdb)
     return {'code_paths': code, 'header_paths': getattr(find_dirs, 'headers', []), 'test_paths': test_dirs, 'mock_paths': mock_dirs,
-            'framework': fw, 'index_backend': 'auto', 'diagrams': 'auto',
+            'framework': fw, 'index_backend': 'auto', 'diagrams': 'auto', 'prompt_diagrams': 'off',
             'framework_counts': {k: v for k, v in counts.items() if v}, 'mock_style': mock, 'build_system': system,
             'build_cmd': cmds['build'], 'run_cmd': cmds['run'], 'clean_cmd': cmds['clean'], 'ci_hints': ci,
             'compile_db': cdb[0] if cdb else 'none', 'coverage_tool': cov or 'none', 'env_setup': 'none'}

@@ -21,7 +21,7 @@ Card lines: `Decisions` = one test per outcome (loops: 0, 1, many; `?:` both; `s
 `[n sub-conditions]` = each must flip the result alone for MC/DC). `Globals/statics` = reset in setup, check after.
 `Calls` with `[function: header]` = mock it; `pure virtual; overridden by X` = an interface, X is an existing double;
 `[pointer: may call f]` = set the pointer to a fake in the test or call `f` directly; `static` = reach it through
-its callers. `Tests reaching it at run time (trace)` appears after a trace run: `0` means no test executes it.
+its callers; `private` / `protected` (clang index) = the same, a test cannot call it. `Tests reaching it at run time (trace)` appears after a trace run: `0` means no test executes it.
 
 `deps` kinds, most important first: `function` (declared in a repo header, defined outside the scan → mock/stub),
 `interface` (C++ pure virtual → mock the interface; `implemented by` names existing mocks), `pointer`, `macro`,
