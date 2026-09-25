@@ -59,6 +59,14 @@ TEST(PerfMonitor, BytesOk_TypicalInputs_ReturnsTrue) {
     CHECK_TRUE(PerfMonitor::bytesOk(r));
 }
 
+// L43 (new in header): coreBytesOk() checks bytes <= kMaxJobBytes for that core, independent of
+// allocated. Boundary: bytes == kMaxJobBytes -> true (operator is <=, not <).
+TEST(PerfMonitor, CoreBytesOk_BytesAtLimit_ReturnsTrue) {
+    PerfRecord r = makeValidRecord();
+    r.bytes = kMaxJobBytes;
+    CHECK_TRUE(PerfMonitor::coreBytesOk(r));
+}
+
 // L34 true: bytesOk() is false (bytes = 0), so integrityOk is false -> !integrityOk increments
 // integrityErrors_.
 TEST(PerfMonitor, Record_IntegrityNotOk_IncrementsIntegrityErrors) {

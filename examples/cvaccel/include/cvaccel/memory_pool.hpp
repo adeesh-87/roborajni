@@ -20,7 +20,7 @@ struct MemBlock {
 class MemoryPool {
 public:
     explicit MemoryPool(size_t poolBytes = kPoolBytes, uint64_t physBase = 0, uint8_t* virtBase = nullptr);
-    Status    allocate(SessionId owner, size_t bytes, MemHandle& outHandle);   // NO_MEMORY, INVALID_ARG (0 or > pool)
+    Status    allocate(SessionId owner, size_t bytes, MemHandle& outHandle, size_t align = kMemAlign);   // NO_MEMORY, INVALID_ARG (0 or > pool)
     Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs
     void      releaseAll(SessionId owner);
     const MemBlock* find(MemHandle h) const;

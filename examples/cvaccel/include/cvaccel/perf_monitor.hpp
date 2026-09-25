@@ -40,6 +40,7 @@ public:
     // integrity rules, exposed for testing
     static bool timestampsOk(const PerfRecord& r);    // queued <= started <= finished, finished > 0
     static bool bytesOk(const PerfRecord& r);         // 0 < bytes <= allocated
+    static bool coreBytesOk(const PerfRecord& r);     // bytes <= kMaxJobBytes for that core
 private:
     std::array<PerfStats, kCoreCount> perCore_{};
     std::map<SessionId, PerfStats> perSession_;

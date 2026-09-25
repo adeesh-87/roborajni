@@ -321,3 +321,14 @@ TEST(MemoryPool, LargestFree_SingleBlock_ReturnsTailGap) {
     CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0, reserved 64
     UNSIGNED_LONGS_EQUAL(960, pool.largestFree());
 }
+
+// memory_pool.hpp:23 adds an optional align parameter (default kMemAlign) to allocate(). The new
+// guard "align == 0 || (align & (align - 1)) != 0" runs before the bytes==0/>-pool check, so a
+// boundary value of align=0 fails the power-of-two test and returns INVALID_ARG immediately, even
+// though bytes=100 is itself a valid, in-range size.
+TEST(MemoryPool, Allocate_ZeroAlign_ReturnsInvalidArg) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 100, handle, 0);
+    CHECK(status == cvaccel::Status::INVALID_ARG);
+}

@@ -11,6 +11,7 @@ bool higherOrEqualPriority(Priority a, Priority b) {
 }  // namespace
 
 Status RequestQueue::enqueue(const Request& r) {
+    for (const auto& q : queues_) for (const auto& x : q) if (x.id == r.id) return Status::INVALID_ARG;   // duplicate id
     unsigned coreIdx = static_cast<unsigned>(r.core);
     if (coreIdx >= kCoreCount) return Status::INVALID_ARG;
     std::deque<Request>& q = queues_[coreIdx];

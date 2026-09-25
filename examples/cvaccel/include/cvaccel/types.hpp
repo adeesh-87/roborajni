@@ -23,8 +23,9 @@ constexpr unsigned kMaxQueuePerCore = 32;
 constexpr size_t   kPoolBytes     = 64u * 1024u * 1024u;
 constexpr size_t   kMemAlign      = 64;
 constexpr unsigned kConfigWords   = 8;
+constexpr uint32_t kMaxJobBytes   = 8u * 1024u * 1024u;
 
-enum class Priority : uint8_t { LOW = 0, NORMAL = 1, HIGH = 2 };
+enum class Priority : uint8_t { LOW = 0, NORMAL = 1, HIGH = 2, URGENT = 3 };
 
 // ioctl command numbers (client -> service and service -> client)
 enum class IoctlCmd : uint32_t {

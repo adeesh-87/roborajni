@@ -12,7 +12,8 @@ size_t alignUp(size_t bytes) {
 MemoryPool::MemoryPool(size_t poolBytes, uint64_t physBase, uint8_t* virtBase)
     : poolBytes_(poolBytes), physBase_(physBase), virtBase_(virtBase) {}
 
-Status MemoryPool::allocate(SessionId owner, size_t bytes, MemHandle& outHandle) {
+Status MemoryPool::allocate(SessionId owner, size_t bytes, MemHandle& outHandle, size_t align) {
+    if (align == 0 || (align & (align - 1)) != 0) return Status::INVALID_ARG;   // power of two only
     if (bytes == 0 || bytes > poolBytes_) return Status::INVALID_ARG;
     size_t reserved = alignUp(bytes);
     if (reserved > poolBytes_) return Status::NO_MEMORY;

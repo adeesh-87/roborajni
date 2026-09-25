@@ -1,10 +1,40 @@
 #include "cvaccel/service.hpp"
+#include "cvaccel/memory_pool.hpp"
+#include "cvaccel/perf_monitor.hpp"
 
 #include "CppUTest/TestHarness.h"
 
 namespace {
 
 using namespace cvaccel;
+
+PerfRecord makeValidPerfRecord() {
+    PerfRecord r;
+    r.request = 1;
+    r.session = 1;
+    r.core = CoreType::RESIZE;
+    r.bytes = 50;
+    r.allocated = 100;
+    r.tQueued = 100;
+    r.tStarted = 150;
+    r.tFinished = 200;
+    r.hwCycles = 10;
+    r.status = Status::OK;
+    return r;
+}
+
+Request makeQueueRequest(RequestId id, CoreType core, Priority priority) {
+    Request r;
+    r.id = id;
+    r.session = 1;
+    r.clientFd = -1;
+    r.mem = 0;
+    r.core = core;
+    r.priority = priority;
+    r.bytes = 100;
+    r.tQueued = 0;
+    return r;
+}
 
 class FakeAccelBlock : public hw::IAccelBlock {
 public:
@@ -1623,4 +1653,352 @@ TEST(CvAccelService, Queued_TypicalPendingRequest_ReturnsQueueSizeTotal) {
     // hw stayed busy through submit()'s internal pump(), so the request is still sitting in the
     // RequestQueue: queued() returns queue_.sizeTotal(), which is 1
     UNSIGNED_LONGS_EQUAL(1, svc.queued());
+}
+
+// The following tests exercise cvaccel::MemoryPool::allocate() (src/memory_pool.cpp) directly.
+// They live in this group/file because AllocMemArgs has no align field, so CvAccelService::allocMem
+// never drives the align path -- MemoryPool must be exercised on its own to cover it.
+
+// L16 true: align=0 makes the first OR operand true, short-circuiting before bytes/poolBytes_ are
+// even considered, so allocate() returns INVALID_ARG.
+TEST(CvAccelService, MemoryPoolAllocate_AlignZero_ReturnsInvalidArg) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 64, handle, 0);
+    CHECK(status == cvaccel::Status::INVALID_ARG);
+}
+
+// L16 false: align=128 is a nonzero power of two, so both OR operands are false and allocate()
+// proceeds past the align check to place the block successfully.
+TEST(CvAccelService, MemoryPoolAllocate_AlignPowerOfTwo_ProceedsPastAlignCheck) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 64, handle, 128);
+    CHECK(status == cvaccel::Status::OK);
+}
+
+// L17 true: bytes=0 makes the first OR operand true, so allocate() returns INVALID_ARG before
+// alignUp() or the pool-size check run.
+TEST(CvAccelService, MemoryPoolAllocate_ZeroBytes_ReturnsInvalidArg) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 0, handle);
+    CHECK(status == cvaccel::Status::INVALID_ARG);
+}
+
+// L17 false: bytes=64 is nonzero and not greater than the default pool size, so both OR operands
+// are false and allocate() proceeds to the reserved-size check.
+TEST(CvAccelService, MemoryPoolAllocate_BytesWithinPoolBytes_ProceedsPastByteCheck) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 64, handle);
+    CHECK(status == cvaccel::Status::OK);
+}
+
+// L19 true: with a 100-byte pool, alignUp(100) rounds up to 128, which exceeds poolBytes_ (100),
+// so allocate() returns NO_MEMORY even though bytes itself (100) passed the L17 check.
+TEST(CvAccelService, MemoryPoolAllocate_ReservedExceedsPoolBytes_ReturnsNoMemory) {
+    cvaccel::MemoryPool pool(100, 0, nullptr);
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 100, handle);
+    CHECK(status == cvaccel::Status::NO_MEMORY);
+}
+
+// L19 false: with the default (64 MiB) pool, alignUp(100) is well within poolBytes_, so allocate()
+// proceeds past the reserved-size check to place the block.
+TEST(CvAccelService, MemoryPoolAllocate_ReservedWithinPoolBytes_ReturnsOk) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 100, handle);
+    CHECK(status == cvaccel::Status::OK);
+}
+
+// L23: blocks_ is empty, so begin() == end() and the loop body runs 0 times; the block is placed
+// at offset 0.
+TEST(CvAccelService, MemoryPoolAllocate_NoExistingBlocks_PlacesAtOffsetZero) {
+    cvaccel::MemoryPool pool;
+    cvaccel::MemHandle handle = 0;
+    cvaccel::Status status = pool.allocate(1, 1, handle);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(0, pool.physAddr(handle));
+}
+
+// L23: one existing block leaves no fitting gap before it, so the loop body runs exactly once
+// (checks it, no break) before ++it reaches end() and the new block is placed after it.
+TEST(CvAccelService, MemoryPoolAllocate_SingleExistingBlock_PlacesAfterIt) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0, reserved 64
+
+    cvaccel::MemHandle b = 0;
+    cvaccel::Status status = pool.allocate(1, 64, b);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(64, pool.physAddr(b));
+}
+
+// L23: three existing blocks leave no fitting gaps, so the loop body runs three times (many
+// iterations) before ++it reaches end() and the new block is placed after the last one.
+TEST(CvAccelService, MemoryPoolAllocate_ThreeExistingBlocks_PlacesAfterAll) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0, b = 0, c = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0
+    CHECK(pool.allocate(1, 64, b) == cvaccel::Status::OK);   // offset 64
+    CHECK(pool.allocate(1, 64, c) == cvaccel::Status::OK);   // offset 128
+
+    cvaccel::MemHandle d = 0;
+    cvaccel::Status status = pool.allocate(1, 64, d);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(192, pool.physAddr(d));
+}
+
+// L24 true: after freeing the middle block, the 64-byte gap between the first and third blocks is
+// exactly big enough, so the loop breaks early on it and the freed slot is reused.
+TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksFits_ReusesGap) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0, b = 0, c = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0
+    CHECK(pool.allocate(1, 64, b) == cvaccel::Status::OK);   // offset 64
+    CHECK(pool.allocate(1, 64, c) == cvaccel::Status::OK);   // offset 128
+    CHECK(pool.release(b, 1) == cvaccel::Status::OK);
+
+    cvaccel::MemHandle d = 0;
+    cvaccel::Status status = pool.allocate(1, 64, d);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(64, pool.physAddr(d));   // reuses b's freed offset
+}
+
+// L24 false: after freeing the first block, the 64-byte gap before the remaining block is not big
+// enough for a 128-byte reservation, so the loop continues past it instead of breaking.
+TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksTooSmall_SkipsGap) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0, b = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0
+    CHECK(pool.allocate(1, 64, b) == cvaccel::Status::OK);   // offset 64
+    CHECK(pool.release(a, 1) == cvaccel::Status::OK);
+
+    cvaccel::MemHandle c = 0;
+    cvaccel::Status status = pool.allocate(1, 100, c);   // reserved 128, gap of 64 is too small
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(128, pool.physAddr(c));
+}
+
+// L27 true: two existing blocks leave no fitting gap, so the loop runs to end() and gapEnd falls
+// back to poolBytes_ rather than a block's offset.
+TEST(CvAccelService, MemoryPoolAllocate_NoFittingGapAmongBlocks_PlacesAfterLast) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0, b = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0
+    CHECK(pool.allocate(1, 64, b) == cvaccel::Status::OK);   // offset 64
+
+    cvaccel::MemHandle c = 0;
+    cvaccel::Status status = pool.allocate(1, 64, c);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(128, pool.physAddr(c));
+}
+
+// L27 false: after freeing the first block, the gap before the remaining block fits, so the loop
+// breaks with it pointing at a real block and gapEnd uses it->offset instead of poolBytes_.
+TEST(CvAccelService, MemoryPoolAllocate_GapAtStartFits_PlacesBeforeFirstBlock) {
+    cvaccel::MemoryPool pool(1024, 0, nullptr);
+    cvaccel::MemHandle a = 0, b = 0, c = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0
+    CHECK(pool.allocate(1, 64, b) == cvaccel::Status::OK);   // offset 64
+    CHECK(pool.allocate(1, 64, c) == cvaccel::Status::OK);   // offset 128
+    CHECK(pool.release(a, 1) == cvaccel::Status::OK);
+
+    cvaccel::MemHandle d = 0;
+    cvaccel::Status status = pool.allocate(1, 64, d);
+    CHECK(status == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(0, pool.physAddr(d));   // gapEnd = b's offset (64), not poolBytes_
+}
+
+// L28 true: one 64-byte block leaves only 36 bytes before the 100-byte pool ends, not enough for
+// another 64-byte reservation, so allocate() returns NO_MEMORY even though L16/L17/L19 all passed.
+TEST(CvAccelService, MemoryPoolAllocate_RemainingSpaceTooSmall_ReturnsNoMemory) {
+    cvaccel::MemoryPool pool(100, 0, nullptr);
+    cvaccel::MemHandle a = 0;
+    CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK);   // offset 0, reserved 64
+
+    cvaccel::MemHandle b = 0;
+    cvaccel::Status status = pool.allocate(1, 64, b);   // 100 - 64 = 36 < 64
+    CHECK(status == cvaccel::Status::NO_MEMORY);
+}
+
+// L36 true: bytes = 0 makes bytesOk() false, so integrityOk is false -> !integrityOk increments
+// integrityErrors_.
+TEST(CvAccelService, PerfMonitorRecord_IntegrityNotOk_IncrementsIntegrityErrors) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    r.bytes = 0;
+    monitor.record(r);
+    UNSIGNED_LONGS_EQUAL(1, monitor.integrityErrors());
+}
+
+// L36 false: timestampsOk() and bytesOk() are both true, so integrityOk is true -> integrityErrors_
+// stays 0.
+TEST(CvAccelService, PerfMonitorRecord_IntegrityOk_IntegrityErrorsStayZero) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    monitor.record(r);
+    UNSIGNED_LONGS_EQUAL(0, monitor.integrityErrors());
+}
+
+// L40 true: coreIdx (0, RESIZE) < kCoreCount (5) -> accumulate() runs on perCore_[0].
+TEST(CvAccelService, PerfMonitorRecord_CoreIndexWithinRange_AccumulatesPerCoreStats) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    monitor.record(r);
+    UNSIGNED_LONGS_EQUAL(1, monitor.core(cvaccel::CoreType::RESIZE).count);
+}
+
+// L40 false: r.core is cast to a value (5) outside the valid CoreType range, so coreIdx (5) is not
+// < kCoreCount (5) -> the per-core accumulate() call is skipped, while perSession_ is still updated.
+TEST(CvAccelService, PerfMonitorRecord_CoreIndexOutOfRange_SkipsPerCoreAccumulation) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    r.core = static_cast<cvaccel::CoreType>(5);
+    monitor.record(r);
+    UNSIGNED_LONGS_EQUAL(0, monitor.totalCount());
+    UNSIGNED_LONGS_EQUAL(1, monitor.session(r.session).count);
+}
+
+// L43 true: integrityOk is true -> record() returns Status::OK.
+TEST(CvAccelService, PerfMonitorRecord_IntegrityOk_ReturnsOk) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    cvaccel::Status status = monitor.record(r);
+    CHECK(status == cvaccel::Status::OK);
+}
+
+// L43 false: integrityOk is false (bytes = 0) -> record() returns Status::INTEGRITY.
+TEST(CvAccelService, PerfMonitorRecord_IntegrityNotOk_ReturnsIntegrity) {
+    cvaccel::PerfMonitor monitor;
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    r.bytes = 0;
+    cvaccel::Status status = monitor.record(r);
+    CHECK(status == cvaccel::Status::INTEGRITY);
+}
+
+// Straight-line: coreBytesOk() returns r.bytes <= kMaxJobBytes. Typical inputs (bytes = 50) are
+// well within kMaxJobBytes -> true.
+TEST(CvAccelService, PerfMonitorCoreBytesOk_TypicalInputs_ReturnsTrue) {
+    cvaccel::PerfRecord r = makeValidPerfRecord();
+    CHECK_TRUE(cvaccel::PerfMonitor::coreBytesOk(r));
+}
+
+TEST_GROUP(RequestQueueEnqueue) {};
+
+// L14 true: a request with the same id (1) is already queued (on a different, valid core), so the
+// nested scan over queues_ finds a match and returns INVALID_ARG before the core index is even checked.
+TEST(RequestQueueEnqueue, Enqueue_L14DuplicateIdAcrossCores_ReturnsInvalidArg) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request first = makeQueueRequest(1, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(first));
+
+    cvaccel::Request duplicate = makeQueueRequest(1, cvaccel::CoreType::CONVOLVE, cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(duplicate);
+    CHECK(st == cvaccel::Status::INVALID_ARG);
+    UNSIGNED_LONGS_EQUAL(1, queue.size(cvaccel::CoreType::RESIZE));
+    UNSIGNED_LONGS_EQUAL(0, queue.size(cvaccel::CoreType::CONVOLVE));
+}
+
+// L14 false: no queued request shares id (2), so the duplicate scan never matches and the request
+// proceeds to be queued.
+TEST(RequestQueueEnqueue, Enqueue_L14UniqueId_ReturnsOk) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request first = makeQueueRequest(1, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(first));
+
+    cvaccel::Request second = makeQueueRequest(2, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(second);
+    CHECK(st == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(2, queue.size(cvaccel::CoreType::RESIZE));
+}
+
+// L16 true: coreIdx (static_cast<unsigned>(r.core) == 5) >= kCoreCount (5) -> INVALID_ARG.
+TEST(RequestQueueEnqueue, Enqueue_L16CoreIdxAtOrAboveCoreCount_ReturnsInvalidArg) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request r = makeQueueRequest(1, static_cast<cvaccel::CoreType>(5), cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(r);
+    CHECK(st == cvaccel::Status::INVALID_ARG);
+}
+
+// L16 false: coreIdx (0, RESIZE) < kCoreCount (5) -> passes the guard and the request is queued.
+TEST(RequestQueueEnqueue, Enqueue_L16CoreIdxBelowCoreCount_ReturnsOk) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request r = makeQueueRequest(1, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(r);
+    CHECK(st == cvaccel::Status::OK);
+}
+
+// L18 true: q.size() (kMaxQueuePerCore, 32) >= kMaxQueuePerCore (32) -> QUEUE_FULL.
+TEST(RequestQueueEnqueue, Enqueue_L18QueueAtMaxSize_ReturnsQueueFull) {
+    cvaccel::RequestQueue queue;
+    for (cvaccel::RequestId id = 1; id <= cvaccel::kMaxQueuePerCore; ++id) {
+        cvaccel::Request r = makeQueueRequest(id, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+        LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(r));
+    }
+    cvaccel::Request extra = makeQueueRequest(cvaccel::kMaxQueuePerCore + 1, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(extra);
+    CHECK(st == cvaccel::Status::QUEUE_FULL);
+}
+
+// L18 false: q.size() (kMaxQueuePerCore - 1, 31) < kMaxQueuePerCore (32) -> passes the guard and the
+// queue reaches size 32.
+TEST(RequestQueueEnqueue, Enqueue_L18QueueBelowMaxSize_ReturnsOk) {
+    cvaccel::RequestQueue queue;
+    for (cvaccel::RequestId id = 1; id < cvaccel::kMaxQueuePerCore; ++id) {
+        cvaccel::Request r = makeQueueRequest(id, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+        LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(r));
+    }
+    cvaccel::Request last = makeQueueRequest(cvaccel::kMaxQueuePerCore, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    cvaccel::Status st = queue.enqueue(last);
+    CHECK(st == cvaccel::Status::OK);
+    UNSIGNED_LONGS_EQUAL(cvaccel::kMaxQueuePerCore, queue.size(cvaccel::CoreType::RESIZE));
+}
+
+// L22 loop 0 iterations: the target core's queue is empty, so q.begin() == q.end() and the while
+// condition is false on entry -- the request is inserted as the sole element.
+TEST(RequestQueueEnqueue, Enqueue_L22LoopZeroIterations_InsertsAsOnlyElement) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request r = makeQueueRequest(1, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(r));
+
+    cvaccel::Request out;
+    CHECK_TRUE(queue.dequeue(cvaccel::CoreType::RESIZE, out));
+    UNSIGNED_LONGS_EQUAL(1, out.id);
+}
+
+// L22 loop 1 iteration: the single queued HIGH entry satisfies higherOrEqualPriority(HIGH, NORMAL), so
+// the loop advances once to end() before the NORMAL request is inserted after it.
+TEST(RequestQueueEnqueue, Enqueue_L22LoopOneIteration_InsertsAfterOneHigherPriorityEntry) {
+    cvaccel::RequestQueue queue;
+    cvaccel::Request high = makeQueueRequest(1, cvaccel::CoreType::RESIZE, cvaccel::Priority::HIGH);
+    cvaccel::Request normal = makeQueueRequest(2, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(high));
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(normal));
+
+    cvaccel::Request out;
+    CHECK_TRUE(queue.dequeue(cvaccel::CoreType::RESIZE, out));
+    UNSIGNED_LONGS_EQUAL(1, out.id);
+    CHECK_TRUE(queue.dequeue(cvaccel::CoreType::RESIZE, out));
+    UNSIGNED_LONGS_EQUAL(2, out.id);
+}
+
+// L22 loop many iterations: three queued HIGH entries all satisfy higherOrEqualPriority(HIGH, NORMAL),
+// so the loop advances three times to end() before the NORMAL request is inserted last.
+TEST(RequestQueueEnqueue, Enqueue_L22LoopManyIterations_InsertsAfterMultipleHigherPriorityEntries) {
+    cvaccel::RequestQueue queue;
+    for (cvaccel::RequestId id = 1; id <= 3; ++id) {
+        cvaccel::Request r = makeQueueRequest(id, cvaccel::CoreType::RESIZE, cvaccel::Priority::HIGH);
+        LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(r));
+    }
+    cvaccel::Request normal = makeQueueRequest(4, cvaccel::CoreType::RESIZE, cvaccel::Priority::NORMAL);
+    LONGS_EQUAL((int)cvaccel::Status::OK, (int)queue.enqueue(normal));
+
+    cvaccel::Request out;
+    for (cvaccel::RequestId expected = 1; expected <= 4; ++expected) {
+        CHECK_TRUE(queue.dequeue(cvaccel::CoreType::RESIZE, out));
+        UNSIGNED_LONGS_EQUAL(expected, out.id);
+    }
 }

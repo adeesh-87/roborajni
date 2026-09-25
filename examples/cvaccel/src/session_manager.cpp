@@ -45,10 +45,5 @@ bool SessionManager::owns(SessionId id, ClientFd clientFd) const {
     return s != nullptr && s->clientFd == clientFd;
 }
 
-unsigned SessionManager::activeCount() const {
-    unsigned n = 0;
-    for (const auto& s : sessions_) if (s.active) ++n;
-    return n;
-}
 
 }  // namespace cvaccel

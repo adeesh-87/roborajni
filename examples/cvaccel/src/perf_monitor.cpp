@@ -23,13 +23,15 @@ bool PerfMonitor::timestampsOk(const PerfRecord& r) {
     return r.tFinished > 0 && r.tQueued <= r.tStarted && r.tStarted <= r.tFinished;
 }
 
+bool PerfMonitor::coreBytesOk(const PerfRecord& r) { return r.bytes <= kMaxJobBytes; }
+
 bool PerfMonitor::bytesOk(const PerfRecord& r) {
     return r.bytes > 0 && r.bytes <= r.allocated;
 }
 
 Status PerfMonitor::record(const PerfRecord& r) {
     bool tsOk = timestampsOk(r);
-    bool byOk = bytesOk(r);
+    bool byOk = bytesOk(r) && coreBytesOk(r);
     bool integrityOk = tsOk && byOk;
     if (!integrityOk) ++integrityErrors_;
 

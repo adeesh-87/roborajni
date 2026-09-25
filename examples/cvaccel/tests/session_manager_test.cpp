@@ -136,19 +136,3 @@ TEST(SessionManager, Owns_TypicalInputs_MatchesFindAndClientFd) {
     CHECK_FALSE(mgr.owns(id, 99));         // s != nullptr but s->clientFd (42) != clientFd (99)
     CHECK_FALSE(mgr.owns(id + 1, 42));     // find(id + 1) is nullptr (never opened)
 }
-
-// L50 true: the opened slot has s.active == true, so it is counted.
-TEST(SessionManager, ActiveCount_OneOpenSession_ReturnsOne) {
-    cvaccel::SessionManager mgr;
-    cvaccel::SessionId id = 0;
-    CHECK(mgr.open(1, cvaccel::Priority::NORMAL, id) == cvaccel::Status::OK);
-
-    UNSIGNED_LONGS_EQUAL(1, mgr.activeCount());
-}
-
-// L50 false: no sessions were ever opened, so every slot has s.active == false and the count
-// stays 0.
-TEST(SessionManager, ActiveCount_NoActiveSessions_ReturnsZero) {
-    cvaccel::SessionManager mgr;
-    UNSIGNED_LONGS_EQUAL(0, mgr.activeCount());
-}

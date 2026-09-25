@@ -21,7 +21,6 @@ public:
     SessionInfo* find(SessionId id);                  // nullptr if not active
     const SessionInfo* find(SessionId id) const;
     bool owns(SessionId id, ClientFd clientFd) const; // session active and belongs to that fd
-    unsigned activeCount() const;
     // every active session of a client (used when a client disconnects)
     template <class F> void forEachOfClient(ClientFd fd, F&& f) { for (auto& s : sessions_) if (s.active && s.clientFd == fd) f(s); }
 private:
