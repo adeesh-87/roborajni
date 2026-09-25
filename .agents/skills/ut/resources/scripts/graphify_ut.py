@@ -266,7 +266,10 @@ def walk(n):
 def func_name(defn, src):
     d = defn.child_by_field_name('declarator')
     while d is not None and d.type != 'function_declarator':
-        d = d.child_by_field_name('declarator')
+        nxt = d.child_by_field_name('declarator')
+        if nxt is None:        # reference_declarator (T& f()) has no 'declarator' field
+            nxt = next((c for c in d.named_children if c.type.endswith('declarator')), None)
+        d = nxt
     if d is None:
         return None, None
     nm = d.child_by_field_name('declarator')
@@ -980,6 +983,9 @@ def read_line(root, rel, line):
 # --------------------------------------------------------------------------- queries for the ut skill
 def load(gpath):
     g = json.load(open(gpath, encoding='utf-8'))
+    if str(g.get('meta', {}).get('schema', '')).startswith('ut-index'):
+        from codeindex.model import Index      # the shared index of any backend, in graph shape
+        g = Index(g).to_graph()
     ids = {n['id']: n for n in g['nodes']}
     out, inc = {}, {}
     for e in g['links']:
@@ -1354,12 +1360,16 @@ def cmd_impact(argv):
         else: die('unknown option ' + k)
     if not mode:
         die('give --base REF, --uncommitted or --range A..B')
-    base_dir = os.path.dirname(os.path.abspath(scan))
-    root = open(os.path.join(base_dir, 'SOURCE_ROOT')).read().strip()
-    args = open(os.path.join(base_dir, 'BUILD_ARGS')).read().splitlines() if os.path.exists(os.path.join(base_dir, 'BUILD_ARGS')) else []
-    paths = [l[5:] for l in args if l.startswith('path=')]
-    cwd = next((l[4:] for l in args if l.startswith('cwd=')), root)
-    rel_paths = [norm(os.path.relpath(os.path.realpath(os.path.join(cwd, p)), root)) for p in paths]
+    meta = json.load(open(gpath, encoding='utf-8')).get('meta', {})
+    if str(meta.get('schema', '')).startswith('ut-index'):      # shared index: root and scope paths are in its meta
+        root, rel_paths = meta['root'], list(meta.get('paths', []))
+    else:
+        base_dir = os.path.dirname(os.path.abspath(scan))
+        root = open(os.path.join(base_dir, 'SOURCE_ROOT')).read().strip()
+        args = open(os.path.join(base_dir, 'BUILD_ARGS')).read().splitlines() if os.path.exists(os.path.join(base_dir, 'BUILD_ARGS')) else []
+        paths = [l[5:] for l in args if l.startswith('path=')]
+        cwd = next((l[4:] for l in args if l.startswith('cwd=')), root)
+        rel_paths = [norm(os.path.relpath(os.path.realpath(os.path.join(cwd, p)), root)) for p in paths]
     is_testside = lambda f: bool(re.search(r'(^|/)(test|tests|unittest|unittests|ut|mocks?|stubs?|fakes?)(/|$)|test_|_test\.|Test\.|[Mm]ock|[Ss]tub|[Ff]ake', f))
     g, ids, out, inc = load(gpath)
     pc, pcpp = parsers()

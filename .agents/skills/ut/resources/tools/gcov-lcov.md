@@ -59,3 +59,6 @@ llvm-cov show   ./tests -instr-profile=tests.profdata src/sensor.c -show-branche
 
 
 Build or run fails → load `resources/tools/errors/gcov-lcov.md` (error messages and fixes).
+
+Into the code index: `index.sh cov-import "$KB_DIR/index" --gcov-dir <build dir>` (best: drops the exception arcs
+that make a fully tested `if` look partial) or `--lcov file.info`; then `index.sh uncovered "$KB_DIR/index"`.

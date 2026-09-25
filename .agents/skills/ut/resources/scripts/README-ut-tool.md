@@ -6,21 +6,28 @@ list of a code change, scope, the plan with a Cases table per task, the executor
 retry, checkpoint, refresh) and the close-out. The agent is called only to write or fix test code, once per task,
 with a prompt of about 1,500–1,800 words that contains only that task's inputs.
 
-Requirements: Python 3.10+ (the Graphify venv is used when present: run `graphify.sh setup` once), git, bash.
+Requirements: Python 3.10+ (the skill venv is used when present: run `index.sh setup clang` once), git, bash.
 The skill (`SKILL.md`) stays the path for driving an agent without the tool; both read the same resource files.
 
 ```sh
 UT=.agents/skills/ut/resources/scripts/ut
 $UT init     --task .ut/2026-09-25-uart --repo .            # phase 1: shows the detected profile, asks 5 questions (--yes = defaults)
 $UT baseline --task .ut/2026-09-25-uart                     # phase 2: build + run, compile DB, commands into the KB
-$UT kb       --task .ut/2026-09-25-uart [--files src/uart.c] # phase 3: graph, testscan, exemplars, conventions, cards
+$UT kb       --task .ut/2026-09-25-uart [--files src/uart.c] # phase 3: code index (backend chosen here), testscan, exemplars, conventions, cards, diagrams
 $UT discover --task .ut/2026-09-25-uart --base origin/main   # phase 4: impact list (or --uncommitted, --range A..B, --names f1 f2)
 $UT scope    --task .ut/2026-09-25-uart                     # phase 5: which items, acceptance; decides the pilot
 $UT pilot    --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 6: two tests, reviewed by you, become the exemplar
-$UT plan     --task .ut/2026-09-25-uart                     # phase 8: tasks/Tnn.md with Cases from the cards
-$UT run      --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 9: the loop; --dry-run writes the prompts only
+$UT coverage --task .ut/2026-09-25-uart --cmd "<coverage build+run>" --gcov-dir build-cov   # phase 7: import (or --lcov / --ctc profile.txt), gaps -> work items
+$UT plan     --task .ut/2026-09-25-uart                     # phase 8: tasks/Tnn.md with Cases from the cards (coverage tasks: the missing outcomes)
+$UT run      --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 9: the loop; --dry-run writes the prompts only; --diagrams auto|on|off
 $UT close    --task .ut/2026-09-25-uart                     # phase 10: final build, summary, refresh
+$UT index    --task .ut/2026-09-25-uart --backend gcc       # rebuild the code index with another backend (--compare gcc: diff only)
+$UT trace    --task .ut/2026-09-25-uart                     # runtime sequence per TEST; cards gain "reached at run time"
 ```
+Code index: `ut kb` runs `index.sh detect` and uses `clang` when libclang parses the code cleanly, otherwise asks once
+between `gcc` and `graphify` when both work (`resources/index-backends.md`). Set `index_backend=<name>` in the profile
+to skip detection. Diagrams: the prompt gets a flowchart for coverage tasks and branchy functions (>= 4 decisions) and a
+sequence for functions with >= 2 mockable collaborators, at most 900 words; `diagrams=off` in the profile disables them.
 `--answers answers.json` makes any phase non-interactive; `--yes` takes every default.
 
 The agent command receives the prompt on stdin (or use `{prompt}` for the file path). Default:
@@ -36,4 +43,5 @@ is refreshed so the next wave's cards see the new tests.
 
 Files: `state.json` (truth), `status.md` and `context.md` (rendered), `impact.md`, `tasks/*.md`, `prompts/*.md`,
 `logs/`. The KB (`resources/kb/<codebase-id>/`) holds `kb.json` + rendered `kb.md`, `exemplars/`, `modules/*.cards.md`,
-`testscan.md`, `graphify/`; hand-written notes go to `notes.md` and `modules/<name>.md`.
+`testscan.md`, `index/` (the code index, coverage.json, traces.json), `diagrams/`; hand-written notes go to `notes.md`
+and `modules/<name>.md`.

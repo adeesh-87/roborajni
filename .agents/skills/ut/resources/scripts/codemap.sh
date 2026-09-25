@@ -84,7 +84,13 @@ fi
 
 if [ "$CMD" = card ]; then
   [ $# -eq 1 ] || { echo "usage: codemap.sh card OUT_DIR FUNCTION" >&2; exit 2; }
-  fn=$1
+  fn=${1#./}
+  if awk -F"$T" -v f="$fn" '$1==f {found=1; exit} END {exit !found}' "$OUT/functions.tsv"; then   # a FILE: every function in it
+    names=$(awk -F"$T" -v f="$fn" '$1==f && $6=="func" {print $2}' "$OUT/functions.tsv")
+    echo "# Cards for $fn ($(echo "$names" | grep -c .) functions)"
+    for n in $names; do echo; "$0" card "$OUT" "$n"; done
+    exit 0
+  fi
   row=$(awk -F"$T" -v f="$fn" '$2==f && $6=="func" {print; exit}' "$OUT/functions.tsv")
   [ -n "$row" ] || { echo "## $fn: not found in $OUT/functions.tsv"; exit 1; }
   file=$(echo "$row" | cut -f1); s=$(echo "$row" | cut -f3); e=$(echo "$row" | cut -f4); st=$(echo "$row" | cut -f5)

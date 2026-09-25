@@ -17,8 +17,11 @@ def kb_id(root):
     return dict(l.split('=', 1) for l in out.splitlines() if '=' in l)
 
 
+HEADER_DIR = re.compile(r'(^|/)(include|inc|api|public|interface|interfaces)$', re.I)
+
+
 def find_dirs(root):
-    tests, code = [], []
+    tests, code, headers = [], [], []
     for d, dirs, files in os.walk(root):
         rel = norm(os.path.relpath(d, root))
         dirs[:] = [x for x in dirs if not x.startswith('.') and not VENDOR.search(norm(os.path.join(rel, x)))]
@@ -28,8 +31,12 @@ def find_dirs(root):
             tests.append(rel); dirs[:] = []; continue
         if any(f.endswith(('.c', '.cpp', '.cc', '.cxx')) for f in files) and rel.count('/') < 3:
             code.append(rel)
+        if HEADER_DIR.search(rel) and rel.count('/') < 3:
+            headers.append(rel); dirs[:] = []           # public headers: interfaces the code under test calls
     # keep only top-most code dirs
     code = [c for c in code if not any(c.startswith(o + '/') for o in code if o != c)]
+    headers = [h for h in headers if not any(h.startswith(c + '/') or h == c for c in code)]
+    find_dirs.headers = headers
     return tests, code
 
 
@@ -96,7 +103,8 @@ def profile(root):
     mock_dirs = [t for t in tests if re.search(r'mock|stub|fake', t, re.I)]
     test_dirs = [t for t in tests if t not in mock_dirs]
     cmds = guess_commands(system, cdb)
-    return {'code_paths': code, 'test_paths': test_dirs, 'mock_paths': mock_dirs, 'framework': fw,
+    return {'code_paths': code, 'header_paths': getattr(find_dirs, 'headers', []), 'test_paths': test_dirs, 'mock_paths': mock_dirs,
+            'framework': fw, 'index_backend': 'auto', 'diagrams': 'auto',
             'framework_counts': {k: v for k, v in counts.items() if v}, 'mock_style': mock, 'build_system': system,
             'build_cmd': cmds['build'], 'run_cmd': cmds['run'], 'clean_cmd': cmds['clean'], 'ci_hints': ci,
             'compile_db': cdb[0] if cdb else 'none', 'coverage_tool': cov or 'none', 'env_setup': 'none'}

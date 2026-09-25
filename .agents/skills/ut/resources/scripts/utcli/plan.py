@@ -10,8 +10,8 @@ WAVE = {'fix-build': 1, 'fix-mocks': 2, 'remove-tests': 2, 'update-tests': 2, 'a
 def discover_diff(st, root, gd, base=None, uncommitted=False, rng=None):
     args = ['--base', base] if base else ['--uncommitted'] if uncommitted else ['--range', rng]
     out_md = os.path.join(st.dir, 'impact.md')
-    rc, out = sh([script('graphify.sh'), 'refresh', gd], cwd=root)
-    rc, out = sh([script('graphify.sh'), 'impact', gd] + args + ['--out', out_md], cwd=root)
+    rc, out = sh([script('index.sh'), 'refresh', gd], cwd=root)
+    rc, out = sh([script('index.sh'), 'impact', gd] + args + ['--out', out_md], cwd=root)
     if rc != 0:
         return [], out
     items = []
@@ -50,7 +50,7 @@ def discover_ask(st, root, gd, names):
     expanded = []
     for name in names:                                    # a file path expands to every function of its card
         if os.path.exists(os.path.join(root, name)):
-            rc, card = sh([script('graphify.sh'), 'card', gd, name], cwd=root)
+            rc, card = sh([script('index.sh'), 'card', gd, name], cwd=root)
             funcs = [m.group(1) for m in re.finditer(r'^## (\S+)\s+\([^)]*\)(.*)$', card, re.M)
                      if 'static' not in m.group(2) and not m.group(1).endswith(('::' + m.group(1).split('::')[0], '::~' + m.group(1).split('::')[0]))]
             expanded += [(f, name) for f in funcs] or [(name, name)]
@@ -60,8 +60,8 @@ def discover_ask(st, root, gd, names):
         rc, out = sh(['grep', '-rnwE', name, '--include=*.c', '--include=*.cc', '--include=*.cpp', '--include=*.h', '--include=*.hpp']
                      + [os.path.join(root, p) for p in st['profile']['code_paths']])
         files = sorted({norm(os.path.relpath(l.split(':', 1)[0], root)) for l in out.splitlines() if ':' in l})
-        rc2, tests = sh([script('graphify.sh'), 'tests', gd, name], cwd=root)
-        rc3, deps = sh([script('graphify.sh'), 'deps', gd, name], cwd=root)
+        rc2, tests = sh([script('index.sh'), 'tests', gd, name], cwd=root)
+        rc3, deps = sh([script('index.sh'), 'deps', gd, name], cwd=root)
         n += 1
         thits = [l for l in tests.splitlines() if re.match(r'\d+ hop', l)]
         items.append({'id': f'W{n}', 'item': f"{file_hint or (files[0] if files else '?')}:{name}", 'kind': 'targeted',
@@ -71,12 +71,25 @@ def discover_ask(st, root, gd, names):
     return items
 
 
-def card_decisions(cards_md, func):
+def card_block(cards_md, func, line=None):
+    """the card of FUNC; with LINE, the overload whose range contains it"""
+    ms = list(re.finditer(r'^## ' + re.escape(func) + r'\s+\(\S+:(\d+)-(\d+)\).*?$(.*?)(?=^## |\Z)', cards_md, re.M | re.S)) or \
+        list(re.finditer(r'^## ' + re.escape(func) + r'\s.*?$()()(.*?)(?=^## |\Z)', cards_md, re.M | re.S))
+    if not ms:
+        return None
+    if line:
+        for m in ms:
+            if m.group(1) and int(m.group(1)) <= int(line) <= int(m.group(2)):
+                return m
+    return ms[0]
+
+
+def card_decisions(cards_md, func, line=None):
     """decision lines of one function from a cards file"""
-    m = re.search(r'^## ' + re.escape(func) + r'\s.*?$(.*?)(?=^## |\Z)', cards_md, re.M | re.S)
+    m = card_block(cards_md, func, line)
     if not m:
         return None
-    block = m.group(1)
+    block = m.group(3)
     dec = re.findall(r'^\s+(L\d+)\s+(\S+)\s+(.*)$', block, re.M)
     returns = re.search(r'^Returns: (.*)$', block, re.M)
     params = re.search(r'^Params: (.*)$', block, re.M)
@@ -85,8 +98,8 @@ def card_decisions(cards_md, func):
             'calls': calls.group(1) if calls else '', 'block': block.strip()}
 
 
-def cases_for(cards_md, func):
-    d = card_decisions(cards_md, func)
+def cases_for(cards_md, func, line=None):
+    d = card_decisions(cards_md, func, line)
     cases = []
     if not d:
         return [('happy path', '', '')]
@@ -141,7 +154,9 @@ def make_plan(st, kb_dir, prof):
         chunks, cur, cur_cases = [], [], 0
         for w in ws:                                    # a task holds <= 12 cases or <= 4 functions
             fn = w['item'].split(':', 1)[1].split(' (')[0] if ':' in w['item'] else ''
-            n = len(cases_for(cards_all, fn)) if fn and ttype in ('add-tests', 'raise-coverage', 'update-tests') else 1
+            ln = (re.search(r'\(L(\d+)\)', w['item']) or re.search('()', '')).group(1) or None
+            n = (len(w['gaps']) if ttype == 'raise-coverage' and w.get('gaps') else
+                 len(cases_for(cards_all, fn, ln)) if fn and ttype in ('add-tests', 'raise-coverage', 'update-tests') else 1)
             if cur and (cur_cases + n > 12 or len(cur) >= 4):
                 chunks.append(cur); cur, cur_cases = [], 0
             cur.append(w); cur_cases += n
@@ -155,11 +170,18 @@ def make_plan(st, kb_dir, prof):
             base = os.path.basename(file).rsplit('.', 1)[0]
             cards = read(os.path.join(kb_dir, 'modules', f'{os.path.basename(file)}.cards.md'))
             mod_tests = kb_mods.get(file, {}).get('test_files', [])
+            mod_tests = [x for x in mod_tests if base in os.path.basename(x)] + [x for x in mod_tests if base not in os.path.basename(x)]
             test_file = file if is_header_task else existing_test_file(chunk) or (mod_tests[0] if mod_tests else '') or \
                 os.path.join(prof['test_paths'][0] if prof['test_paths'] else 'tests', pattern.format(module=base))
             cases = []
+            gaps_of = {w['item'].split(':', 1)[1].split(' (')[0]: w.get('gaps') for w in chunk if ':' in w['item']}
+            lines_of = {w['item'].split(':', 1)[1].split(' (')[0]: (re.search(r'\(L(\d+)\)', w['item']) or re.search('()', '')).group(1) or None
+                        for w in chunk if ':' in w['item']}
             for f in funcs:
-                cases += [(f,) + c for c in cases_for(cards, f)] if ttype in ('add-tests', 'raise-coverage', 'update-tests') else []
+                if ttype == 'raise-coverage' and gaps_of.get(f):      # only the outcomes the coverage run never took
+                    cases += [(f, gap_case(g), '', 'the outcome the code gives for it') for g in gaps_of[f]]
+                    continue
+                cases += [(f,) + c for c in cases_for(cards, f, lines_of.get(f))] if ttype in ('add-tests', 'raise-coverage', 'update-tests') else []
             if is_header_task:
                 cases = [(w['item'].split(': re-check')[0], f"re-check boundary values / types after {w['item'].split('using ')[-1]}", '', 'unchanged or updated')
                          if 'baseline' not in w['kind'] else (w['item'].split(':')[0], w['tests'][:120], '', 'builds and passes') for w in chunk]
@@ -169,7 +191,8 @@ def make_plan(st, kb_dir, prof):
             t = {'id': f'T{tid:02d}', 'title': f'{ttype} {file}: {", ".join(funcs)[:60] or "header change"}', 'type': ttype, 'file': file, 'functions': funcs,
                  'notes': '; '.join(notes),
                  'work_items': [w['id'] for w in chunk], 'wave': WAVE.get(ttype, 3), 'depends': [], 'status': 'TODO', 'owner': '',
-                 'attempts': 0, 'touches': sorted(set(touches)), 'test_file': test_file, 'cases': cases}
+                 'attempts': 0, 'touches': sorted(set(touches)), 'test_file': test_file, 'cases': cases,
+                 'lines': {f: l for f, l in lines_of.items() if l and f in funcs}}
             if prev_same_file:                          # same test file: one task after the other
                 t['depends'] = [prev_same_file]
             prev_same_file = t['id']
@@ -183,6 +206,26 @@ def make_plan(st, kb_dir, prof):
     for t in tasks:
         write_task_file(st, t, kb_dir)
     return tasks
+
+
+def gap_case(g):
+    """'L47 if (st == BUSY) never TRUE' -> 'L47 make (st == BUSY) TRUE - never taken by any test yet'"""
+    m = re.match(r'L(\d+) (if|\?:) \((.*)\) never (TRUE|FALSE)$', g)
+    if m:
+        return f'L{m.group(1)} make ({m.group(3)}) {m.group(4)} - never taken by any test yet'
+    m = re.match(r'L(\d+) (?:if|\?:) \((.*)\): (?:only )?(\d+/\d+) (?:branch|condition) outcomes hit', g)
+    if m:
+        return f'L{m.group(1)} ({m.group(2)}): each sub-condition must decide the outcome alone ({m.group(3)} outcomes hit so far)'
+    m = re.match(r'L(\d+) loop \((.*)\) body never runs', g)
+    if m:
+        return f'L{m.group(1)} loop ({m.group(2)}) runs at least once'
+    m = re.match(r'L(\d+) loop \((.*)\) never exits normally', g)
+    if m:
+        return f'L{m.group(1)} loop ({m.group(2)}) ends because its condition becomes false'
+    m = re.match(r'L(\d+) switch \((.*)\) case (.*) never taken', g)
+    if m:
+        return f'L{m.group(1)} switch ({m.group(2)}) takes case {m.group(3)}'
+    return g
 
 
 def existing_test_file(ws):

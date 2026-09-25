@@ -23,17 +23,20 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
     if t['type'] in ('fix-mocks', 'add-tests') or 'mock' in ' '.join(c[2] for c in t.get('cases', [])):
         P.append('\n## Mock exemplar\n' + read(os.path.join(kb_dir, 'exemplars', 'mock.md')))
     P.append('\n## Registration\n' + read(os.path.join(kb_dir, 'exemplars', 'register.md')))
+    from .plan import card_block
     cards = read(os.path.join(kb_dir, 'modules', f"{os.path.basename(t['file'])}.cards.md"))
+    lines = t.get('lines') or {}
     for f in t['functions']:
-        m = re.search(r'^## ' + re.escape(f) + r'\s.*?$(.*?)(?=^## |\Z)', cards, re.M | re.S)
+        m = card_block(cards, f, lines.get(f))
         if m:
             P.append(f'\n## Card: {f}\n' + m.group(0).strip())
     src = read(os.path.join(st['repo'], t['file']))
     for f in t['functions']:   # the function's source itself, cut from the card's line range
-        m = re.search(r'^## ' + re.escape(f) + r'\s+\(\S+:(\d+)-(\d+)\)', cards, re.M)
-        if m and src:
+        m = card_block(cards, f, lines.get(f))
+        if m and m.group(1) and src:
             a, b = int(m.group(1)), int(m.group(2))
             P.append(f"\n## Source: {t['file']}:{a}-{b}\n```c\n" + '\n'.join(src.splitlines()[a - 1:b]) + '\n```')
+    P += diagrams_for(st, kb_dir, t, cards)
     if t['test_file'] and os.path.exists(os.path.join(st['repo'], t['test_file'])):
         body = read(os.path.join(st['repo'], t['test_file']))
         P.append(f"\n## Current test file {t['test_file']} ({len(body.splitlines())} lines; add to it)\n```cpp\n{body[:6000]}\n```")
@@ -50,6 +53,47 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
     if review:
         P.append('\n## The user reviewed your test file and asks for these changes:\n' + review + '\nApply them to the same file.')
     return '\n'.join(P)
+
+
+DIAG_LEGEND = ('Mermaid TEXT for you to read (never render it). Flow: Lnn = source line; T/F = the condition true/false; '
+               '"NOT HIT" = no test takes that edge yet; "Nx" = times taken. Sequence: the calls in order with the branch or loop '
+               'around them; participant notes name existing test doubles to reuse.')
+DIAG_BUDGET = 900      # words of diagrams per prompt
+
+
+def diagrams_for(st, kb_dir, t, cards):
+    from .plan import card_block
+    """flowchart when branches matter (coverage task, >= 4 decisions); sequence when collaborators matter (mock task,
+    >= 2 interface/external/pointer calls). Always generated fresh from the index (includes the last coverage run)."""
+    mode = st.get('diagrams') or st['profile'].get('diagrams', 'auto')
+    gd = os.path.join(kb_dir, 'index')
+    if mode == 'off' or not os.path.exists(os.path.join(gd, 'index.json')):
+        return []
+    out, budget = [], DIAG_BUDGET
+    for f in t['functions']:
+        m = card_block(cards, f, (t.get('lines') or {}).get(f))
+        block = m.group(3) if m else ''
+        ndec = len(re.findall(r'^\s+L\d+\s', block, re.M))
+        calls = (re.search(r'^Calls: (.*)$', block, re.M) or re.search('()', '')).group(1)
+        nmock = len(re.findall(r'\[(?:interface|function|pointer)|pure virtual', calls))
+        want = [('flow', mode == 'on' or t['type'] == 'raise-coverage' or ndec >= 4),
+                ('seq', mode == 'on' or t['type'] == 'fix-mocks' or nmock >= 2)]
+        for kind, ok in want:
+            if not ok:
+                continue
+            ln = (t.get('lines') or {}).get(f)
+            rc, txt = sh([script('index.sh'), kind, gd, f'{f}@{ln}' if ln else f], cwd=st['repo'])
+            if rc != 0 or not txt.strip().startswith('%%'):
+                continue
+            w = words(txt)
+            if w > budget:
+                out.append(f'\n(The {kind} diagram of {f} is {w} words, over the budget: `index.sh {kind} {gd} {f}` prints it.)')
+                continue
+            budget -= w
+            out.append(f"\n## {'Flow' if kind == 'flow' else 'Sequence'}: {f}\n```mermaid\n{txt.strip()}\n```")
+    if out:
+        out.insert(0, '\n## Diagrams\n' + DIAG_LEGEND)
+    return out
 
 
 def error_keys(error):
@@ -191,7 +235,7 @@ def checkpoint(st, wave, executor, kb_dir):
     st['plan']['checkpoints'][str(wave)] = 'PASSED' if status == 'OK' else f'FAILED ({status})'
     st.log(executor, f"checkpoint wave {wave}: {st['plan']['checkpoints'][str(wave)]} {detail if status == 'OK' else ''}")
     if status == 'OK':
-        sh([script('graphify.sh'), 'refresh', os.path.join(kb_dir, 'graphify')], cwd=st['repo'])
+        sh([script('index.sh'), 'refresh', os.path.join(kb_dir, 'index')], cwd=st['repo'])
     else:
         st['open_issues'].append(f'checkpoint wave {wave} failed: {str(detail).splitlines()[0][:160]}')
     st.save()
@@ -207,5 +251,5 @@ def closeout(st, kb_dir):
     st['final_summary'] = summary
     st['next_steps'] = [f"{t['id']} {t['status']}: {t.get('notes', '')[:100]}" for t in tasks if t['status'] != 'DONE'] or ['nothing open']
     st.log('tool', 'closeout: ' + summary); st.done('closeout'); st.save()
-    sh([script('graphify.sh'), 'refresh', os.path.join(kb_dir, 'graphify')], cwd=st['repo'])
+    sh([script('index.sh'), 'refresh', os.path.join(kb_dir, 'index')], cwd=st['repo'])
     return summary

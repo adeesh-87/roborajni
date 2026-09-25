@@ -52,12 +52,40 @@ def render_kb(kb_dir, kb):
     write(os.path.join(kb_dir, 'kb.md'), '\n'.join(L) + '\n')
 
 
-def build_graph(kb_dir, root, prof, cdb=None):
-    gd = os.path.join(kb_dir, 'graphify')
-    paths = prof['code_paths'] + prof['test_paths'] + prof['mock_paths']
-    cmd = [script('graphify.sh'), 'build'] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + [gd] + paths
+def index_dir(kb_dir):
+    return os.path.join(kb_dir, 'index')
+
+
+def scan_paths(prof):
+    seen = []
+    for p in prof['code_paths'] + prof.get('header_paths', []) + prof['test_paths'] + prof['mock_paths']:
+        if p not in seen:
+            seen.append(p)
+    return seen
+
+
+def detect_backends(root, cdb):
+    """index.sh detect -> dict (viable backends, recommendation)"""
+    import json as _json
+    rc, out = sh([script('index.sh'), 'detect', root] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + ['--json'], cwd=root)
+    try:
+        return _json.loads(out[out.index('{'):])
+    except ValueError:
+        return {'recommended': 'graphify', 'viable': ['graphify', 'codemap'], 'backends': {}, 'why': 'detection failed: ' + out[-200:]}
+
+
+def build_graph(kb_dir, root, prof, cdb=None, backend=None):
+    """build the code index (kb/<id>/index/index.json) with the chosen backend"""
+    gd = index_dir(kb_dir)
+    backend = backend or prof.get('index_backend') or 'auto'
+    cmd = [script('index.sh'), 'build', '--backend', backend] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + [gd] + scan_paths(prof)
     rc, out = sh(cmd, cwd=root)
     return rc, out, gd
+
+
+def make_diagrams(kb_dir, root):
+    rc, out = sh([script('index.sh'), 'diagrams', index_dir(kb_dir), os.path.join(kb_dir, 'diagrams')], cwd=root)
+    return out.strip().splitlines()[-1] if out.strip() else ''
 
 
 def testscan(kb_dir, root, prof):
@@ -148,11 +176,17 @@ def make_exemplars(kb_dir, root, prof, scan):
 def module_cards(kb_dir, root, prof, gd, files):
     mods = []
     os.makedirs(os.path.join(kb_dir, 'modules'), exist_ok=True)
+    ir = index_root(gd)
+    if ir:                                           # a real index: all cards in one call (paths relative to the index root)
+        sh([script('index.sh'), 'kb-cards', gd, kb_dir] + [norm(os.path.relpath(os.path.join(root, f), ir)) for f in files], cwd=root)
+    else:                                            # bash code map fallback: card + deps per file
+        for f in files:
+            rc, card = sh([script('index.sh'), 'card', gd, f], cwd=root)
+            rc2, deps = sh([script('index.sh'), 'deps', gd, f], cwd=root)
+            write(os.path.join(kb_dir, 'modules', f'{os.path.basename(f)}.cards.md'), card + '\n' + deps)
     for f in files:
         name = os.path.basename(f)
-        rc, card = sh([script('graphify.sh'), 'card', gd, f], cwd=root)
-        rc2, deps = sh([script('graphify.sh'), 'deps', gd, f], cwd=root)
-        write(os.path.join(kb_dir, 'modules', f'{name}.cards.md'), card + '\n' + deps)
+        card = read(os.path.join(kb_dir, 'modules', f'{name}.cards.md'))
         notes = os.path.join(kb_dir, 'modules', f'{name}.md')
         if not os.path.exists(notes):
             write(notes, f'# Module: {name}\nFile: {f}\nPurpose: (fill in)\n\n## Facts\n-\n\n## How to test this module\n-\n\n## Learnings\n-\n')
@@ -160,6 +194,14 @@ def module_cards(kb_dir, root, prof, gd, files):
         tfiles = sorted({m.group(1) for l in tlines for m in re.finditer(r'\(([^()\s]+\.(?:cpp|cxx|cc|c)\b):L\d+\)', l)})
         mods.append({'name': name, 'file': f, 'tests': ', '.join(tfiles) or 'none', 'test_files': tfiles})
     return mods
+
+
+def index_root(gd):
+    import json as _json
+    try:
+        return _json.load(open(os.path.join(gd, 'index.json'), encoding='utf-8'))['meta']['root']
+    except (OSError, ValueError, KeyError):
+        return ''
 
 
 def test_name_pattern(kb_dir, prof, fw):

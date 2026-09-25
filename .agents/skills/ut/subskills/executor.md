@@ -16,8 +16,10 @@ Mark it IN_PROGRESS with Owner ME in status.md and in the task file; one Log lin
 
 ## 2. Load exactly the task's Inputs
 The card file for its functions, `exemplars/test.md` (+ `mock.md` if the task mocks), the tool file, and
-`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Graph questions (`"$G" card|deps|tests`):
-`G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"` (details: `resources/graph-queries.md`).
+`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Graph questions (`"$I" card|deps|tests`):
+`I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"` (details: `resources/graph-queries.md`).
+Diagrams (`"$I" flow|seq "$GD" <function>`) help when the card is not enough: a coverage gap to reach (flow shows the
+path and what is NOT HIT), or collaborators to fake (seq names the existing test doubles). How to read them: `resources/diagrams.md`.
 
 ## 3. Work
 Follow the playbook. Write one test per `Cases` line, copying the exemplar's shape. Register new files like

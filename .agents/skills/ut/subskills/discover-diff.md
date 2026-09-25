@@ -9,9 +9,9 @@ Default: this branch vs its base. Not said in setup → Ask once:
 
 ## 2. Run the impact script
 ```sh
-G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
-"$G" refresh "$GD"                                                   # the graph must match the current code
-"$G" impact "$GD" --base origin/main --out "$TASK/impact.md" --context "$TASK/context.md"
+I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"
+"$I" refresh "$GD"                                                   # the index must match the current code
+"$I" impact "$GD" --base origin/main --out "$TASK/impact.md" --context "$TASK/context.md"
 #            or:  --uncommitted        or:  --range A..B
 ```
 It writes `TASK/impact.md` (summary, work-item table, details per item) and inserts the table rows into

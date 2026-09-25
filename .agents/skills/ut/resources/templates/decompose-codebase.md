@@ -5,8 +5,9 @@ Do not write tests. Write short, factual module notes.
 
 ## Read
 1. <KB_DIR>/kb.md (Profile, Conventions, Modules)
-2. <KB_DIR>/modules/*.cards.md (per-function cards: decisions, globals, calls) and `graphify.sh explain|path|deps
-   <KB_DIR>/graphify ...` from <SKILL_DIR>/resources/scripts/ for call chains
+2. <KB_DIR>/modules/*.cards.md (per-function cards: decisions, globals, calls), <KB_DIR>/diagrams/SCENARIOS.md
+   (one sequence per entry point) and, for call chains, from <SKILL_DIR>/resources/scripts/:
+   `index.sh seq|flow|deps|tests <KB_DIR>/index <function>` and `index.sh lsp <KB_DIR>/index callers|callees|refs <function>`
 3. The source files of these modules: <MODULES>
 
 ## Write one file per module: <KB_DIR>/modules/<module>.md (sections Facts and How to test; keep existing Learnings)

@@ -36,11 +36,11 @@ continue here. Everything you learn goes into files; your memory is those files.
 |---|-------|------|------|-----------|
 | 1 | Setup | `subskills/setup.md` | 2 messages | status.md Config confirmed |
 | 2 | Baseline | `subskills/baseline.md` | 0–1 | KB has verified commands; baseline recorded |
-| 3 | Knowledge | `subskills/knowledge.md` | 0 | KB has graph, testscan, exemplar draft, module cards |
+| 3 | Knowledge | `subskills/knowledge.md` | 0–1 | KB has code index, testscan, exemplar draft, module cards, diagrams |
 | 4 | Discovery | one of `subskills/discover-{resume,diff,ask}.md` | 0–1 | context.md work items filled |
 | 5 | Scope | `subskills/scope.md` | 1 | work items approved; pilot need decided |
 | 6 | Pilot | `subskills/pilot.md` — only if scope says `Pilot: yes` | 1–3 reviews | exemplar approved, 2 tests pass |
-| 7 | Coverage | `subskills/coverage.md` — only if a work item has category G | 0–1 | coverage gaps listed |
+| 7 | Coverage | `subskills/coverage.md` — only if a work item has category G or the user wants coverage | 0–1 | coverage gaps listed |
 | 8 | Plan | `subskills/plan.md` | 1 | plan approved, task files written |
 | 9 | Execute | `subskills/executor.md` | only on blockers | every task DONE / PARTIAL / BLOCKED / DROPPED |
 | 10 | Close out | `subskills/closeout.md` | 0 | final summary; KB updated |
@@ -48,7 +48,15 @@ continue here. Everything you learn goes into files; your memory is those files.
 After each phase: tick it in status.md `Phases`, set `Current phase`, add one `Log` line.
 Skipped phases (6, 7): tick and write `skipped`.
 Any time the code or the tests changed (a finished round, a new commit, the user asks): load `subskills/refresh.md`
-so the graph and the cards match the code again. One command, about a minute.
+so the index, the cards and the diagrams match the code again. One command.
+
+## Code index and diagrams
+All code facts come from ONE index (`KB_DIR/index/index.json`) built by `resources/scripts/index.sh` with the backend
+that works best on this machine: `clang` (compiler AST, default), `gcc` (your own compiler's call graph), `graphify`
+(tree-sitter, no compile needed) or `codemap` (bash). Phase 3 picks it (`resources/index-backends.md`). Every query
+(`card`, `deps`, `tests`, `impact`) and view is the same whatever the backend. Views are Mermaid TEXT for agents:
+`flow` (branches of a function, with coverage counts), `seq` (calls in order, with existing test doubles),
+`scenarios` (one sequence per entry point), `trace` (what a test really called). Reading them: `resources/diagrams.md`.
 
 ### Discovery file (phase 4)
 | The user's answer in setup | Load |

@@ -6,7 +6,7 @@ Goal: turn the request (Config `Request`, context.md section 1) into work items.
 For every module, feature or function named in the request:
 ```sh
 grep -rn '<name>' <code paths> | head -20
-awk -F'\t' '{print $1}' "$KB_DIR/codemap/functions.tsv" 2>/dev/null | sort -u | grep -i '<name>'   # or the graph's file list
+awk -F'\t' '{print $1}' "$KB_DIR/codemap/functions.tsv" 2>/dev/null | sort -u | grep -i '<name>'   # or: index.sh card "$KB_DIR/index" <file> lists its functions
 ```
 Nothing named, or ambiguous → Ask once: "Which files or functions exactly? [my guess: <list>]".
 One work-item row per function (change kind `targeted`), or per file for "test this module" / coverage requests.

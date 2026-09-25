@@ -103,9 +103,15 @@ def cmd_kb(args):
     st = load(args); root = st['repo']; prof = st['profile']; kb = KB.load_kb(st['kb_dir'])
     ident = detect.kb_id(root)
     kb.update({'id': ident.get('id'), 'remote': ident.get('remote'), 'roots': root, 'profile': prof})
-    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'))
-    say('\n'.join(l for l in out.splitlines() if re.search(r'preprocessed|augmented|MODE|WARNING|FAILED', l)))
-    kb['last_graph_build'] = f"{baseline.now()} ({'compile DB' if prof.get('compile_db', 'none') != 'none' else 'no compile DB'})"
+    backend = choose_backend(args, st, prof, root)
+    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), backend)
+    say('\n'.join(l for l in out.splitlines() if re.search(r'index:|backend|preprocessed|augmented|MODE|WARNING|FAILED|translation units|flags borrowed', l)))
+    if rc != 0 and backend != 'graphify':
+        say(f'index build with {backend} FAILED; falling back to graphify')
+        backend = 'graphify'
+        rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), backend)
+    prof['index_backend'] = backend
+    kb['last_graph_build'] = f"{baseline.now()} (backend {backend}; {'compile DB' if prof.get('compile_db', 'none') != 'none' else 'no compile DB'})"
     scan = KB.testscan(st['kb_dir'], root, prof)
     ex = KB.make_exemplars(st['kb_dir'], root, prof, scan)
     conv = kb.get('conventions', {})
@@ -116,19 +122,134 @@ def cmd_kb(args):
         files = [f for f in files if any(f.startswith(x) or f == x for x in args.files)]
     kb['modules'] = KB.module_cards(st['kb_dir'], root, prof, gd, files)
     st['kb_modules'] = kb['modules']
+    if prof.get('diagrams', 'auto') != 'off' and backend != 'codemap':
+        say(KB.make_diagrams(st['kb_dir'], root))
     kb['updated'] = baseline.now()
     KB.save_kb(st['kb_dir'], kb)
     idx = os.path.join(SKILL_DIR, 'resources', 'kb', 'INDEX.md')
-    if kb['id'] and kb['id'] not in read(idx):
+    if kb['id'] and not kb['id'].startswith('local-') and kb['id'] not in read(idx):     # local KBs are machine-specific, not listed
         with open(idx, 'a', encoding='utf-8') as fh:
             fh.write(f"| {kb['id']} | {kb.get('remote', '')} | {root} | | {kb['updated']} | {kb['updated']} |\n")
     say(f"KB: {st['kb_dir']}  exemplar: {ex or 'none (greenfield)'}  modules: {len(kb['modules'])}  conventions: {len(kb['conventions']['lines'])} lines")
     st.done('knowledge'); st.log('tool', f"knowledge: {len(kb['modules'])} module cards"); st.save()
 
 
+def choose_backend(args, st, prof, root):
+    """the index backend: the profile's choice, else detection; ONE question only when the choice is a real trade-off"""
+    want = prof.get('index_backend') or 'auto'
+    if want != 'auto':
+        return want
+    d = KB.detect_backends(root, prof.get('compile_db'))
+    rec, viable = d.get('recommended', 'graphify'), d.get('viable', [])
+    say('Index backends on this machine: ' + ', '.join(f"{b} {'OK' if v.get('ok') else 'no (' + v.get('note', '')[:60] + ')'}"
+                                                      for b, v in d.get('backends', {}).items()))
+    choice = rec
+    if rec != 'clang' and 'gcc' in viable and 'graphify' in viable:      # a real trade-off: ask once
+        choice = ask('Index backend? gcc = exact calls from your own compiler (compiles every unit once); '
+                     'graphify = tolerant tree-sitter parse (no compile needed)', rec, args.yes, answers_of(args), 'index_backend')
+    say(f"index backend: {choice} ({d.get('why', '') if choice == rec else 'your choice'})")
+    st.decide('index backend', choice)
+    return choice
+
+
+# ------------------------------------------------------------------ index (switch backend / compare)
+def cmd_index(args):
+    st = load(args); prof = st['profile']; root = st['repo']
+    if args.compare:
+        other = os.path.join(st['kb_dir'], f'index-{args.compare}')
+        rc, out = sh([script('index.sh'), 'build', '--backend', args.compare] + (['--cdb', os.path.join(root, prof['compile_db'])]
+                     if prof.get('compile_db', 'none') != 'none' else []) + [other] + KB.scan_paths(prof), cwd=root)
+        rc, out = sh([script('index.sh'), 'compare', KB.index_dir(st['kb_dir']), other], cwd=root)
+        write(os.path.join(st.dir, f'compare-{args.compare}.md'), out)
+        say(out[:3000]); return
+    prof['index_backend'] = args.backend
+    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), args.backend)
+    say(out.strip().splitlines()[-1] if out.strip() else out)
+    kb = KB.load_kb(st['kb_dir']); kb['profile'] = prof
+    kb['modules'] = KB.module_cards(st['kb_dir'], root, prof, gd, [m['file'] for m in kb.get('modules', [])])
+    if prof.get('diagrams', 'auto') != 'off':
+        say(KB.make_diagrams(st['kb_dir'], root))
+    KB.save_kb(st['kb_dir'], kb)
+    st.decide('index backend', args.backend); st.save()
+
+
+# ------------------------------------------------------------------ coverage (phase 7, scripted)
+def cmd_coverage(args):
+    """run the coverage build+tests, import the report into the index, annotate the flowcharts, add G work items"""
+    st = load(args); root = st['repo']; kb = KB.load_kb(st['kb_dir'])
+    cmds = kb.setdefault('commands', {})
+    cmd = args.cov_cmd or cmds.get('coverage', {}).get('cmd')
+    imp = [x for x in (['--lcov', args.lcov] if args.lcov else ['--gcov-dir', args.gcov_dir] if args.gcov_dir else
+                       ['--ctc', args.ctc] if args.ctc else ['--json', args.json] if args.json else [])]
+    imp = imp or (cmds.get('coverage_import', {}).get('cmd', '').split(' ', 1) if cmds.get('coverage_import') else [])
+    if not imp:
+        sys.exit('give the report to import: --lcov FILE | --gcov-dir BUILD_DIR | --ctc profile.txt | --json FILE '
+                 '(and --cmd "coverage build+run command" to produce it)')
+    if cmd:
+        say(f'running: {cmd}')
+        rc, out = sh(cmd, cwd=root)
+        write(os.path.join(st.dir, 'logs', 'coverage-run.log'), out)
+        if rc != 0:
+            sys.exit(f'coverage command FAILED (rc {rc}); see logs/coverage-run.log')
+        cmds['coverage'] = {'cmd': cmd, 'verified': baseline.now()}
+    gd = KB.index_dir(st['kb_dir'])
+    rc, out = sh([script('index.sh'), 'cov-import', gd, imp[0], os.path.join(root, imp[1]) if not os.path.isabs(imp[1]) else imp[1]], cwd=root)
+    say(out.strip())
+    if rc != 0:
+        sys.exit('import FAILED')
+    cmds['coverage_import'] = {'cmd': f'{imp[0]} {imp[1]}', 'verified': baseline.now()}
+    KB.save_kb(st['kb_dir'], kb)
+    say(KB.make_diagrams(st['kb_dir'], root))
+    rc, gaps = sh([script('index.sh'), 'uncovered', gd], cwd=root)
+    write(os.path.join(st.dir, 'coverage-gaps.md'), gaps)
+    ir = KB.index_root(gd)
+    code = tuple(norm(os.path.relpath(os.path.join(root, p), ir)) for p in st['profile']['code_paths'])
+    items, n = [], len(st['work_items'])
+    for m in re.finditer(r'^- (\S+) \((\S+):(\d+)\)(?:: (.*))?$', gaps, re.M):
+        name, file, line, g = m.groups()
+        if not file.startswith(code) or '.lambda@' in name:
+            continue
+        n += 1
+        f_repo = norm(os.path.relpath(os.path.join(ir, file), root))
+        items.append({'id': f'W{n}', 'item': f'{f_repo}:{name} (L{line})', 'kind': 'coverage gap' if g else 'never executed',
+                      'tests': 'see card', 'mocks': '', 'work': ('G drive: ' + g) if g else 'D no test runs it', 'cat': 'G' if g else 'D',
+                      'gaps': [x.strip() for x in (g or '').split(';') if x.strip()], 'in_scope': '', 'priority': ''})
+    known = {w['item'].split(' (')[0] for w in st['work_items']}
+    new = [w for w in items if w['item'].split(' (')[0] not in known]
+    st['work_items'] += new
+    st['coverage']['last'] = out.strip().splitlines()[-1] if out.strip() else ''
+    st['coverage_gaps'] = [l[2:] for l in gaps.splitlines() if l.startswith('- ')][:60]
+    st.done('coverage', st['coverage']['last'][:80])
+    say(f"{len(new)} coverage work items added (G = missing outcomes, D = never executed); full list: {os.path.join(st.dir, 'coverage-gaps.md')}")
+    for w in new[:20]:
+        say(f"  {w['id']:<4} {w['cat']}  {w['item'][:70]}  {w['work'][:90]}")
+    st.log('tool', f'coverage imported: {len(new)} work items'); st.save()
+
+
+# ------------------------------------------------------------------ trace (runtime sequences)
+def cmd_trace(args):
+    st = load(args); root = st['repo']; prof = st['profile']
+    gd = KB.index_dir(st['kb_dir'])
+    run = args.run or (st['baseline'].get('test_binaries') or [''])[0]
+    if not run:
+        sys.exit('give --run "test command" (the test binary built with the trace flags)')
+    cmd = [script('index.sh'), 'trace', gd, '--run', run]
+    if prof.get('build_system') == 'cmake' and not args.no_build:
+        defs = ' '.join(re.findall(r'-D\w+=\S+', prof.get('build_cmd', '')))
+        cmd += ['--cmake', root, '--build-dir', os.path.join(gd, 'trace', 'build'), '--cmake-args', defs]
+        if not args.run:
+            cmd[cmd.index('--run') + 1] = '{build}/' + os.path.relpath(run, os.path.join(root, 'build')) if run.startswith(os.path.join(root, 'build')) else run
+    rc, out = sh(cmd, cwd=root)
+    say(out.strip()[-1500:])
+    if rc == 0:
+        kb = KB.load_kb(st['kb_dir'])
+        KB.module_cards(st['kb_dir'], root, prof, gd, [m['file'] for m in kb.get('modules', [])])   # cards gain runtime reach
+        st.log('tool', 'trace: runtime sequences + reach'); st.save()
+
+
 # ------------------------------------------------------------------ discovery (phase 4)
 def cmd_discover(args):
-    st = load(args); gd = os.path.join(st['kb_dir'], 'graphify')
+    st = load(args); gd = KB.index_dir(st['kb_dir'])
     if args.base or args.uncommitted or args.range:
         items, summary = PLAN.discover_diff(st, st['repo'], gd, args.base, args.uncommitted, args.range)
         say(summary.strip()[:600])
@@ -182,6 +303,8 @@ def cmd_run(args):
     st = load(args)
     if not st['plan']['tasks']:
         sys.exit('no plan: run plan first')
+    if args.diagrams:
+        st['diagrams'] = args.diagrams
     RUN.run_tasks(st, st['kb_dir'], args.agent, executor=args.executor, dry=args.dry_run, max_attempts=args.attempts, only=args.only)
     if all(t['status'] != 'TODO' for t in st['plan']['tasks']):
         st.done('execute')
@@ -279,12 +402,20 @@ def main(argv=None):
     s = sub.add_parser('plan', help='phase 8: tasks with Cases from the cards'); opt(s)
     s = sub.add_parser('run', help='phase 9: executor loop'); opt(s); s.add_argument('--agent', default=RUN.DEFAULT_AGENT, help='command; reads the prompt on stdin, or use {prompt} for the file')
     s.add_argument('--executor', default='E1'); s.add_argument('--dry-run', action='store_true'); s.add_argument('--attempts', type=int, default=3); s.add_argument('--only', nargs='*')
+    s.add_argument('--diagrams', choices=['auto', 'on', 'off'], help='Mermaid diagrams in the prompts (default: the profile, auto)')
     s = sub.add_parser('harness', help='greenfield: create tests/CMakeLists.txt + runner + smoke test, hook into the root CMake, build it'); opt(s); s.add_argument('--framework', default='cpputest', choices=['cpputest', 'gtest']); s.add_argument('--dir', default='tests')
     s = sub.add_parser('close', help='phase 10'); opt(s)
+    s = sub.add_parser('index', help='rebuild the code index with another backend, or compare two backends'); opt(s)
+    s.add_argument('--backend', default='clang', choices=['clang', 'gcc', 'graphify', 'codemap']); s.add_argument('--compare', choices=['clang', 'gcc', 'graphify'])
+    s = sub.add_parser('coverage', help='phase 7: run coverage, import it, annotate flowcharts, add work items'); opt(s)
+    s.add_argument('--cmd', dest='cov_cmd', help='coverage build+run command'); s.add_argument('--lcov'); s.add_argument('--gcov-dir'); s.add_argument('--ctc'); s.add_argument('--json')
+    s = sub.add_parser('trace', help='runtime sequence per TEST (-finstrument-functions); cards gain runtime reach'); opt(s)
+    s.add_argument('--run', help='test command; {build} = the trace build dir'); s.add_argument('--no-build', action='store_true')
     s = sub.add_parser('status'); opt(s)
     a = p.parse_args(argv)
     {'init': cmd_init, 'baseline': cmd_baseline, 'kb': cmd_kb, 'discover': cmd_discover, 'scope': cmd_scope, 'pilot': cmd_pilot,
-     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness}[a.cmd](a)
+     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness,
+     'index': cmd_index, 'coverage': cmd_coverage, 'trace': cmd_trace}[a.cmd](a)
 
 
 if __name__ == '__main__':

@@ -18,6 +18,10 @@ compiled per operating system and Python version, so they are installed on the t
   `scripts/graphify.sh wheelhouse resources/vendor/graphify/wheels <platform> <python version>`,
   e.g. `win_amd64 3.11`, `manylinux2014_x86_64 3.12`, `macosx_11_0_arm64 3.12`,
   copy the `wheels/` folder to the offline machine, then run `setup` there (it uses `wheels/` automatically).
+  For the clang backend and clangd add their wheels to the same folder before copying it:
+  `pip download --only-binary=:all: --platform <platform> --python-version <ver> -d wheels "clang==<libclang major>.*" libclang clangd`
+  (`clang==N.*` = bindings for a system libclang N; `libclang` = bindings with the library inside; `clangd` = the
+  language server). `scripts/index.sh setup clang|clangd` then installs from `wheels/`.
 
 Requirements: Python 3.10 or newer, bash (Git Bash or WSL on Windows).
 

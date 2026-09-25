@@ -12,7 +12,9 @@ kb/
     testscan.md            generated: framework, asserts, mock API, naming patterns with counts (scripts/testscan.sh)
     modules/<name>.md      per module: purpose, files, tests, facts, how to test, learnings
     modules/<name>.cards.md generated: one card per function (decisions, globals, calls, callers, tests)
-    graphify/ | codemap/   generated code graph (scripts/graphify.sh) or its bash fallback
+    index/                 generated code index (scripts/index.sh): index.json from the chosen backend (clang | gcc |
+                           graphify | codemap), BUILD_ARGS, coverage.json, traces.json, backend work files
+    diagrams/              generated Mermaid text: flow/, seq/, scenarios/, traces/, SCENARIOS.md, INDEX.md
     decompositions/        notes written by a stronger model (optional)
 ```
 When the `ut` tool builds the KB it also keeps `kb.json` (machine-readable truth) and renders `kb.md` from it;

@@ -37,6 +37,9 @@ ctcpost MON.sym MON.dat -u untested.txt        # only untested code (smaller, go
 ctc2html -i profile.txt -o CTCHTML             # HTML
 ```
 View options for listings (typical): `-ff` function, `-fd` decision, `-fc` condition, `-fmcdc` MC/DC.
+Into the code index (true/false counts per decision go onto the flowchart edges; gaps become work items):
+`index.sh cov-import "$KB_DIR/index" --ctc profile.txt` then `index.sh uncovered "$KB_DIR/index"`. The listing parser
+follows the documented column layout (hits/true, false, line); compare the first import with ctc2html once.
 
 ## Reading the text listings
 - Totals per function and file: `grep -n '\*\*\*TER' profile.txt` → lines like

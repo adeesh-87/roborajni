@@ -1,0 +1,79 @@
+"""python -m codeindex COMMAND ...   (index.sh is the normal entry point; it picks the Python)"""
+import os, sys
+
+
+def need(argv, n, usage):
+    if len(argv) < n:
+        sys.exit('usage: ' + usage)
+
+
+def main(argv):
+    if not argv:
+        print(__doc__); sys.exit(2)
+    cmd, a = argv[0], argv[1:]
+    from .model import Index
+    if cmd == 'export-graphify':
+        need(a, 2, 'export-graphify GRAPHIFY_DIR INDEX_JSON')
+        from .be_graphify import export
+        ix = export(a[0], a[1]); print(f"index: {a[1]}  {ix.stats()}")
+    elif cmd == 'build-clang':
+        need(a, 3, 'build-clang INDEX_JSON COMPILE_DB PATH...')
+        from .be_clang import build
+        ix = build(a[0], a[1], a[2:]); print(f"index: {a[0]}  {ix.stats()}")
+    elif cmd == 'build-gcc':
+        need(a, 3, 'build-gcc INDEX_JSON COMPILE_DB PATH...')
+        from .be_gcc import build
+        ix = build(a[0], a[1], a[2:]); print(f"index: {a[0]}  {ix.stats()}")
+    elif cmd == 'card':
+        need(a, 2, 'card INDEX_JSON FUNCTION|FILE')
+        from .query import cmd_card
+        print(cmd_card(Index.load(a[0]), a[1]))
+    elif cmd in ('deps', 'tests', 'impact'):
+        import graphify_ut as G
+        if cmd == 'impact':
+            G.cmd_impact([a[0], '-'] + a[1:])
+        else:
+            {'deps': G.cmd_deps, 'tests': G.cmd_tests}[cmd](a)
+    elif cmd in ('flow', 'seq', 'scenarios', 'diagrams'):
+        from . import mermaid as M
+        M.main(cmd, a)
+    elif cmd == 'cov-import':
+        from . import coverage as C
+        C.main(a)
+    elif cmd == 'uncovered':
+        from . import coverage as C
+        C.cmd_uncovered(a)
+    elif cmd == 'trace':
+        from . import trace as T
+        T.main(a)
+    elif cmd == 'lsp':
+        from . import lsp as L
+        L.main(a)
+    elif cmd == 'compare':
+        from . import compare as C
+        C.main(a)
+    elif cmd == 'detect':
+        from . import detect as D
+        D.main(a)
+    elif cmd == 'check':
+        from . import selfcheck as S
+        S.main(a)
+    elif cmd in ('kb-cards', 'refresh', 'functions'):
+        from . import kbops as K
+        K.main(cmd, a)
+    elif cmd == 'mkcdb':
+        import graphify_ut as G
+        G.cmd_mkcdb(a)
+    elif cmd == 'stats':
+        print(Index.load(a[0]).stats())
+    else:
+        sys.exit(f'unknown command {cmd}')
+
+
+if __name__ == '__main__':
+    try:
+        import signal
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+    except (AttributeError, ValueError):
+        pass
+    main(sys.argv[1:])

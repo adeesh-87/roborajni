@@ -11,8 +11,16 @@ Use text/XML output when the tool allows (easy to grep). Record totals in status
 ```
 
 ## 2. Gaps for in-scope files only
-One row per function with uncovered lines/branches: file, function, now %, uncovered lines. Then open the card
-(`KB_DIR/modules/*.cards.md`) and the source at each gap and set `Why` and `Action`:
+Put the report into the code index; it maps every count onto the decisions of each function:
+```sh
+I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"
+"$I" cov-import "$GD" --gcov-dir <coverage build dir>     # or --lcov file.info | --ctc profile.txt (ctcpost -p) | --json file
+"$I" uncovered "$GD" > "$TASK/coverage-gaps.md"           # never-run functions + never-taken outcomes, per function
+"$I" diagrams "$GD" "$KB_DIR/diagrams"                     # flowcharts now show "Nx" / "NOT HIT" on every edge
+```
+(The ut tool does all of this with `ut coverage --cmd "<coverage build+run>" --gcov-dir <dir>` and adds the work items.)
+One row per function with gaps: file, function, the gap lines from `coverage-gaps.md`. For each gap open the card and
+`"$I" flow "$GD" <function>` (the path from `start` to the NOT HIT edge = the conditions a test must set) and set `Why` and `Action`:
 | Why | Action |
 |-----|--------|
 | branch needs a specific input | `test`: write the input |
