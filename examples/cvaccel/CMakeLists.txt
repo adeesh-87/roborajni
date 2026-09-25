@@ -38,5 +38,6 @@ add_executable(demo_app apps/demo_app.cpp)
 target_link_libraries(demo_app PRIVATE cvclient cvsim cvaccel Threads::Threads)
 
 if(BUILD_UNIT_TESTS)
-    add_subdirectory(tests)
+    enable_testing()
+  add_subdirectory(tests)
 endif()
