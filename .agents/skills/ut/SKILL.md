@@ -1,98 +1,83 @@
 ---
 name: ut
-description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps all state in a task folder (status.md, context.md, kb.md) so work can be resumed later and split across parallel executor agents using path locks.
+description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps a per-codebase knowledge base and a task folder (status.md, context.md) so work can be resumed and split across parallel executor agents.
 ---
 
 # ut — unit test task driver
 
-You are the ORCHESTRATOR. Follow the steps below in order.
-Load a sub-skill ONLY when a step tells you to. Read it fully, do it, then move on.
-Never load two sub-skills at the same time.
+You are the ORCHESTRATOR. Do the phases in order. Load ONE sub-skill at a time, follow it, then
+continue here. Everything you learn goes into files; your memory is those files.
 
-## Names used in all ut files
-- `SKILL_DIR` = absolute path of the folder that holds this SKILL.md.
-- `TASK` = the task folder the user gives you.
-- `KB` = the kb.md path written in status.md Config, normally `$SKILL_DIR/resources/kb/<codebase-id>/kb.md`.
-  `KB_DIR` = its folder. A KB belongs to ONE codebase: never use another codebase's KB folder.
-- Ask = ask the user and WAIT for the answer. Never invent an answer.
-- Record = write it into the named file NOW, before doing anything else.
-- In shell commands, write the real absolute paths for `$TASK`, `$SKILL_DIR`, `$KB`
-  (or set them at the start of every command: shell variables are not kept between calls).
+## Names
+- `SKILL_DIR` absolute path of the folder holding this file. `TASK` the task folder. `KB_DIR` the
+  codebase's knowledge folder (`SKILL_DIR/resources/kb/<codebase-id>/`, found in phase 3). `KB` = `KB_DIR/kb.md`.
+- In shell commands write real absolute paths; shell variables are not kept between calls.
+- **Ask** = ask the user and wait. **Record** = write it to the named file now.
 
-## Rules that are always on
-1. The files in TASK are your memory. Record every answer, command and finding right away.
-2. Do not change production code (code under test) unless Config says it is allowed.
-3. Ask before you delete files, commit, push, or run anything that flashes or talks to hardware.
-4. Copy the style of existing tests. Never invent a new style.
-5. Ask short numbered questions, at most 5 per message, each with a suggested default in [brackets].
-6. Read only the file sections you need. Do not paste big files into the chat.
-7. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+## Rules
+1. Never change production code (code under test) unless status.md Config allows it.
+2. Ask before deleting files, committing, pushing, or running anything that flashes or talks to hardware.
+3. Copy the approved exemplar (`KB_DIR/exemplars/test.md`) for every test you write. Never invent a style.
+4. Never weaken or delete an assertion to make a test pass. A test that shows the code is wrong is
+   reported as an open issue (category I), not "fixed".
+5. Read only the file sections a step names. Never paste whole files into the chat.
+6. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
 
-## Step 0 — Task folder
-1. Find SKILL_DIR (the directory of this file) as an absolute path.
-2. Ask: "Path to the task folder? It will be created if missing."
-3. If `TASK/status.md` exists, go to **Step R**.
-4. Otherwise run:
+## Asking the user (question budget)
+- Look first, then ask. Show what you found in a table and ask the user to correct it; do not ask
+  what a file can tell you (paths, framework, build system, CI command).
+- At most 4 numbered questions per message, each with a default in `[brackets]`. Silence or "ok" = default.
+- Never ask the same thing twice: check status.md Config and context.md `Decisions` first.
+- Prefer "review this concrete test file" over "describe your rules". The pilot phase exists for that.
+- Questions are allowed only where a phase says so.
+
+## Phases
+| # | Phase | Load | Asks | Done when |
+|---|-------|------|------|-----------|
+| 1 | Setup | `subskills/setup.md` | 2 messages | status.md Config confirmed |
+| 2 | Baseline | `subskills/baseline.md` | 0–1 | KB has verified commands; baseline recorded |
+| 3 | Knowledge | `subskills/knowledge.md` | 0 | KB has graph, testscan, exemplar draft, module cards |
+| 4 | Discovery | one of `subskills/discover-{resume,diff,ask}.md` | 0–1 | context.md work items filled |
+| 5 | Scope | `subskills/scope.md` | 1 | work items approved; pilot need decided |
+| 6 | Pilot | `subskills/pilot.md` — only if scope says `Pilot: yes` | 1–3 reviews | exemplar approved, 2 tests pass |
+| 7 | Coverage | `subskills/coverage.md` — only if a work item has category G | 0–1 | coverage gaps listed |
+| 8 | Plan | `subskills/plan.md` | 1 | plan approved, task files written |
+| 9 | Execute | `subskills/executor.md` | only on blockers | every task DONE / PARTIAL / BLOCKED / DROPPED |
+| 10 | Close out | `subskills/closeout.md` | 0 | final summary; KB updated |
+
+After each phase: tick it in status.md `Phases`, set `Current phase`, add one `Log` line.
+Skipped phases (6, 7): tick and write `skipped`.
+Any time the code or the tests changed (a finished round, a new commit, the user asks): load `subskills/refresh.md`
+so the graph and the cards match the code again. One command, about a minute.
+
+### Discovery file (phase 4)
+| The user's answer in setup | Load |
+|----------------------------|------|
+| "continue", or status.md has `Next steps` / open tasks from an earlier session | `discover-resume.md` |
+| "my changes", "the diff", "this branch", "after the refactoring" | `discover-diff.md` |
+| a module, feature, ticket, bug, "coverage of X", "fix the build" | `discover-ask.md` |
+
+## Two ways to run this skill
+- **Tool-driven (fewest tokens):** `resources/scripts/ut` runs phases 1–5, 7, 8, 10 as scripts, asks the user the
+  same questions with defaults, and calls an agent per task with a prompt that holds only that task's inputs
+  (see `resources/scripts/README-ut-tool.md`). When the user runs the tool, you are that per-task agent: follow the
+  prompt you receive, nothing below applies.
+- **Agent-driven:** the phases below, for an agent session without the tool.
+
+## Start
+1. Ask (one message): "1) Task folder? [`<repo>/.ut/<YYYYMMDD>-<short-name>`, created if missing]
+   2) What should I work on? (the changes on this branch / a module, feature or ticket / continue the last task)"
+2. `TASK/status.md` exists → **Resume** below. Otherwise:
    ```sh
    mkdir -p "$TASK/tasks" "$TASK/logs" "$TASK/locks"
-   cp "$SKILL_DIR/resources/templates/status.md"  "$TASK/status.md"
-   cp "$SKILL_DIR/resources/templates/context.md" "$TASK/context.md"
+   cp "$SKILL_DIR/resources/templates/status.md" "$TASK/status.md"; cp "$SKILL_DIR/resources/templates/context.md" "$TASK/context.md"
    ```
-5. Record `Task folder` and `Skill dir` in the Config table of TASK/status.md.
+   Record the answers (Config `Task folder`, `Skill dir`, `Request`; context.md section 1). Go to phase 1.
 
-## Step 1..9 — Phases
-Do the phases in this order. For each phase: load the sub-skill, do it, then in TASK/status.md
-tick the phase in `Phase tracker`, set `Current phase`, and add one line to `Log`.
-
-| # | Phase | Load | Finished when |
-|---|-------|------|---------------|
-| 1 | Setup | `subskills/setup.md` | Config table is complete and confirmed |
-| 2 | Knowledge | `subskills/knowledge.md` | KB has sources, code map, confirmed conventions |
-| 3 | Discovery | ONE of the three files below | context.md `Candidate work` is filled |
-| 4 | Build & run baseline | `subskills/build-run.md` | Commands verified, baseline recorded |
-| 5 | Scope | `subskills/scope.md` | context.md `Confirmed scope` approved by user |
-| 6 | Coverage | `subskills/coverage.md` — ONLY if scope has category G | context.md `Coverage gaps` filled |
-| 7 | Plan | `subskills/plan.md` | Plan approved, task files written |
-| 8 | Execute | `subskills/executor.md` | Every task is DONE, PARTIAL, BLOCKED or DROPPED |
-| 9 | Close out | `subskills/closeout.md` | Final summary in status.md and KB updated |
-
-Skip phase 6 when scope has no coverage work: tick it and write "skipped" after it.
-
-### Choosing the discovery file (phase 3)
-Ask: "What should I work on? 1) continue what status.md says  2) the code changes in git  3) I will tell you".
-Pick the default like this:
-
-| Situation | Load |
-|-----------|------|
-| status.md has `Next steps` or open tasks from an earlier session | `subskills/discover-resume.md` |
-| User says "my changes", "the diff", "this branch", "after refactoring" | `subskills/discover-diff.md` |
-| Anything else: a module, a feature, a ticket, a bug, "improve coverage of X", "fix the build" | `subskills/discover-ask.md` |
-
-Record the choice in Config `Discovery mode`.
-
-## Step R — Resume
-1. Read TASK/status.md sections `Config`, `Phase tracker`, `Next steps`, `Open issues` only.
-2. Tell the user in 3–5 lines: current phase, what is done, what is next.
-3. If Config says parallel executors: run `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`.
-   Report every STALE owner to the user. Remove its locks only if the user approves (`reap <ID>`).
-4. If the user says they are an **executor** (e.g. "executor E2"), load `subskills/executor.md` now.
-5. Otherwise continue at the first unticked phase in the table above.
-   If phases 1–7 are ticked and new work is requested, go back to phase 3 and pick a discovery file.
-
-## Resource files (loaded by sub-skills, listed in Config `Resources to load`)
-| Config says | Load |
-|-------------|------|
-| CppUTest / CppUMock | `resources/tools/cpputest.md` |
-| GoogleTest / gMock / FFF | `resources/tools/gtest-gmock.md` |
-| Unity / CMock / Ceedling | `resources/tools/unity-cmock.md` |
-| Parasoft C/C++test (tests, stubs or coverage) | `resources/tools/parasoft-cpptest.md` |
-| Testwell CTC++ | `resources/tools/ctc.md` |
-| gcov, lcov, gcovr, llvm-cov | `resources/tools/gcov-lcov.md` |
-| CMake, Make, Ceedling, scripts, CI files | `resources/tools/build-systems.md` |
-| Writing any test | `resources/test-design.md` |
-| Diff or user-described change analysis | `resources/impact-analysis.md` |
-| Codebase id / KB folder (phase 2) | `resources/scripts/kb-id.sh` (run it) |
-| Code graph: deps (mock candidates), tests reaching a function, callers, call chains | `resources/scripts/graphify.sh` (bundled Graphify + C/C++ fixes; run it; output in `KB_DIR/graphify/`) |
-| Code map: fallback without Python, quick per-file tables | `resources/scripts/codemap.sh` (run it; output in `KB_DIR/codemap/`) |
-| A task of type `<type>` (executor only) | `resources/playbooks/<type>.md` |
-| Parallel executors | `resources/scripts/lock.sh` (run it, do not read it; `status` shows who holds what) |
+## Resume
+1. Read status.md `Config`, `Phases`, `Next steps`, `Open issues` only.
+2. Tell the user in 3 lines: current phase, done, next.
+3. Parallel executors in Config → `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`; report STALE owners;
+   `reap` only with approval.
+4. User says they are an executor (e.g. "executor E2") → load `subskills/executor.md`.
+5. Otherwise continue at the first unticked phase. New work on a finished task → phase 4 again.

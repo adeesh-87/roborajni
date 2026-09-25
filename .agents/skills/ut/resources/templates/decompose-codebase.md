@@ -4,13 +4,12 @@ You are asked to explain part of a C/C++ codebase so that a smaller model can wr
 Do not write tests. Write short, factual module notes.
 
 ## Read
-1. <KB_DIR>/kb.md sections 0, 2, 3 (identity, code map table, test conventions)
-2. <KB_DIR>/graphify/out/GRAPH_REPORT.md and, for questions, `graphify.sh explain|query|path <KB_DIR>/graphify ...`
-   (run from <SKILL_DIR>/resources/scripts/)
-3. <KB_DIR>/codemap/summary.md (functions, calls, external dependencies; a heuristic map, verify in code)
-4. The source files of these modules: <MODULES / PATHS>
+1. <KB_DIR>/kb.md (Profile, Conventions, Modules)
+2. <KB_DIR>/modules/*.cards.md (per-function cards: decisions, globals, calls) and `graphify.sh explain|path|deps
+   <KB_DIR>/graphify ...` from <SKILL_DIR>/resources/scripts/ for call chains
+3. The source files of these modules: <MODULES>
 
-## Write one file per module: <KB_DIR>/decompositions/<module>.md
+## Write one file per module: <KB_DIR>/modules/<module>.md (sections Facts and How to test; keep existing Learnings)
 Keep each file under 120 lines. Use this structure:
 ```
 # <module> (<source files>)
@@ -28,6 +27,5 @@ Suggested test focus: 5-15 bullets, highest risk first
 Open questions for a human: ...
 ```
 ## Then
-- In <KB_DIR>/kb.md: add one row per module file to section 1, and 3-5 lines per module to section 6
-  ending with `(source: decompositions/<module>.md)`.
+- In <KB_DIR>/kb.md `Modules` table: one row per module with its notes file.
 - Tell the user the notes are written.

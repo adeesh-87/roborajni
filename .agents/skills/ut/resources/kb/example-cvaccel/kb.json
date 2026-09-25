@@ -1,0 +1,130 @@
+{
+ "commands": {
+  "build": {
+   "cmd": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_UNIT_TESTS=ON && cmake --build build -j",
+   "verified": "FAILED 2026-09-25 07:47"
+  },
+  "run": {
+   "cmd": "ctest --test-dir build --output-on-failure",
+   "verified": "FAILED 2026-09-25 07:47"
+  },
+  "clean": {
+   "cmd": "cmake --build build --target clean",
+   "verified": "FAILED 2026-09-25 07:47"
+  },
+  "single_test": {
+   "cmd": "build/tests/unit_tests -sg {group}",
+   "verified": ""
+  },
+  "compile_db": {
+   "cmd": "build/compile_commands.json",
+   "verified": "2026-09-25 07:47"
+  }
+ },
+ "build_paths": [
+  "build",
+  "build/tests"
+ ],
+ "summary_example": "",
+ "id": "example-cvaccel",
+ "profile": {
+  "code_paths": [
+   "src",
+   "client/src"
+  ],
+  "test_paths": [
+   "tests"
+  ],
+  "mock_paths": [
+   "tests/mocks"
+  ],
+  "framework": "cpputest",
+  "framework_counts": {},
+  "mock_style": "CppUMock",
+  "build_system": "cmake",
+  "build_cmd": "cmake -S . -B build -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_UNIT_TESTS=ON && cmake --build build -j",
+  "run_cmd": "ctest --test-dir build --output-on-failure",
+  "clean_cmd": "cmake --build build --target clean",
+  "ci_hints": [],
+  "compile_db": "build/compile_commands.json",
+  "coverage_tool": "Testwell CTC++",
+  "env_setup": "none"
+ },
+ "updated": "2026-09-25 07:47",
+ "remote": "none",
+ "roots": "<repo>/examples/cvaccel",
+ "last_graph_build": "2026-09-25 07:47 (compile DB)",
+ "conventions": {
+  "approved": "2026-09-25 07:03 (pilot: tests/cvclient_test.cpp)",
+  "lines": [
+   "Framework: CppUTest (? files); mocks: CppUMock",
+   "Test file names: 1  other: main.cpp; 1  <name>_test.<ext>",
+   "Test names: 1  CamelCase",
+   "Real examples: TEST(Smoke, HarnessBuilds)",
+   "Asserts used (count name): 1  CHECK_TRUE",
+   "CppUTest TEST_GROUP: 1"
+  ]
+ },
+ "modules": [
+  {
+   "name": "cvclient.cpp",
+   "file": "client/src/cvclient.cpp",
+   "tests": "none",
+   "test_files": []
+  },
+  {
+   "name": "dispatcher.cpp",
+   "file": "src/dispatcher.cpp",
+   "tests": "tests/dispatcher_test.cpp",
+   "test_files": [
+    "tests/dispatcher_test.cpp"
+   ]
+  },
+  {
+   "name": "memory_pool.cpp",
+   "file": "src/memory_pool.cpp",
+   "tests": "tests/dispatcher_test.cpp, tests/memory_pool_test.cpp, tests/service_test.cpp",
+   "test_files": [
+    "tests/dispatcher_test.cpp",
+    "tests/memory_pool_test.cpp",
+    "tests/service_test.cpp"
+   ]
+  },
+  {
+   "name": "perf_monitor.cpp",
+   "file": "src/perf_monitor.cpp",
+   "tests": "tests/cvclient_test.cpp, tests/dispatcher_test.cpp, tests/perf_monitor_test.cpp",
+   "test_files": [
+    "tests/cvclient_test.cpp",
+    "tests/dispatcher_test.cpp",
+    "tests/perf_monitor_test.cpp"
+   ]
+  },
+  {
+   "name": "request_queue.cpp",
+   "file": "src/request_queue.cpp",
+   "tests": "tests/dispatcher_test.cpp, tests/request_queue_test.cpp",
+   "test_files": [
+    "tests/dispatcher_test.cpp",
+    "tests/request_queue_test.cpp"
+   ]
+  },
+  {
+   "name": "service.cpp",
+   "file": "src/service.cpp",
+   "tests": "tests/service_test.cpp",
+   "test_files": [
+    "tests/service_test.cpp"
+   ]
+  },
+  {
+   "name": "session_manager.cpp",
+   "file": "src/session_manager.cpp",
+   "tests": "tests/dispatcher_test.cpp, tests/session_manager_test.cpp",
+   "test_files": [
+    "tests/dispatcher_test.cpp",
+    "tests/session_manager_test.cpp"
+   ]
+  }
+ ]
+}

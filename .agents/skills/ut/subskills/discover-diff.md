@@ -1,48 +1,26 @@
-# Sub-skill: discover-diff (phase 3, mode "diff")
+# Phase 4 — Discovery, mode "diff"
 
-Goal: know every code change and what it means for tests and mocks. Result: context.md
-sections 3 and 5.
+Goal: the full list of what changed in the code under test and which tests, mocks and stubs each change touches,
+so the user can pick from it. A script produces it; you only present it.
 
-## Step 1 — Agree on the range
-Ask: "Which changes? [branch vs its base]"
- 1) this branch vs base branch — which base? [origin/main or origin/master]
- 2) uncommitted changes only
- 3) a commit range or list of commits
- 4) branch + uncommitted
-Record the answer in context.md section 3 `Base ref`.
+## 1. Range
+Default: this branch vs its base. Not said in setup → Ask once:
+"Which changes? [branch vs origin/main] (or: uncommitted only / a commit range A..B)".
 
-Commands (pick what matches; `BASE` = base ref):
+## 2. Run the impact script
 ```sh
-git fetch origin 2>/dev/null
-MB=$(git merge-base BASE HEAD)
-git diff --stat "$MB" -- <code paths> <test paths> <mock paths>     # branch vs base
-git diff --stat HEAD -- <code paths> <test paths> <mock paths>      # uncommitted (staged + unstaged)
-git diff --name-status "$MB" -- <code paths>
+G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
+"$G" refresh "$GD"                                                   # the graph must match the current code
+"$G" impact "$GD" --base origin/main --out "$TASK/impact.md" --context "$TASK/context.md"
+#            or:  --uncommitted        or:  --range A..B
 ```
+It writes `TASK/impact.md` (summary, work-item table, details per item) and inserts the table rows into
+context.md `Work items`. Each row: file:function, change kind (added, deleted, signature, modified-logic,
+new-dependency, moved/renamed, type/macro), tests reaching it, mocks/stubs/fakes of it, proposed work, category.
+Rows for test/mock files already changed on the branch are marked H: read them, do not redo that work.
+Bash fallback (`MODE: codemap`): `impact` is unavailable; list changed functions with
+`git diff -W <base> -- <file>` and fill the columns with `deps`/`tests` from the graph queries.
 
-## Step 2 — List changed items
-For each changed source or header file:
-```sh
-git diff -U0 "$MB" -- <file> | grep -E '^@@' | head -40   # hunk headers usually name the function
-```
-The name in a hunk header is the last function-like line ABOVE the hunk. It is often wrong
-(e.g. when the change is on the function's first line). ALWAYS open the file at the new line numbers
-(`+<line>` in the header) and read which function contains them. For whole changed functions:
-`git diff -W "$MB" -- <file>` shows each changed function completely. Fill context.md 3.1.
-Change kinds: `added`, `modified-logic`, `signature` (params/return/qualifiers changed),
-`deleted`, `moved/renamed`, `type/macro` (struct, enum, #define, typedef), `new-dependency`
-(the function now calls something it did not call before).
-Also list changes inside test and mock paths: someone may have started the work already.
-
-If more than 40 functions changed: stop listing details. Group by file, tell the user, and
-mark the task "complex" in context.md section 8 (the planner will escalate).
-
-## Step 3 — Impact analysis
-Load `resources/impact-analysis.md` and follow it for every row of 3.1. Result: context.md 3.2.
-
-## Step 4 — Candidate work
-Turn each impact row into one or more rows in context.md section 5 with a category letter.
-Show the list grouped by category. Ask: "Anything missing or wrong?" Fix it.
-
-## Finish
-Tick phase 3 in status.md, add a Log line.
+## 3. Present
+Show the summary line and the table grouped by category. Do not read the details unless a row is unclear.
+More than 40 rows → write `complex` next to the Work items header (the planner escalates). Tick phase 4.

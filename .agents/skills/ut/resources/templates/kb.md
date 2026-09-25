@@ -1,61 +1,45 @@
-# Codebase Knowledge Base: <codebase-id>
+# Knowledge base: <codebase-id>
+> ONLY about this codebase. Facts with sources (file:line or person). Keep this file under 120 lines;
+> details go to `modules/<name>.md`, examples to `exemplars/`. Last updated: YYYY-MM-DD by <task>
 
-> THIS FILE IS ONLY ABOUT THE CODEBASE BELOW. Do not use it for any other repository.
-> Durable knowledge, reused by later tasks. Short facts, each with a source (file:line or person).
-> Facts that are true only on one branch: prefix them with `[branch <name>]`.
-> Last updated: YYYY-MM-DD by <task folder / executor id>
+## Identity
+| id | remote | roots seen | last graph build (date, compile DB yes/no) |
+|----|--------|------------|--------------------------------------------|
 
-## 0. Codebase identity
-| Key | Value |
-|-----|-------|
-| id (from kb-id.sh) | |
-| Remote (origin) | |
-| Roots seen | |
-| Components / sub-projects covered | |
-| Code graph | graphify/out/GRAPH_REPORT.md, graph.json (built YYYY-MM-DD for paths ...) |
-| Code map | codemap/summary.md (generated YYYY-MM-DD for paths ...) |
+## Profile
+| Code paths | Test paths | Mock paths | Framework | Mock style | Build system | Compile DB | Coverage tool | Env before build |
+|------------|------------|------------|-----------|------------|--------------|------------|---------------|------------------|
 
-## 1. External knowledge sources
-Documents, decompositions and maps made by people or other tools (including this KB's codemap/ and
-decompositions/ folders). Link, do not copy.
-| Path / URL | Made by (tool / person) | Covers | Trust (high/med/low) | Notes |
-|------------|-------------------------|--------|----------------------|-------|
+## Commands (verified by running them; run from `Run from`)
+| Purpose | Command | Run from | Verified on |
+|---------|---------|----------|-------------|
+| Env setup | | | |
+| Clean | | | |
+| Build tests | | | |
+| Run all tests | | | |
+| Run one group / test | | | |
+| Compile DB (test build) | path or none | | |
+| Coverage build / report | | | |
+Paths written by build (lock these in parallel mode):
+Test summary line looks like:
 
-## 2. Codebase map
-| Module / dir | Purpose (1 line) | Source files | Test files | Mocks / stubs |
-|--------------|------------------|--------------|------------|---------------|
+## Conventions  (approved: no | approved on <date> (pilot: <file>))
+Facts with counts from testscan.md, ≤ 12 lines. Example lines:
+- Test file: `tests/<module>_test.cpp`, one per source file (14/14). Register in tests/CMakeLists.txt (see exemplars/register.md).
+- Test name: `TEST(<Module>, <Function>_<Condition>_<Expected>)` (61 of 68).
+- Asserts: LONGS_EQUAL (84), CHECK_TRUE (31), STRCMP_EQUAL (12). Expected value first.
+- Mocks: CppUMock, `mock().expectOneCall(...)`; mocks live in tests/mocks/<header>_mock.cpp; `mock().clear()` in teardown.
+- Statics: tested through public callers (no `#include "x.c"` anywhere).
+- Headers: `extern "C" { #include }` for C headers; copyright header copied from the exemplar.
+Exemplars: exemplars/test.md, exemplars/mock.md, exemplars/register.md
 
-## 3. Test conventions
-Confirmed by user on:
-| Item | Convention | Example (file:line) |
-|------|------------|---------------------|
-| Test file name | | |
-| Test file location | | |
-| Group / suite name | | |
-| Test name | | |
-| Fixture setup / teardown | | |
-| Mock / stub style and location | | |
-| Preferred asserts | | |
-| Includes and `extern "C"` | | |
-| Access to static functions / globals | | |
-| Hardware / register fakes | | |
-| File header, comments, requirement IDs | | |
-| How a new test file is registered in the build | | |
-| One test checks one behaviour? | | |
+## Build notes
+(quirks, slow steps, files the graph could not preprocess, flaky tests, license limits)
 
-## 4. Coding conventions for test code
-(indentation, braces, naming of variables and helpers, magic numbers, max line length, MISRA/CERT exceptions for tests)
+## Modules
+| Module | File | Purpose | Tests | Notes file |
+|--------|------|---------|-------|------------|
 
-## 5. Build and tool notes
-(quirks, required env, slow steps, flaky tests, license limits, where outputs go)
-
-## 6. Logic notes per module
-### <module>
-- 
-
-## 7. Learnings (append, one line each)
-- YYYY-MM-DD [task/executor] learning
-
-## 8. Glossary
+## Glossary
 | Term | Meaning |
 |------|---------|

@@ -1,48 +1,31 @@
 # Task Context
-
-> Facts about THIS task only. Durable codebase knowledge goes to KB instead.
+> Facts about THIS task. Durable codebase facts go to the KB.
 
 ## 1. Request (user's own words)
 
-## 2. User-provided files
-| Path | What it is | Read? | Key points |
-|------|------------|-------|------------|
+## 2. Inputs
+| Path | What it is | Key points (≤ 5) |
+|------|------------|-------------------|
 
-## 3. Discovery
-Mode:
-Base ref / commit range / scope given:
+## 3. Work items
+Discovery mode / range:
+Change kinds: added, modified-logic, signature, deleted, moved/renamed, type/macro, new-dependency, targeted.
+Categories: A remove, B update tests, C mocks/stubs, D new tests, E fix build, F fix run, G coverage, H cleanup, I production bug (report only).
+| W# | Code item (file:function) | Change kind | Existing tests | Mocks affected | Proposed work | Cat | In scope | Priority | Acceptance |
+|----|---------------------------|-------------|----------------|----------------|---------------|-----|----------|----------|------------|
 
-### 3.1 Changed or targeted code
-| File | Function / item | Change kind | Notes |
-|------|-----------------|-------------|-------|
-
-### 3.2 Impact table
-Change kind: added, modified-logic, signature, deleted, moved/renamed, type/macro, new-dependency
-| # | Code item (file:function) | Change kind | Existing tests (file:test) | Mocks / stubs affected | Proposed work | Category |
-|---|---------------------------|-------------|----------------------------|------------------------|---------------|----------|
-
-## 4. Baseline problems (from build-run)
-| # | Problem | Evidence (log file:line) | Likely cause |
-|---|---------|--------------------------|--------------|
-
-## 5. Candidate work (not yet confirmed)
-Categories: A remove, B update tests, C mocks/stubs, D new tests, E fix build, F fix failing run, G coverage, H cleanup, I production bug report
-| C# | Description | Category | Evidence |
-|----|-------------|----------|----------|
-
-## 6. Confirmed scope
-Confirmed by user on:
-| S# | Description | Category | Priority | Acceptance |
-|----|-------------|----------|----------|------------|
-
-Acceptance for the whole task:
+Acceptance for the task:
 Out of scope:
 
-## 7. Coverage gaps
-Report used: (path, date)
-| G# | File | Function | Now | Uncovered lines / branches | Why uncovered | Action |
-|----|------|----------|-----|----------------------------|---------------|--------|
+## 4. Baseline problems
+| # | Problem | Evidence (log:line) | Likely cause | Cat |
+|---|---------|---------------------|--------------|-----|
 
-## 8. Decisions and answers
+## 5. Coverage gaps
+Report: (path, date)
+| G# | File | Function | Now | Uncovered lines / branches | Why | Action |
+|----|------|----------|-----|----------------------------|-----|--------|
+
+## 6. Decisions (every answer the user gave)
 | Date | Question | Answer |
 |------|----------|--------|

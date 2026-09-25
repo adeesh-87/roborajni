@@ -1,125 +1,59 @@
-# Sub-skill: knowledge (phase 2)
+# Phase 3 — Knowledge
 
-Goal: the knowledge base (KB) of THIS codebase exists and has (1) knowledge sources, (2) a code map
-of the in-scope code, (3) test conventions confirmed by the user.
-KBs live inside the skill, one folder per codebase: `$SKILL_DIR/resources/kb/<codebase-id>/`.
+Goal: `KB_DIR` holds everything a test writer needs about THIS codebase, in the form a small model uses best:
+one real example to copy, counted facts, and one card per function. No questions in this phase.
 
-## Step 1 — Identify the codebase and find its KB
+## 1. KB folder
 ```sh
-"$SKILL_DIR/resources/scripts/kb-id.sh" "<repo root>"          # prints id=..., root=..., remote=...
-cat "$SKILL_DIR/resources/kb/INDEX.md"
+"$SKILL_DIR/resources/scripts/kb-id.sh" "<repo root>"       # id=...
+KB_DIR="$SKILL_DIR/resources/kb/<id>"; KB="$KB_DIR/kb.md"
+mkdir -p "$KB_DIR/exemplars" "$KB_DIR/modules" "$KB_DIR/decompositions"
+[ -f "$KB" ] || cp "$SKILL_DIR/resources/templates/kb.md" "$KB"
 ```
-Set `KB_DIR = $SKILL_DIR/resources/kb/<id>` and `KB = $KB_DIR/kb.md`.
-- Check the skill folder is writable: `touch "$SKILL_DIR/resources/kb/.w" && rm "$SKILL_DIR/resources/kb/.w"`.
-  Not writable → ask the user for another place [TASK/kb/] and use that as KB_DIR instead.
-- `$KB` exists → it is THIS codebase's KB. Read only sections 0, 1, 3 and 7. Add the current root to
-  `Roots seen` (section 0 and INDEX.md) if it is new.
-  Ask: "The knowledge base for <id> exists (last updated <date>). Refresh conventions or code map? [no]"
-  No → go to Step 2 to add new sources only, then Step 6.
-- `$KB` does not exist →
-  ```sh
-  mkdir -p "$KB_DIR/codemap" "$KB_DIR/decompositions"
-  cp "$SKILL_DIR/resources/templates/kb.md" "$KB"
-  ```
-  Fill section 0 (id, remote, root). Add a row to `resources/kb/INDEX.md`.
-  Ask: "Is there a knowledge base for this codebase somewhere else (older ut task, other machine)? [no]"
-  If yes, copy its content into the new sections.
-Record `KB path` in status.md Config. Never open a KB folder with a different id.
+Not writable → use `$TASK/kb/` instead and record it. Fill KB `Identity` and `Profile` (from Config), add a row
+to `resources/kb/INDEX.md`. Record `KB dir` in Config. Never open another codebase's KB folder.
+KB exists with `Conventions approved on <date>` and the code did not change much → do only steps 2 and 5, then finish.
 
-## Step 2 — Existing knowledge from people or tools
-Ask:
-"Has anything already documented or decomposed this codebase? For example:
- 1) architecture or design docs, requirement specs, test specifications
- 2) AGENTS.md, CLAUDE.md, README, CONTRIBUTING, docs/ folder
- 3) output of analysis or agentic tools: code maps, repo wikis, call graphs, module summaries,
-    Doxygen, cscope/ctags databases, Understand or similar reports
- 4) notes written earlier by a model or a person
-Give paths or 'none'."
-Also check yourself: `ls AGENTS.md CLAUDE.md README* docs doc "$KB_DIR/decompositions" 2>/dev/null`.
-For each source: add a row to KB section 1, read only headings and the parts about in-scope modules,
-write at most 10 lines per module into KB section 6, each ending with `(source: <path>)`. Link, never copy.
-
-## Step 3 — Knowledge graph with Graphify (first choice when no decomposition exists)
-Do this step when Step 2 found no decomposition of the in-scope code. If one exists, ask
-"Also build a code graph? It takes a minute and helps navigation. [yes]".
-The skill bundles a pinned Graphify (`resources/vendor/graphify/`) plus C/C++ fixes (`graphify_ut.py`).
-Everything runs locally; the wrapper removes LLM keys, so nothing leaves the machine.
+## 2. Code graph (always; local; about a minute)
 ```sh
 G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
-"$G" setup        # once per machine: needs Python 3.10+ and a package index (or an offline wheelhouse)
-# with the compile DB recorded in status.md section 3 (best):
-"$G" build --cdb <compile_commands.json> "$GD" <code paths> <test paths> <mock paths>
-# without one:
-"$G" build "$GD" <code paths> <test paths> <mock paths>
+"$G" setup                                    # once per machine (Python 3.10+); falls back to the bash map by itself
+"$G" build --cdb <compile DB from KB Commands> "$GD" <code paths> <test paths> <mock paths>   # omit --cdb if none
 ```
-- `setup` fails (no Python 3.10+, no network, no index): tell the user the exact error and point to
-  `resources/vendor/graphify/README.md` (offline wheelhouse). Use Step 3b instead. Record in KB section 5.
-- Output lines to check: `preprocessed with compile flags: N translation units` (compile DB used) and
-  `augmented: ...` (fixes applied). `not preprocessed` lines and syntax-error warnings name files that are
-  only partly in the graph: record them in KB section 5.
-- Without a compile DB, macros are not expanded and BOTH sides of every `#if` are in the graph.
-What the graph gives you (paths are repo-relative, lines are original source lines):
+Check the output for `preprocessed with compile flags` (good) and `not preprocessed` / syntax warnings (record those
+files in KB `Build notes`). How to ask the graph questions: `resources/graph-queries.md` (load it when needed).
+
+## 3. How the existing tests are written
 ```sh
-"$G" deps    "$GD" src/sensor.c          # what a file or function calls outside itself: mock/stub candidates
-"$G" tests   "$GD" sensor_read           # which TEST blocks / test functions reach it (3 call hops)
-"$G" explain "$GD" "sensor_read"         # definition, callers, callees
-"$G" path    "$GD" "app_main" "sensor_read"   # call chain from A to B
-"$G" query   "$GD" "what calls sensor_read" --budget 800
+"$SKILL_DIR/resources/scripts/testscan.sh" "$KB_DIR" <test paths> <mock paths>
 ```
-`deps` kinds: `function` (declared in a repo header: mock or stub it), `pointer` (called through a variable or
-struct member: set it in the test), `macro`, `in-scope code` (another scanned file, often an existing mock),
-`library` (system/C library, usually not mocked), `test-framework`.
-Functions carry `static: true` when static (also via `STATIC`/`PRIVATE` macros). Every `TEST(...)`, `TEST_F(...)`,
-`TEST_GROUP(...)` block is its own node. Known limits: calls hidden in macros are only seen with a compile DB;
-function pointers are reported by the expression used (e.g. `hooks->allocate`), not by the function behind them.
-Read `$GD/out/GRAPH_REPORT.md` (Graphify's overview of main modules and most connected functions). Add a row
-for the graph to KB section 1 and 3-5 lines to KB section 6.
+Read `$KB_DIR/testscan.md`. Then read fully (they are short): the top exemplar candidate, the top mock/stub file,
+and the lines that register one existing test file in the build (`grep -n '<test file name>' CMakeLists.txt Makefile* project.yml`).
+Write:
+- `KB_DIR/exemplars/test.md` from `resources/templates/exemplar.md`: the candidate file VERBATIM (cut to ≤ 80 lines
+  keeping 2–3 tests), each part labelled in the comment column; then the skeleton to copy for a new file.
+- `KB_DIR/exemplars/mock.md`: one real mock/stub function verbatim + how a test sets its return value and checks its
+  arguments (from a test that uses it). Greenfield or no mocks → write `none yet`.
+- `KB_DIR/exemplars/register.md`: the exact lines that add a test file to the build, with file:line.
+- KB `Conventions`: ≤ 12 lines of facts with counts from testscan (file name pattern, test name pattern, fixture use,
+  top asserts, mock API, `extern "C"`, statics access). Mark `DRAFT (from N files); approved: no`.
+No tests exist → write `greenfield` in Conventions; the pilot will create the exemplars.
 
-## Step 3b — Code map (fallback, and quick per-file tables)
-Run it when Graphify could not be set up; otherwise it is optional (it needs only bash + awk):
+## 4. Module cards (in-scope code only)
+For each in-scope source file `F` (from Config paths and the request):
 ```sh
-"$SKILL_DIR/resources/scripts/codemap.sh" "$KB_DIR/codemap" <code paths> <test paths> <mock paths>
+"$G" card "$GD" F  > "$KB_DIR/modules/<basename of F>.cards.md"
+"$G" deps "$GD" F >> "$KB_DIR/modules/<basename of F>.cards.md"
 ```
-It writes `summary.md` (per file: functions, calls, external dependencies = mock/stub candidates),
-`functions.tsv`, `calls.tsv`, `includes.tsv`, `externals.tsv`. It is a heuristic: confirm in the code.
-Read only what you need, e.g. one file's part: `grep -A40 '^### src/sensor.c' "$KB_DIR/codemap/summary.md"`.
-Useful queries:
-```sh
-awk -F'\t' '$3=="sensor_read"' "$KB_DIR/codemap/calls.tsv"            # who calls sensor_read, incl. each TEST(...)
-awk -F'\t' '$5!="external" && $5!="macro" && $1!=$5 {print $1" -> "$5}' "$KB_DIR/codemap/calls.tsv" | sort | uniq -c   # file dependencies
-```
-Record in KB section 0 the date, paths and mode (compile DB or not) of the graph and/or code map. Rebuild when
-the code changed a lot (seconds to a minute).
+Create `KB_DIR/modules/<name>.md` from `resources/templates/module.md` if missing: purpose (1 line, from the header
+comment or file name), files, test file(s) (from testscan / graph `tests`), the cards file name.
+Read the docs the user named in setup (context.md section 2): write ≤ 8 lines per module into the module file,
+each ending `(source: <path>)`. Link, never copy.
 
-## Step 4 — Deeper decomposition when none exists
-If Step 2 found no module-level notes for the in-scope code, count the work:
-`wc -l < "$KB_DIR/codemap/functions.tsv"`.
-Ask (recommend 2 when more than ~150 functions, or the code has state machines, RTOS/ISR logic,
-protocol parsing or complex error handling):
-"No explanation of this code exists yet. I built a code graph and a code map. Options:
- 1) Continue with those only; I learn the logic while working. [default for small scopes]
- 2) You run a stronger model once with a prepared request; it writes module notes into the KB that I
-    and later tasks reuse. I can continue meanwhile and pick the notes up when they appear.
- 3) You have another tool's output (Doxygen with call graphs, cscope, clangd index, Understand...):
-    give me the path.
- 4) Skip."
-Option 2: copy `resources/templates/decompose-codebase.md` to `TASK/decompose-codebase.md`, replace
-`<KB_DIR>` and `<MODULES / PATHS>`, and tell the user which file to give to the stronger model.
-Add to status.md `Next steps`: "read KB decompositions/ when present". Do not wait unless the user asks.
+## 5. Decomposition by a stronger model (only when it pays)
+If no notes exist for the in-scope modules AND (the cards show > 40 functions, or state machines, ISR/RTOS,
+protocol parsing, or the user said the code is tricky): copy `resources/templates/decompose-codebase.md` to
+`$TASK/decompose-codebase.md`, fill `<KB_DIR>` and `<MODULES>`, and tell the user in one line that giving that file
+to a stronger model will produce module notes you and later tasks reuse. Do not wait for it.
 
-## Step 5 — Code map table and conventions
-1. Fill KB section 2 from the graph (`deps` per source file, `tests` for key functions) or the code map:
-   one row per module, pairing each source file with its test and mock files. A source file with no test gets `no tests`.
-2. Pick samples: `git log -n 30 --name-only --pretty=format: -- <test paths> | sort | uniq -c | sort -rn | head`.
-   Read 3 test files (different modules, recently edited), 1–2 mock/stub files and the file that registers
-   tests in the build (CMakeLists.txt, Makefile, project.yml, Parasoft project).
-3. Fill every row of KB section 3 with a value and an example `file:line`, and section 4 from what you see.
-
-## Step 6 — Confirm with the user
-Show KB section 3 as a table. Ask: "Are these your test conventions? Correct anything wrong."
-Apply corrections. Write `Confirmed by user on <date>`.
-Ask: "Any rules I cannot see in the code? (e.g. one assert per test, requirement IDs in comments, forbidden APIs)"
-Record answers in section 3 or 4. Update `Last updated` in the KB and INDEX.md.
-
-## Finish
-Tick phase 2 in status.md, set `Current phase: 3`, add a Log line.
+Update KB `Last updated` and INDEX.md. Tick phase 3.
