@@ -4,9 +4,10 @@
 namespace cvaccel {
 
 namespace {
-uint32_t reservedBytesOf(const MemoryPool& pool, MemHandle h) {
+// "allocated" for a PerfRecord: the size of the memory handle the request used, i.e. MemBlock::bytes.
+uint32_t blockBytesOf(const MemoryPool& pool, MemHandle h) {
     const MemBlock* blk = pool.find(h);
-    return blk ? static_cast<uint32_t>(blk->reserved) : 0;
+    return blk ? static_cast<uint32_t>(blk->bytes) : 0;
 }
 }  // namespace
 
@@ -57,7 +58,7 @@ unsigned Dispatcher::pump() {
             rec.session = r.session;
             rec.core = r.core;
             rec.bytes = r.bytes;
-            rec.allocated = reservedBytesOf(pool_, r.mem);
+            rec.allocated = blockBytesOf(pool_, r.mem);
             rec.tQueued = r.tQueued;
             rec.tStarted = now;
             rec.tFinished = now;
@@ -94,7 +95,7 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {
     rec.session = r.session;
     rec.core = r.core;
     rec.bytes = r.bytes;
-    rec.allocated = reservedBytesOf(pool_, r.mem);
+    rec.allocated = blockBytesOf(pool_, r.mem);
     rec.tQueued = r.tQueued;
     rec.tStarted = r.tStarted;
     rec.tFinished = dev_.nowNs();
