@@ -33,4 +33,4 @@ Apply corrections, rebuild, rerun, show again. After the third round, take what 
 - `KB_DIR/exemplars/register.md` ← the exact registration lines.
 - KB `Conventions` ← rewrite in ≤ 12 lines from the approved file; set `approved on <date> (pilot: <file>)`.
 - Mark the two functions' work items as covered by the pilot (their remaining cases stay planned work).
-Tick phase 6.
+- Load `subskills/refresh.md` (the cards now show the pilot tests). Tick phase 6.

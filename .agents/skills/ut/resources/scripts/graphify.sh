@@ -16,6 +16,8 @@
 #                                                globals, calls, callers, existing tests
 # If Python 3.10+ / Graphify cannot be set up, build/deps/tests/card fall back to the bash code map
 # (codemap.sh) automatically and print "MODE: codemap". explain/path/query need the real graph.
+#   graphify.sh refresh OUT_DIR                  rebuild with the last build's arguments, rescan tests, regenerate the
+#                                                module cards under <KB_DIR>/modules/, write <KB_DIR>/last-refresh.md (delta)
 #   graphify.sh selftest                         build a bundled fixture and check the C/C++ fixes on THIS machine
 #   graphify.sh wheelhouse DIR PLATFORM PYVER    download every wheel for an OFFLINE machine,
 #                                                e.g. win_amd64 3.11 | manylinux2014_x86_64 3.12 | macosx_11_0_arm64 3.12
@@ -34,7 +36,7 @@ VENV="$VENDOR/.venv"
 WHEELS="$VENDOR/wheels"
 
 die() { echo "graphify.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,30p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,32p' "$0"; exit 2; }
 CMD=$1; shift
 
 venv_py() {
@@ -77,7 +79,70 @@ do_setup() {
 ensure() { [ -n "$(venv_py)" ] || ( do_setup ) >&2; [ -n "$(venv_py)" ]; }   # subshell: a failed setup must not exit
 
 # fallback: the bash code map, same commands
-fallback_build() { local out=$1; shift; echo "MODE: codemap (Graphify unavailable: $FALLBACK_REASON)"; mkdir -p "$out"; echo codemap > "$out/MODE"; "$HERE/codemap.sh" build "$out/codemap" "$@"; }
+fallback_build() { local out=$1; shift; echo "MODE: codemap (Graphify unavailable: $FALLBACK_REASON)"; mkdir -p "$out"; echo codemap > "$out/MODE"
+  { echo "cwd=$PWD"; echo "cdb="; for p in "$@"; do echo "path=$p"; done; } > "$out/BUILD_ARGS"
+  "$HERE/codemap.sh" build "$out/codemap" "$@"; }
+
+# rebuild with the arguments of the last build, regenerate every module's cards, write the delta
+do_refresh() {
+  local gd=$1 kb args cwd cdb paths=() line
+  gd=$(cd "$gd" && pwd -P) || die "no such folder: $1"
+  kb=$(dirname "$gd"); args="$gd/BUILD_ARGS"
+  [ -f "$args" ] || die "no BUILD_ARGS in $gd (build once with: graphify.sh build ...)"
+  cwd=$(sed -n 's/^cwd=//p' "$args"); cdb=$(sed -n 's/^cdb=//p' "$args")
+  while IFS= read -r line; do case $line in path=*) paths+=("${line#path=}") ;; esac; done < "$args"
+  [ -d "$cwd" ] || die "build directory of the last build no longer exists: $cwd"
+  local stamp; stamp=$(date '+%Y-%m-%d %H:%M')
+  local before="$gd/.functions-before"; : > "$before"
+  [ -f "$gd/out/graph.json" ] && "$(venv_py)" - "$gd/out/graph.json" > "$before" <<'PY'
+import json, sys
+g = json.load(open(sys.argv[1]))
+for n in g['nodes']:
+    if n.get('_callable') and n.get('source_file') and n.get('kind') not in ('test', 'fixture'):
+        print(f"{n.get('source_file')}	{n['label']}")
+PY
+  [ -f "$gd/codemap/functions.tsv" ] && cut -f1,2 "$gd/codemap/functions.tsv" > "$before"
+  local ntests_before; ntests_before=$(grep -c . "$kb/testscan.md" 2>/dev/null | head -1)
+  echo "== refresh $stamp (same arguments as the last build)"
+  ( cd "$cwd" && if [ -n "$cdb" ]; then do_build --cdb "$cdb" "$gd" "${paths[@]}"; else do_build "$gd" "${paths[@]}"; fi ) | grep -E 'preprocessed|augmented|MODE|WARNING|FAILED' || true
+  # test scan again (cheap) on the test/mock paths among the build paths
+  local tpaths=() p
+  for p in "${paths[@]}"; do case $p in *test*|*Test*|*mock*|*Mock*|*stub*|*Stub*|*fake*) tpaths+=("$cwd/$p") ;; esac; done
+  [ ${#tpaths[@]} -gt 0 ] && ( cd "$cwd" && "$HERE/testscan.sh" "$kb" "${tpaths[@]}" ) | tail -1
+  # cards: regenerate every file card found under modules/
+  local delta="$kb/last-refresh.md" f src tmp
+  { echo "# Last refresh: $stamp"; echo "Graph rebuilt with the arguments of $(date -r "$args" '+%Y-%m-%d' 2>/dev/null || echo 'the last build'): ${paths[*]}${cdb:+ (compile DB: $cdb)}"; echo; echo "## Functions added / removed since the previous graph"; } > "$delta"
+  local after="$gd/.functions-after"
+  if [ -f "$gd/out/graph.json" ]; then "$(venv_py)" - "$gd/out/graph.json" > "$after" <<'PY'
+import json, sys
+g = json.load(open(sys.argv[1]))
+for n in g['nodes']:
+    if n.get('_callable') and n.get('source_file') and n.get('kind') not in ('test', 'fixture'):
+        print(f"{n.get('source_file')}	{n['label']}")
+PY
+  else cut -f1,2 "$gd/codemap/functions.tsv" > "$after"; fi
+  comm -13 <(sort -u "$before") <(sort -u "$after") | sed 's/^/+ /' >> "$delta"
+  comm -23 <(sort -u "$before") <(sort -u "$after") | sed 's/^/- /' >> "$delta"
+  [ "$(comm -3 <(sort -u "$before") <(sort -u "$after") | wc -l)" = 0 ] && echo "(none)" >> "$delta"
+  echo >> "$delta"; echo "## Cards regenerated (changed lines per file)" >> "$delta"
+  for f in "$kb"/modules/*.cards.md; do
+    [ -f "$f" ] || continue
+    src=$(sed -n '1s/^# Cards for \([^ ]*\) .*/\1/p' "$f"); [ -n "$src" ] || continue
+    tmp="$f.new"
+    { case $(mode_of "$gd") in graph) "$(venv_py)" "$HERE/graphify_ut.py" card "$gd/out/graph.json" "$gd/scan" "$src";
+                                         "$(venv_py)" "$HERE/graphify_ut.py" deps "$gd/out/graph.json" "$src" ;;
+                                 codemap) "$HERE/codemap.sh" card "$gd/codemap" "$src"; "$HERE/codemap.sh" deps "$gd/codemap" "$src" ;; esac; } > "$tmp" 2>/dev/null
+    if [ -s "$tmp" ]; then
+      local ch; ch=$(diff <(grep -v '^Generated' "$f") <(grep -v '^Generated' "$tmp") | grep -c '^[<>]')
+      printf -- '- %s: %s changed lines' "$(basename "$f")" "$ch" >> "$delta"
+      [ "$ch" -gt 0 ] && { echo >> "$delta"; diff <(grep -v '^Generated' "$f") <(grep -v '^Generated' "$tmp") | grep -E '^[<>] +(##|  L|Existing tests|Calls:|Globals)' | head -12 | sed 's/^/    /' >> "$delta"; }
+      echo >> "$delta"; mv -f "$tmp" "$f"
+    else rm -f "$tmp"; echo "- $(basename "$f"): could not regenerate (source $src not in the graph?)" >> "$delta"; fi
+  done
+  echo "$stamp refresh: $(sed -n '/^## Functions/,/^## Cards/p' "$delta" | grep -c '^[+-] ') function(s) added/removed; cards regenerated" >> "$kb/refresh.log"
+  rm -f "$before" "$after"
+  echo "delta: $delta"; sed -n '4,40p' "$delta"
+}
 mode_of() { [ -f "$1/out/graph.json" ] && echo graph || { [ -f "$1/codemap/functions.tsv" ] && echo codemap || echo none; }; }
 need_graph() { case $(mode_of "$1") in graph) return 0 ;; codemap) echo "graphify.sh: '$CMD' needs the Graphify graph; this folder has the bash code map only. Use deps/tests/card." >&2; exit 1 ;; *) echo "graphify.sh: no graph in $1 (run: graphify.sh build ...)" >&2; exit 1 ;; esac; }
 
@@ -99,6 +164,7 @@ do_build() {
   [ $# -ge 1 ] || die "usage: build [--cdb compile_commands.json] OUT_DIR PATH..."
   mkdir -p "$out" || die "cannot create $out"
   out=$(cd "$out" && pwd -P)
+  { echo "cwd=$PWD"; echo "cdb=$cdb"; for p in "$@"; do echo "path=$p"; done; } > "$out/BUILD_ARGS"   # for refresh
   # 1. mirror only the in-scope files (preprocessed with the real flags when a compile DB is given);
   #    nothing is written into the repository
   "$(venv_py)" "$HERE/graphify_ut.py" mirror "$out/scan" ${cdb:+--cdb "$cdb"} "$@" || return 1
@@ -145,6 +211,7 @@ case $CMD in
   card)    [ $# -eq 2 ] || die "usage: card OUT_DIR FUNCTION|FILE"
            case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" card "$1/out/graph.json" "$1/scan" "$2" ;;
              codemap) "$HERE/codemap.sh" card "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+  refresh) [ $# -eq 1 ] || die "usage: refresh OUT_DIR"; ensure >/dev/null 2>&1 || true; do_refresh "$1" ;;
   selftest)
     ensure || exit 2
     tmp=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/ut-selftest-$$"); mkdir -p "$tmp"
@@ -161,5 +228,5 @@ case $CMD in
     mkdir -p "$1" && cp "$WHEEL" "$1/"
     $py -m pip download --disable-pip-version-check --only-binary=:all: --platform "$2" --python-version "$3" -d "$1" "$WHEEL" \
       && echo "wheelhouse ready: $1 (copy it to resources/vendor/graphify/wheels on the offline machine, then run setup)" ;;
-  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|card|selftest|wheelhouse|version)" ;;
+  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|card|refresh|selftest|wheelhouse|version)" ;;
 esac

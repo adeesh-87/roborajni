@@ -43,6 +43,8 @@ LLM API keys from Graphify's environment, so no code or names are sent to any mo
 - **deps** / **tests** / **card**: mock candidates; tests reaching a function; a per-function test-planning card
   (signature, every decision with its line, returns, globals touched, calls, callers, existing tests).
 - **selftest**: bundled fixture (`scripts/selftest/`) with known answers, built with the local compiler.
+- **refresh**: rebuild with the last build's arguments (`BUILD_ARGS`), rescan tests, regenerate `modules/*.cards.md`,
+  write `last-refresh.md` (functions added/removed, changed card lines) and append to `refresh.log`.
 
 To upgrade: replace the wheel, update the version in `scripts/graphify.sh` (`GRAPHIFY_VERSION`), delete `.venv/`,
 run `setup`, and re-test on a known codebase.

@@ -40,6 +40,7 @@ later task needs → `KB_DIR/modules/<module>.md` `Learnings` (one line each, wi
 ## 6. Checkpoint
 All tasks of the current wave finished and no result recorded → full build + all tests → status.md `Checkpoints`:
 `wave N: PASSED/FAILED (<tests>) <date> by ME`. FAILED → open issue, tell the user, do not start the next wave.
+PASSED → load `subskills/refresh.md` once, so the next wave's cards show the tests and mocks this wave added.
 (parallel: take the checkpoint lock first, see parallel.md.)
 
 ## 7. Stop

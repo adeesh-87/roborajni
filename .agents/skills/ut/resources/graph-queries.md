@@ -9,6 +9,7 @@ Works the same when the bash fallback is in use (`MODE: codemap`), except `expla
 | Which tests already reach a function (through callers and function pointers) | `"$G" tests "$GD" sensor_read` |
 | Callers and callees of one function | `"$G" explain "$GD" sensor_read` |
 | Call chain from A to B | `"$G" path "$GD" app_main sensor_read` |
+| Code changed: bring graph, testscan and all cards up to date, get the delta | `"$G" refresh "$GD"` → `KB_DIR/last-refresh.md` (see `subskills/refresh.md`) |
 
 Card lines: `Decisions` = one test per outcome (loops: 0, 1, many; `?:` both; `switch` every case + default;
 `[n sub-conditions]` = each must flip the result alone for MC/DC). `Globals/statics` = reset in setup, check after.

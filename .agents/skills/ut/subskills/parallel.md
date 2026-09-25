@@ -21,6 +21,7 @@ Rules
 4. Build/run: `alive $ME <2x expected seconds> "Tnn build"`, `wait $ME 1800` on KB `Paths written by build`
    (use `build-$ME` if each executor has its own folder), build, run, release those paths.
 5. Checkpoint: `acquire $ME "$TASK/checkpoint-wave-N"` (exit 1 = someone else runs it). Closeout: `acquire $ME "$TASK/closeout"`.
+   Refresh (subskills/refresh.md) locks `KB_DIR/graphify`, `KB_DIR/modules`, `KB_DIR/testscan.md`, `KB_DIR/last-refresh.md`.
 6. Every lock call is a heartbeat. Silence longer than `stale_after` makes you STALE to others.
 7. `STALE-WARNING` line or exit 3 → STOP, show the user that line, ask "Is <ID> still running? May I remove its
    locks?". Only after yes: `reap <ID>`, set its IN_PROGRESS tasks back to TODO. Never `reap --force` or `break`

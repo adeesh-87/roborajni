@@ -8,8 +8,7 @@
    Coverage: before → after (target) | Acceptance met: yes/no (reason) | Open issues: n | Production bugs reported: ...
    ```
    Rewrite `Next steps` so a new session needs nothing else. Tick phase 10.
-4. KB: move task learnings into the right place (module file, Conventions, Build notes); rebuild the graph and
-   testscan so they include the new tests (`graphify.sh build ...`, `testscan.sh "$KB_DIR" ...`); regenerate the cards
-   of touched files; set `Last updated` in KB and INDEX.md.
+4. KB: move task learnings into the right place (module file, Conventions, Build notes); load `subskills/refresh.md`
+   (graph, testscan and cards include the new tests); set `Last updated` in KB and INDEX.md.
 5. Report: the summary numbers, files changed (tests / mocks / build), open issues, next steps. Remind the user
    nothing was committed if Config says so. Parallel → `release-all`.

@@ -47,6 +47,8 @@ continue here. Everything you learn goes into files; your memory is those files.
 
 After each phase: tick it in status.md `Phases`, set `Current phase`, add one `Log` line.
 Skipped phases (6, 7): tick and write `skipped`.
+Any time the code or the tests changed (a finished round, a new commit, the user asks): load `subskills/refresh.md`
+so the graph and the cards match the code again. One command, about a minute.
 
 ### Discovery file (phase 4)
 | The user's answer in setup | Load |
