@@ -2,7 +2,7 @@
 
 CTC++ instruments C/C++ sources at compile time. The instrumented test program writes counters
 when it exits. `ctcpost` makes listings, `ctc2html` makes HTML. **VERIFY options with `ctc -h`,
-`ctcpost -h`, `ctc2html -h` for the installed version**; record verified commands in status.md section 3.
+`ctcpost -h`, `ctc2html -h` for the installed version**; record verified commands in KB `Commands`.
 
 ## Files
 | File | Made by | Contains |
@@ -54,13 +54,5 @@ View options for listings (typical): `-ff` function, `-fd` decision, `-fc` condi
 #pragma CTC ANNOTATION reason text      /* documents a justification in the report */
 ```
 
-## Problems
-| Symptom | Fix |
-|---------|-----|
-| `MON.dat` not created | program crashed or was killed; fix the crash, or call `ctc_append_all()` before exit if the repo does that; check write permission and data file path |
-| Coverage lower than expected / old numbers | stale `MON.dat` from earlier runs: delete and re-run |
-| Warnings about timestamps / sym mismatch | sources changed after instrumentation: delete `MON.sym` + `MON.dat`, rebuild |
-| Tests and mocks appear in the report | exclude them from instrumentation |
-| Link errors about `ctc_` symbols | link step was not done through `ctc`/`ctcwrap`, add the CTC++ runtime library |
-| Embedded target | data must be sent with the Host-Target add-on: ask the user for their procedure |
-Parallel executors share `MON.sym`/`MON.dat` unless each has its own build folder: lock them.
+
+Build or run fails → load `resources/tools/errors/ctc.md` (error messages and fixes).

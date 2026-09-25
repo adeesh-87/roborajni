@@ -1,55 +1,27 @@
-# Test design for C/C++ unit tests (read before writing any test)
+# Test design (read once per task, before the first test)
 
-## Golden rules
-1. **Imitate.** Open the existing test file named in the task Inputs (or the closest one for the
-   same module). Copy its includes, fixture, mock style, naming and layout exactly.
-2. **One behaviour per test.** Name says input/state and expected result:
-   `<Function>_<Condition>_<Expected>` (or the naming in KB section 3).
-3. **Arrange / Act / Assert.** Set inputs and mock expectations, call the function once, check results.
-4. **Check every output:** return value, out-parameters, changed globals/state, calls to dependencies.
-5. **Independent tests.** Reset all state in setup/teardown. No test may rely on another test's order.
-6. **Never** change an expected value just to make a test pass. Work out the right value from the
-   code and the requirement. If code and requirement disagree, report it (category I).
-7. Use exact literal expected values (`42`, `0x1F`). Do not recompute them with the code under test.
+Shape: copy `exemplars/test.md`. One behaviour per test; name `<Function>_<Condition>_<Expected>` unless the
+Conventions say otherwise. Arrange (inputs, mock returns, state) → Act (one call) → Assert (return value,
+out-parameters, changed globals, calls made). Reset all state in setup/teardown; no test depends on another.
+Expected values are literals worked out from the code and the requirement, never computed by calling the code
+under test. Code and requirement disagree → open issue (category I), not a changed assertion.
 
-## Choosing test cases (do this list for every function)
-Read the function top to bottom and write down:
-| Look for | Tests to write |
-|----------|----------------|
-| each `if` / `else if` / `else` | one test per outcome (true and false) |
-| `&&` / `\|\|` conditions | each sub-condition deciding the result (needed for MC/DC) |
-| `switch` | each `case`, plus `default` |
-| loops | 0 iterations, 1 iteration, many / max iterations, early `break` |
-| input ranges | min, min-1, max, max+1, zero, typical value (boundary values) |
-| pointers | `NULL` argument (if the code checks it), valid pointer |
-| buffers / lengths | length 0, 1, exact size, size+1 |
-| return codes of called functions | success, each handled error (mock returns the error) |
-| state machines | each transition, invalid event in each state |
-| arithmetic | overflow / wrap, division by zero guard, sign |
-| enums | each value, out-of-range value if handled |
-Make a short table in the task file before coding: `case | inputs | mock setup | expected`.
+Cases come from the card's `Decisions`; add these when they apply:
+| Seen in the card | Cases |
+|------------------|-------|
+| `if` / `?:` | true and false (and `else`) |
+| `[n sub-conditions]` | each sub-condition flips the outcome alone |
+| `switch` | every case, the default, an unknown value if handled |
+| loop | 0, 1, many/max iterations, early exit |
+| numeric input | min, min−1, max, max+1, zero, typical |
+| pointer input | NULL if checked, valid |
+| buffer + length | 0, 1, exact, exact+1 |
+| call to a dependency | success, each handled error (mock returns it) |
+| state machine (globals written) | each transition, invalid event per state |
 
-## Dependencies
-- Everything the function calls outside its own module is replaced by a mock, stub or fake
-  (as the repo already does). Use the mock to set return values and to check call arguments.
-- Only expect calls the test is about. Use the framework's "ignore other calls" only if the repo does.
-- Out-parameters from a dependency: make the mock write the value (see the tool file).
+Embedded seams (check Conventions first): static function → via its public caller, or `#include "module.c"` in the test,
+or a `STATIC` macro empty in test builds; registers → fake register array or mocked HAL; module globals → `extern`
++ reset in setup; ticks/delays → mock the tick function; ISR → call it directly; `while(1)` → body in a function.
 
-## Common embedded C patterns
-| Problem | Usual solution (check KB first) |
-|---------|--------------------------------|
-| `static` function | test via public function; or `#include "module.c"` in the test file; or a `STATIC` macro that is empty in test builds |
-| hardware registers `*(volatile uint32_t*)0x4000` | register macros point to a fake array in test builds; or a HAL layer that is mocked |
-| globals of the module | `extern` them in the test, reset in setup |
-| time / delays / ticks | mock the tick or delay function; control the returned time |
-| interrupts / ISR | call the ISR function directly from the test |
-| infinite loop `while(1)` | loop body in a separate function; or a test-only macro `FOREVER` |
-| asserts / fatal handlers | mock the handler; with CppUTest/gtest check it was called |
-| memory allocation | mock or wrap `malloc` to test the failure path |
-
-## Before you build
-- [ ] File name, location and group name follow KB section 3.
-- [ ] New test file is registered in the build (see KB "How a new test file is registered").
-- [ ] Every mock expectation has a matching check (framework verifies at teardown or explicitly).
-- [ ] No leftover debug prints, no commented-out tests, no `IGNORE`/`DISABLED_` unless asked.
-- [ ] Header/copyright/requirement comments as in the imitated file.
+Before building: file name, location and registration as in `exemplars/register.md`; every expectation checked;
+no debug prints, no commented-out or disabled tests; header comment as in the exemplar.

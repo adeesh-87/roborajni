@@ -1,19 +1,10 @@
 # Playbook: add-tests
-New tests for functions or behaviour that have none. Read `resources/test-design.md` first.
-
-1. Read the function(s) under test fully, and the header that declares them.
-2. Open the test file to imitate (task Inputs). Decide: add to an existing test file or create one?
-   Follow KB section 3: usually one test file per source file.
-3. Write the case table (test-design.md) into the task file under Steps. Keep it short.
-4. List the dependencies the function calls: `"$SKILL_DIR/resources/scripts/graphify.sh" deps "$KB_DIR/graphify" <function>`
-   (or the code map: `grep -A40 '^### <file>' "$KB_DIR/codemap/summary.md"`). Confirm in the code.
-   `in-scope code` in a mock folder = a mock already exists. For each other dependency: does a mock/stub exist?
-   - Yes → use it as other tests do.
-   - No → if it is in Touches, create it following the mock style in KB; otherwise record as
-     needed work and mark the task PARTIAL at the end.
-5. Write the tests, one per case row. Start with the simplest (happy path) and build it right away.
-6. New file → register it in the build (CMakeLists.txt / Makefile / project.yml / Parasoft project),
-   exactly like the neighbouring files are registered.
-7. Build, run only these tests (single-test command). Fix, max 3 attempts per error.
-8. All pass → run the whole test group of this module to see you broke nothing.
-9. Result: list test names added, one line each.
+1. Read the card of each function in `Inputs` and the function's source. Read `exemplars/test.md`.
+2. The task file's `Cases` table is the plan: one test per line. Missing a decision the card lists → add a line.
+3. Dependencies: the card's `Calls` says which are mocked (`(mock file)`), which need a mock (`[function: header]`),
+   which are pointers to set. A needed mock that is not in `Touches` → write it down, mark the task PARTIAL at the end.
+4. New file or existing file per `Conventions`. Copy the exemplar's includes, group/fixture, setup/teardown.
+   Write the tests in `Cases` order; happy path first; build after the first one.
+5. New file → register it exactly as `exemplars/register.md` shows.
+6. Build, run this file only (single-test command). Fix, max 3 attempts per error (`tools/errors/<tool>.md`).
+7. All pass → run the module's whole group. Result: test names added, one per line.

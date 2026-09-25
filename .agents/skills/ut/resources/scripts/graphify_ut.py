@@ -20,6 +20,8 @@ Run with the Graphify venv python (graphify.sh does this). Two steps:
         node, e.g. `TEST_F(ProtoTest, Feed_StartByte)`, with its own calls
       - duplicate nodes (same function seen from several translation units) merged
 
+  card  GRAPH_JSON SCAN_DIR FUNCTION|FILE  test-planning card: signature, params, every decision with its
+                                        line, returns, globals touched, calls, callers, existing tests
   deps  GRAPH_JSON FILE|FUNCTION        what it calls outside itself (mock/stub candidates first)
   tests GRAPH_JSON FUNCTION [HOPS=4]    test blocks that reach FUNCTION through calls (incl. via function pointers)
 """
@@ -1066,6 +1068,215 @@ def cmd_tests(argv):
         print(f"{d} hop(s) [{what}]: {n['label']}  {n.get('source_file')}:{n.get('source_location')}   via {' <- '.join(chain)}")
 
 
+# --------------------------------------------------------------------------- function cards
+DECISION_TYPES = {'if_statement': 'if', 'switch_statement': 'switch', 'while_statement': 'while',
+                  'do_statement': 'do-while', 'for_statement': 'for', 'conditional_expression': '?:'}
+
+
+def file_scope_vars(root, src):
+    out = set()
+    for d in root.named_children:
+        if d.type == 'declaration':
+            for c in d.named_children:
+                if c.type in ('identifier', 'init_declarator', 'pointer_declarator', 'array_declarator'):
+                    nm = innermost_name(c, src)
+                    if nm is not None and nm.type == 'identifier':
+                        out.add(txt(nm, src))
+    return out
+
+
+def one_line(t, n=90):
+    t = ' '.join(t.split())
+    return t if len(t) <= n else t[:n - 3] + '...'
+
+
+def find_def(scan, name, pc, pcpp, want_rel=None):
+    """(rel, node, src, root) of the function definition called name (Class::m or plain)"""
+    hits = []
+    for d, _, files in os.walk(scan):
+        for fn in files:
+            ext = os.path.splitext(fn)[1].lower()
+            if ext not in EXTS:
+                continue
+            p = os.path.join(d, fn)
+            rel = norm(os.path.relpath(p, scan))
+            src = open(p, 'rb').read()
+            if name.split('::')[-1].encode() not in src:
+                continue
+            tree = (pc if ext == '.c' else pcpp).parse(src)
+            _IS_C[id(src)] = ext == '.c'
+            for n in walk(tree.root_node):
+                if n.type != 'function_definition':
+                    continue
+                nm, _ = func_name(n, src)
+                if not nm:
+                    continue
+                cls = enclosing_class(n, src)
+                q = f'{cls}::{nm}' if cls and '::' not in nm else nm
+                if q == name or q.split('::')[-1] == name.split('::')[-1] and ('::' not in name or q.endswith(name)):
+                    hits.append((rel, n, src, tree.root_node))
+    if want_rel:
+        pref = [h for h in hits if h[0] == want_rel]
+        if pref:
+            return pref[0]
+    return hits[0] if hits else None
+
+
+def card_for(name, node_info, scan, lm, root, ids, out, inc, pc, pcpp):
+    rel_hint = None
+    if node_info:
+        for r, runs in lm.m.items():   # which mirror file holds this original file?
+            if any(rr[2] == node_info.get('source_file') for rr in runs[0]):
+                rel_hint = r; break
+        rel_hint = rel_hint or node_info.get('source_file')
+    hit = find_def(scan, name, pc, pcpp, rel_hint)
+    lines = []
+    if not hit:
+        lines.append(f'## {name}: definition not found in the scanned code')
+        return '\n'.join(lines)
+    rel, n, src, tree_root = hit
+    of, ol = lm.to_orig(rel, n.start_point[0] + 1)
+    _, el = lm.to_orig(rel, n.end_point[0] + 1)
+    body = n.child_by_field_name('body')
+    head = src[n.start_byte:body.start_byte].decode('utf-8', 'replace') if body is not None else txt(n, src)
+    static = bool(re.search(r'\b(static|STATIC|PRIVATE)\b', head))
+    lines.append(f'## {name}  ({of}:{ol}-{el}){"  static" if static else ""}')
+    lines.append(f'Signature: {one_line(head, 140)}')
+    if body is None:
+        return '\n'.join(lines)
+    decl = n.child_by_field_name('declarator')
+    while decl is not None and decl.type != 'function_declarator':
+        decl = decl.child_by_field_name('declarator')
+    params = []
+    plist = decl.child_by_field_name('parameters') if decl is not None else None
+    for pd in (plist.named_children if plist is not None else []):
+        if pd.type == 'parameter_declaration':
+            nm = innermost_name(pd.child_by_field_name('declarator'), src)
+            if nm is None and txt(pd, src).strip() == 'void':
+                continue
+            params.append((txt(nm, src) if nm is not None else '?', one_line(txt(pd, src), 40)))
+    if params:
+        lines.append('Params: ' + '; '.join(f'{p} ({t})' for p, t in params))
+    # decisions, returns, compound conditions
+    decisions, returns, seen_lines = [], [], set()
+    for x in walk(body):
+        if x.type in DECISION_TYPES:
+            cond = x.child_by_field_name('condition')
+            ctext = one_line(txt(cond, src)) if cond is not None else ''
+            if x.type == 'do_statement' and ctext.strip('()') == '0':
+                continue   # do { } while (0) from a macro
+            if x.type == 'for_statement':
+                ctext = one_line(txt(x, src).split('{')[0].strip()[3:].strip())
+            f2, l2 = lm.to_orig(rel, x.start_point[0] + 1)
+            srcline = read_line(root, f2, l2)
+            kind = DECISION_TYPES[x.type]
+            extra = ''
+            if x.type == 'if_statement' and x.child_by_field_name('alternative') is not None:
+                extra = ' (has else)'
+            if cond is not None:
+                ops = sum(1 for y in walk(cond) if y.type == 'binary_expression' and
+                          txt(y.child_by_field_name('operator') if y.child_by_field_name('operator') else y, src) in ('&&', '||')) \
+                    if cond.type != 'identifier' else 0
+                ops = len(re.findall(r'&&|\|\|', txt(cond, src)))
+                if ops:
+                    extra += f' [{ops + 1} sub-conditions: each must flip the outcome alone]'
+            if x.type == 'switch_statement':
+                cases = [one_line(txt(c.child_by_field_name('value'), src), 30) for c in walk(x)
+                         if c.type == 'case_statement' and c.child_by_field_name('value') is not None]
+                has_default = any(c.type == 'case_statement' and c.child_by_field_name('value') is None for c in walk(x))
+                extra += f" cases: {', '.join(cases)}{' + default' if has_default else ' (NO default)'}"
+            tag = ''
+            inner = ctext.strip().strip('()').strip()
+            if srcline and inner and inner not in srcline and re.search(r'\b[A-Z][A-Z0-9_]{2,}\s*\(', srcline):
+                tag = f'   src: {one_line(srcline.strip(), 60)}'   # condition came from a macro: show the source line
+            key = (l2, kind, ctext)
+            if key in seen_lines:
+                continue
+            seen_lines.add(key)
+            decisions.append(f'  L{l2:<5} {kind:<8} {ctext}{extra}{tag}')
+        elif x.type == 'return_statement':
+            rt = one_line(txt(x, src)[6:].strip().rstrip(';'), 50) or '(void)'
+            if rt not in returns:
+                returns.append(rt)
+    if decisions:
+        lines.append('Decisions (drive each outcome; loops: 0, 1, many):')
+        lines += decisions[:40]
+        if len(decisions) > 40:
+            lines.append(f'  ... {len(decisions) - 40} more')
+    else:
+        lines.append('Decisions: none (straight-line code)')
+    if returns:
+        lines.append('Returns: ' + ' | '.join(returns[:8]))
+    # globals
+    gvars = file_scope_vars(tree_root, src)
+    local = variables(n, src) | {p for p, _ in params}
+    reads, writes = set(), set()
+    for x in walk(body):
+        if x.type == 'assignment_expression' or x.type == 'update_expression':
+            lhs = x.child_by_field_name('left') or x.child_by_field_name('argument')
+            k = ptr_key(lhs, src) if lhs is not None else None
+            if k and k[0] == 'var' and k[1] in gvars and k[1] not in local:
+                writes.add(k[1])
+        if x.type == 'identifier':
+            t = txt(x, src)
+            if t in gvars and t not in local:
+                reads.add(t)
+    reads -= writes
+    if reads or writes:
+        lines.append('Globals/statics: ' + ', '.join(sorted(f'{w} (written)' for w in writes) + sorted(f'{r} (read)' for r in reads)))
+    # calls (from the graph), callers, tests
+    nid = node_info['id'] if node_info else None
+    if nid:
+        calls = []
+        for e in out.get(nid, []):
+            tg = ids[e['target']]
+            if tg.get('type') == 'external':
+                where = tg.get('declared_in') or ''
+                if tg.get('targets'):
+                    where = 'may call ' + ', '.join(t.split(' (')[0] for t in tg['targets'][:3])
+                calls.append(f"{tg['label']} [{tg.get('kind')}: {where}]")
+            else:
+                st = ' static' if tg.get('static') else ''
+                calls.append(f"{tg['label']} ({tg.get('source_file')}:{tg.get('source_location')}{st})")
+        if calls:
+            lines.append('Calls: ' + '; '.join(sorted(set(calls))))
+        callers = sorted({(f"via pointer {ids[e['source']]['label']}" if ids[e['source']].get('type') == 'external'
+                           else f"{ids[e['source']]['label']} ({ids[e['source']].get('source_file')})") for e in inc.get(nid, [])
+                          if ids[e['source']].get('kind') not in ('test', 'fixture')})
+        if callers:
+            lines.append('Callers: ' + '; '.join(callers[:8]))
+        tests = sorted({f"{ids[e['source']]['label']} ({ids[e['source']].get('source_file')}:{ids[e['source']].get('source_location')})"
+                        for e in inc.get(nid, []) if ids[e['source']].get('kind') in ('test', 'fixture')
+                        or re.search(r'(^|/)(test|tests)/', ids[e['source']].get('source_file') or '')})
+        lines.append('Existing tests calling it directly: ' + ('; '.join(tests[:8]) if tests else 'none'))
+    return '\n'.join(lines)
+
+
+def cmd_card(argv):
+    """card GRAPH_JSON SCAN_DIR NAME|FILE: test-planning card(s) for a function or every function of a file"""
+    if len(argv) != 3:
+        die('usage: card GRAPH_JSON SCAN_DIR FUNCTION|FILE')
+    gpath, scan, target = argv
+    base = os.path.dirname(os.path.abspath(scan))
+    root = open(os.path.join(base, 'SOURCE_ROOT')).read().strip()
+    lm = LineMap(os.path.join(base, 'linemap.json'))
+    g, ids, out, inc = load(gpath)
+    pc, pcpp = parsers()
+    t = norm(target)
+    nodes = [n for n in ids.values() if n.get('_callable') and n.get('source_file') == t
+             and n.get('kind') not in ('test', 'fixture') and '::' not in n['label'].rstrip('()') or
+             (n.get('source_file') == t and n.get('declared_at'))]
+    if nodes:
+        nodes = [n for n in ids.values() if n.get('_callable') and n.get('source_file') == t and n.get('kind') not in ('test', 'fixture')]
+        nodes.sort(key=lambda n: int((LOC.search(n.get('source_location') or 'L0') or LOC.search('L0')).group(1)))
+        print(f'# Cards for {t} ({len(nodes)} functions)')
+        for n in nodes:
+            print(); print(card_for(n['label'].rstrip('()') if n['label'].endswith('()') else n['label'], n, scan, lm, root, ids, out, inc, pc, pcpp))
+        return
+    cands = find(ids, t)
+    print(card_for(t, cands[0] if cands else None, scan, lm, root, ids, out, inc, pc, pcpp))
+
+
 # --------------------------------------------------------------------------- self-test
 def cmd_mkcdb(argv):
     """mkcdb FIXTURE_DIR: write compile_commands.json for the self-test fixture with local compilers"""
@@ -1138,7 +1349,7 @@ if __name__ == '__main__':
     except (AttributeError, ValueError):
         pass
     cmds = {'mirror': cmd_mirror, 'augment': cmd_augment, 'deps': cmd_deps, 'tests': cmd_tests,
-            'mkcdb': cmd_mkcdb, 'check': cmd_check}
+            'mkcdb': cmd_mkcdb, 'check': cmd_check, 'card': cmd_card}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__); sys.exit(2)
     cmds[sys.argv[1]](sys.argv[2:])

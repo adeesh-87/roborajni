@@ -40,7 +40,8 @@ LLM API keys from Graphify's environment, so no code or names are sent to any mo
   C: function pointers bound to the functions stored in them (designated and positional struct initializers,
   assignments, callbacks passed to a registration function), so call chains continue through them.
 - Graphify then re-clusters locally so `GRAPH_REPORT.md` reflects the fixes (`graph.html` skipped above 5000 nodes).
-- **deps** / **tests**: the two questions unit-test work asks most (mock candidates; tests reaching a function).
+- **deps** / **tests** / **card**: mock candidates; tests reaching a function; a per-function test-planning card
+  (signature, every decision with its line, returns, globals touched, calls, callers, existing tests).
 - **selftest**: bundled fixture (`scripts/selftest/`) with known answers, built with the local compiler.
 
 To upgrade: replace the wheel, update the version in `scripts/graphify.sh` (`GRAPHIFY_VERSION`), delete `.venv/`,

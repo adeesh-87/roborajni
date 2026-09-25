@@ -11,7 +11,11 @@
 #   graphify.sh explain OUT_DIR "name"           one node and its neighbours (callers, callees, file)
 #   graphify.sh path    OUT_DIR "A" "B"          shortest chain of calls/references from A to B
 #   graphify.sh deps    OUT_DIR FILE|FUNCTION    what it calls outside itself: mock/stub candidates first
-#   graphify.sh tests   OUT_DIR FUNCTION [HOPS]  which test blocks reach FUNCTION (default 3 call hops)
+#   graphify.sh tests   OUT_DIR FUNCTION [HOPS]  which test blocks reach FUNCTION (default 4 call hops)
+#   graphify.sh card    OUT_DIR FUNCTION|FILE    test-planning card: signature, every decision line, returns,
+#                                                globals, calls, callers, existing tests
+# If Python 3.10+ / Graphify cannot be set up, build/deps/tests/card fall back to the bash code map
+# (codemap.sh) automatically and print "MODE: codemap". explain/path/query need the real graph.
 #   graphify.sh selftest                         build a bundled fixture and check the C/C++ fixes on THIS machine
 #   graphify.sh wheelhouse DIR PLATFORM PYVER    download every wheel for an OFFLINE machine,
 #                                                e.g. win_amd64 3.11 | manylinux2014_x86_64 3.12 | macosx_11_0_arm64 3.12
@@ -30,7 +34,7 @@ VENV="$VENDOR/.venv"
 WHEELS="$VENDOR/wheels"
 
 die() { echo "graphify.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,25p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,30p' "$0"; exit 2; }
 CMD=$1; shift
 
 venv_py() {
@@ -70,7 +74,12 @@ do_setup() {
   echo "graphify $GRAPHIFY_VERSION ready in $VENV"
 }
 
-ensure() { [ -n "$(venv_py)" ] || do_setup >&2 || exit 2; }
+ensure() { [ -n "$(venv_py)" ] || ( do_setup ) >&2; [ -n "$(venv_py)" ]; }   # subshell: a failed setup must not exit
+
+# fallback: the bash code map, same commands
+fallback_build() { local out=$1; shift; echo "MODE: codemap (Graphify unavailable: $FALLBACK_REASON)"; mkdir -p "$out"; echo codemap > "$out/MODE"; "$HERE/codemap.sh" build "$out/codemap" "$@"; }
+mode_of() { [ -f "$1/out/graph.json" ] && echo graph || { [ -f "$1/codemap/functions.tsv" ] && echo codemap || echo none; }; }
+need_graph() { case $(mode_of "$1") in graph) return 0 ;; codemap) echo "graphify.sh: '$CMD' needs the Graphify graph; this folder has the bash code map only. Use deps/tests/card." >&2; exit 1 ;; *) echo "graphify.sh: no graph in $1 (run: graphify.sh build ...)" >&2; exit 1 ;; esac; }
 
 run_graphify() {   # code-only: strip every LLM credential / endpoint
   env -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL -u OPENAI_API_KEY -u OPENAI_BASE_URL \
@@ -118,16 +127,26 @@ do_build() {
 
 case $CMD in
   setup)   do_setup ;;
-  version) ensure; run_graphify --version 2>/dev/null || "$(venv_py)" -c "import importlib.metadata as m; print('graphifyy', m.version('graphifyy'))" ;;
-  build)   [ $# -ge 2 ] || die "usage: build [--cdb FILE] OUT_DIR PATH..."; ensure; do_build "$@" ;;
+  version) ensure || exit 2; run_graphify --version 2>/dev/null || "$(venv_py)" -c "import importlib.metadata as m; print('graphifyy', m.version('graphifyy'))" ;;
+  build)   [ $# -ge 2 ] || die "usage: build [--cdb FILE] OUT_DIR PATH..."
+           if ensure; then do_build "$@"; else
+             FALLBACK_REASON="Python 3.10+ or package install failed"; [ "${1:-}" = "--cdb" ] && shift 2
+             fallback_build "$@"; fi ;;
   query)   [ $# -ge 2 ] || die "usage: query OUT_DIR \"question\" [--budget N]"
-           ensure; o=$1; q=$2; shift 2; run_graphify query "$q" --graph "$o/out/graph.json" "$@" ;;
-  explain) [ $# -ge 2 ] || die "usage: explain OUT_DIR NAME"; ensure; run_graphify explain "$2" --graph "$1/out/graph.json" ;;
-  path)    [ $# -ge 3 ] || die "usage: path OUT_DIR A B"; ensure; run_graphify path "$2" "$3" --graph "$1/out/graph.json" ;;
-  deps)    [ $# -eq 2 ] || die "usage: deps OUT_DIR FILE|FUNCTION"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
-  tests)   [ $# -ge 2 ] || die "usage: tests OUT_DIR FUNCTION [HOPS]"; ensure; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
+           need_graph "$1"; ensure || exit 2; o=$1; q=$2; shift 2; run_graphify query "$q" --graph "$o/out/graph.json" "$@" ;;
+  explain) [ $# -ge 2 ] || die "usage: explain OUT_DIR NAME"; need_graph "$1"; ensure || exit 2; run_graphify explain "$2" --graph "$1/out/graph.json" ;;
+  path)    [ $# -ge 3 ] || die "usage: path OUT_DIR A B"; need_graph "$1"; ensure || exit 2; run_graphify path "$2" "$3" --graph "$1/out/graph.json" ;;
+  deps)    [ $# -eq 2 ] || die "usage: deps OUT_DIR FILE|FUNCTION"
+           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
+             codemap) "$HERE/codemap.sh" deps "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+  tests)   [ $# -ge 2 ] || die "usage: tests OUT_DIR FUNCTION [HOPS]"
+           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
+             codemap) "$HERE/codemap.sh" tests "$1/codemap" "$2" ${3:-} ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+  card)    [ $# -eq 2 ] || die "usage: card OUT_DIR FUNCTION|FILE"
+           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" card "$1/out/graph.json" "$1/scan" "$2" ;;
+             codemap) "$HERE/codemap.sh" card "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
   selftest)
-    ensure
+    ensure || exit 2
     tmp=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/ut-selftest-$$"); mkdir -p "$tmp"
     cp -r "$HERE/selftest/." "$tmp/fx"
     if "$(venv_py)" "$HERE/graphify_ut.py" mkcdb "$tmp/fx"; then mode=""; cdbarg="--cdb $tmp/fx/compile_commands.json"
@@ -142,5 +161,5 @@ case $CMD in
     mkdir -p "$1" && cp "$WHEEL" "$1/"
     $py -m pip download --disable-pip-version-check --only-binary=:all: --platform "$2" --python-version "$3" -d "$1" "$WHEEL" \
       && echo "wheelhouse ready: $1 (copy it to resources/vendor/graphify/wheels on the offline machine, then run setup)" ;;
-  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|selftest|wheelhouse|version)" ;;
+  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|card|selftest|wheelhouse|version)" ;;
 esac

@@ -1,7 +1,7 @@
 # Parasoft C/C++test — quick reference
 
 Parasoft has several products and versions. Syntax below is typical but **VERIFY against the repo's
-existing test suites and stubs, and copy their exact pattern**. Record verified facts in KB section 5.
+existing test suites and stubs, and copy their exact pattern**. Record verified facts in KB `Build notes`.
 Ask the user which product is used:
 - **C/C++test Professional** (Eclipse / Visual Studio based): own unit-test framework (`CPPTEST_*`
   macros), generated test suites and stubs, run through the IDE or `cpptestcli` with a workspace.
@@ -112,11 +112,5 @@ Other metrics flags: `-statement-coverage`, `-simple-condition-coverage`, `-mcdc
 Delete old `.clog` files before a fresh run. In Professional, coverage comes from the
 "with Coverage" test configuration and is shown in the report and IDE.
 
-## Errors and fixes
-| Symptom | Fix |
-|---------|-----|
-| New test does not run | missing `CPPTEST_TEST(name);` line in the class block |
-| `undefined reference` to a dependency | add a stub (copy style), or enable auto stubs in the test config |
-| Test uses real function instead of stub | stub name/signature does not exactly match; check `CppTest_Stub_` prefix and types |
-| static function not visible | suite not `INCLUDED_TO` the source; follow the repo's way |
-| License error | environment problem: tell the user, do not retry in a loop |
+
+Build or run fails → load `resources/tools/errors/parasoft-cpptest.md` (error messages and fixes).

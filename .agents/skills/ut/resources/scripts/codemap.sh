@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # codemap.sh - zero-dependency map of C/C++ code for unit-test work (bash + awk only).
+# Fallback for graphify.sh when Python is not available; same question set.
 #
-# Usage: codemap.sh OUT_DIR PATH...        PATH = files or directories (code under test AND test code)
+#   codemap.sh build OUT_DIR PATH...        map the C/C++ files in PATH... (files or dirs)
+#   codemap.sh deps  OUT_DIR FILE|FUNCTION  what it calls outside itself (mock/stub candidates)
+#   codemap.sh tests OUT_DIR FUNCTION [HOPS] test functions / TEST blocks that reach FUNCTION (default 4 hops)
+#   codemap.sh card  OUT_DIR FUNCTION        signature, decision lines, calls, callers, tests of one function
 #
-# Writes to OUT_DIR:
+# build writes to OUT_DIR:
 #   functions.tsv  file, function, start line, end line, static(1/0), kind(func|macro-block)
 #   calls.tsv      file, caller function, callee, count, where the callee is defined
 #                  (file of the scanned set | "macro" | "external")
@@ -17,10 +21,89 @@
 # so the map also shows which test calls which function.
 
 set -u
-[ $# -ge 2 ] || { sed -n '2,19p' "$0"; exit 2; }
+[ $# -ge 2 ] || { sed -n '2,20p' "$0"; exit 2; }
+CMD=$1
+case $CMD in build|deps|tests|card) shift ;; *) CMD=build ;; esac     # old form: codemap.sh OUT PATH...
 OUT=$1; shift
+T=$(printf '\t')
+
+is_test_file() { case $1 in *test*|*Test*|*TEST*) return 0 ;; *) return 1 ;; esac; }
+
+if [ "$CMD" != build ]; then
+  [ -f "$OUT/functions.tsv" ] || { echo "codemap: no map in $OUT (run: codemap.sh build $OUT PATH...)" >&2; exit 1; }
+  ROOT=$(cat "$OUT/SOURCE_ROOT" 2>/dev/null || pwd -P)
+fi
+
+if [ "$CMD" = deps ]; then
+  [ $# -eq 1 ] || { echo "usage: codemap.sh deps OUT_DIR FILE|FUNCTION" >&2; exit 2; }
+  tgt=${1#./}
+  echo "# dependencies of $tgt  (mock/stub candidates first; 'in-scope code' = another scanned file, often an existing mock)"
+  awk -F"$T" -v t="$tgt" '
+    FILENAME ~ /externals\.tsv$/ { ek[$1]=$2; ed[$1]=$3; next }
+    FILENAME ~ /functions\.tsv$/ { if ($6=="func") st[$1 FS $2]=$5; next }
+    { file=$1; sub(/^\.\//, "", file)
+      if (file != t && $2 != t) next
+      if ($5 == file) next                              # call inside the same file
+      callee=$3; where=$5
+      if (where == "external") { k=(callee in ek) ? ek[callee] : "library"; d=(callee in ed) ? ed[callee] : "?"
+        if (k=="function" && d ~ /^\?/) k="library" }
+      else if (where == "macro") { k="macro"; d="(defined in scanned code)" }
+      else { k="in-scope code"; d="defined in " where (st[where FS callee]==1 ? " (static)" : "") }
+      key=k SUBSEP callee; kind[key]=k; decl[key]=d; by[key]=by[key] (by[key]?"; ":"") $2 " @ " file
+    }
+    END {
+      n=split("function pointer macro in-scope code library test-framework", order, " ")
+      # note: "in-scope code" contains a space -> handled below
+      split("function|pointer|macro|in-scope code|library|test-framework", order, "|")
+      for (i=1;i<=6;i++) { k=order[i]; first=1
+        for (key in kind) if (kind[key]==k) { if (first) { print ""; print "## " k; first=0 }
+          split(key, kk, SUBSEP); print "- " kk[2] "()  [" decl[key] "]  called by: " by[key] } }
+    }' "$OUT/externals.tsv" "$OUT/functions.tsv" "$OUT/calls.tsv"
+  exit 0
+fi
+
+if [ "$CMD" = tests ]; then
+  [ $# -ge 1 ] || { echo "usage: codemap.sh tests OUT_DIR FUNCTION [HOPS]" >&2; exit 2; }
+  awk -F"$T" -v t="$1" -v hops="${2:-4}" '
+    { callers[$3]=callers[$3] SUBSEP $2 "\t" $1 }          # callee -> "caller \t file" list
+    END {
+      n=0; q[++n]=t; depth[t]=0; via[t]=t; found=0
+      for (i=1;i<=n;i++) { cur=q[i]; if (depth[cur]>=hops) continue
+        m=split(callers[cur], cs, SUBSEP)
+        for (j=2;j<=m;j++) { split(cs[j], cf, "\t"); c=cf[1]; f=cf[2]
+          if (c in depth) continue
+          depth[c]=depth[cur]+1; via[c]=via[cur] " <- " c
+          if (c ~ /^(TEST|TEST_F|TEST_P|TEST_GROUP|IGNORE_TEST)\(/ || f ~ /(^|\/)(test|tests|unittest|ut)\// || c ~ /^test_/) {
+            what = (c ~ /^[A-Z_]+\(/) ? "TEST block" : "test-file function"
+            printf "%d hop(s) [%s]: %s  %s   via %s\n", depth[c], what, c, f, via[c]; found++ }
+          q[++n]=c } }
+      if (!found) print "no test reaches " t " within " hops " call hops"
+    }' "$OUT/calls.tsv" | sort -n
+  exit 0
+fi
+
+if [ "$CMD" = card ]; then
+  [ $# -eq 1 ] || { echo "usage: codemap.sh card OUT_DIR FUNCTION" >&2; exit 2; }
+  fn=$1
+  row=$(awk -F"$T" -v f="$fn" '$2==f && $6=="func" {print; exit}' "$OUT/functions.tsv")
+  [ -n "$row" ] || { echo "## $fn: not found in $OUT/functions.tsv"; exit 1; }
+  file=$(echo "$row" | cut -f1); s=$(echo "$row" | cut -f3); e=$(echo "$row" | cut -f4); st=$(echo "$row" | cut -f5)
+  echo "## $fn  ($file:$s-$e)$([ "$st" = 1 ] && echo '  static')"
+  src="$ROOT/$file"; [ -f "$src" ] || src="$file"
+  sig=""; for k in 0 1 2 3; do l=$(sed -n "$((s-k))p" "$src"); case $l in *'('*) sig=$l; break ;; esac; done
+  echo "Signature: $(echo "$sig" | sed 's/^[[:space:]]*//; s/[[:space:]]*{[[:space:]]*$//')"
+  echo "Decisions (lines with a branch, loop, case or return; drive each outcome):"
+  sed -n "${s},${e}p" "$src" | awk -v s="$s" '{ ln=s+NR-1; l=$0; gsub(/^[ \t]+/, "", l)
+      if (l ~ /^(if|else|switch|case|default|while|for|do|return)([^A-Za-z0-9_]|$)|\?|&&|\|\||ASSERT|assert/) printf "  L%-5d %s\n", ln, substr(l,1,90) }'
+  echo "Calls: $(awk -F"$T" -v f="$fn" '$2==f {printf "%s%s [%s]", (n++?"; ":""), $3, ($5=="external"||$5=="macro")?$5:$5}' "$OUT/calls.tsv")"
+  echo "Callers: $(awk -F"$T" -v f="$fn" '$3==f && $2 !~ /^(TEST|TEST_F|TEST_P)\(/ {printf "%s%s (%s)", (n++?"; ":""), $2, $1}' "$OUT/calls.tsv")"
+  echo "Existing tests calling it directly: $(awk -F"$T" -v f="$fn" '$3==f && ($2 ~ /^(TEST|TEST_F|TEST_P)\(/ || $1 ~ /(^|\/)(test|tests)\// ) {printf "%s%s (%s)", (n++?"; ":""), $2, $1}' "$OUT/calls.tsv")"
+  exit 0
+fi
+
 mkdir -p "$OUT" || exit 2
 REPO=$(git -C "$1" rev-parse --show-toplevel 2>/dev/null || (cd "$(dirname "$1")" && pwd -P))
+echo "$REPO" > "$OUT/SOURCE_ROOT"
 
 LIST="$OUT/.files"
 for p in "$@"; do
