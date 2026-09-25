@@ -23,9 +23,7 @@ if command -v ctcwrap >/dev/null 2>&1; then
         cmake --build build-ctc
 
     # Run the unit-test binary if the tests subdirectory has produced one.
-    if [ -x build-ctc/tests/cvaccel_tests ]; then
-        ./build-ctc/tests/cvaccel_tests
-    fi
+    ctest --test-dir build-ctc --output-on-failure
 
     ctcpost MON.sym MON.dat -p coverage/profile.txt
     ctc2html -i coverage/profile.txt -o coverage/CTCHTML
@@ -37,10 +35,8 @@ else
     cmake -S . -B build-cov -DCOVERAGE=ON -DCMAKE_CXX_FLAGS="--coverage -O0" -DBUILD_UNIT_TESTS=ON
     cmake --build build-cov -j
 
-    # Run the unit-test binary if the tests subdirectory has produced one.
-    if [ -x build-cov/tests/cvaccel_tests ]; then
-        ./build-cov/tests/cvaccel_tests
-    fi
+    # Run every registered test (the harness names the binary; ctest does not care)
+    ctest --test-dir build-cov --output-on-failure
 
     gcovr -r . build-cov --filter 'src/' --txt
     gcovr -r . build-cov --filter 'src/' --html-details coverage/index.html
