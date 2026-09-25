@@ -12,7 +12,7 @@ card, deps and tests work. Which backend built the index: `"$I" stats "$GD"` or 
 | The branches of a function, with what the last coverage run hit | `"$I" flow "$GD" sensor_read` (Mermaid text, see `resources/diagrams.md`) |
 | The calls a function makes, in order, and the test doubles that exist | `"$I" seq "$GD" sensor_read` |
 | Which decision outcomes no test takes | `"$I" uncovered "$GD" src/sensor.c` (after `cov-import`) |
-| What the tests REALLY call at run time | `"$I" trace "$GD" --run "<test binary>" ...` → `KB_DIR/index/diagrams/traces/` |
+| What the tests REALLY call at run time | `"$I" trace "$GD" --run "<test binary>" ...` → `KB_DIR/diagrams/traces/` |
 | Callers / callees / references from the compiler's language server | `"$I" lsp "$GD" callers sensor_read` (clangd; interactive) |
 | What changed in the code under test and which tests/mocks it hits (the pick-list) | `"$I" impact "$GD" --base origin/main --out "$TASK/impact.md" --context "$TASK/context.md"` |
 | Code changed: bring the index, all cards and diagrams up to date, get the delta | `"$I" refresh "$GD"` → `KB_DIR/last-refresh.md` (see `subskills/refresh.md`) |

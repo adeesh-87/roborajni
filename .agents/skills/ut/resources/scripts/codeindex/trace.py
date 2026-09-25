@@ -7,7 +7,7 @@ block: what the test REALLY called, in order, including virtual dispatch and cal
   --build      your own build command; {cflags} and {ldflags} are replaced by the trace flags
   (neither)    the binary is already built with the flags printed by: trace INDEX --flags
   --run        the test command, e.g. "{build}/tests/unit_tests -sg Dispatcher" ({build} = --build-dir)
-Output: <out>/<Group>.<Test>.md (default <index dir>/diagrams/traces), <index dir>/traces.json (functions each test reached).
+Output: <out>/<Group>.<Test>.md (default KB_DIR/diagrams/traces, or <index dir>/diagrams/traces outside a KB), <index dir>/traces.json (functions each test reached).
 Linux + glibc; binutils addr2line. A crashing test loses the unflushed part of the trace."""
 import json, os, re, shlex, subprocess, sys
 from .model import Index, is_testside
@@ -137,9 +137,10 @@ def main(a):
     if not os.path.exists(tfile):
         sys.exit('trace: no trace written. Is the binary built with the trace flags and linked with ' + obj + '?\n' + out[-800:])
     maps, events = parse_trace(tfile)
-    rows = render(ix, maps, events, opt('--out', os.path.join(idx_dir, 'diagrams', 'traces')), int(opt('--max', 80)),
-                  opt('--threads', 'main'), idx_dir)
-    print(f"trace: {len(events)} events, {len(rows)} tests -> {opt('--out', os.path.join(idx_dir, 'diagrams', 'traces'))} (test command exit {rc})")
+    kb_layout = os.path.basename(idx_dir) == 'index'      # KB_DIR/index -> KB_DIR/diagrams/traces
+    out_dir = opt('--out', os.path.join(os.path.dirname(idx_dir) if kb_layout else idx_dir, 'diagrams', 'traces'))
+    rows = render(ix, maps, events, out_dir, int(opt('--max', 80)), opt('--threads', 'main'), idx_dir)
+    print(f"trace: {len(events)} events, {len(rows)} tests -> {out_dir} (test command exit {rc})")
 
 
 def render(ix, maps, events, out_dir, max_msgs, threads, idx_dir):

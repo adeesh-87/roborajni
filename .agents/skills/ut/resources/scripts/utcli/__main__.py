@@ -237,8 +237,12 @@ def cmd_trace(args):
     if prof.get('build_system') == 'cmake' and not args.no_build:
         defs = ' '.join(re.findall(r'-D\w+=\S+', prof.get('build_cmd', '')))
         cmd += ['--cmake', root, '--build-dir', os.path.join(gd, 'trace', 'build'), '--cmake-args', defs]
-        if not args.run:
-            cmd[cmd.index('--run') + 1] = '{build}/' + os.path.relpath(run, os.path.join(root, 'build')) if run.startswith(os.path.join(root, 'build')) else run
+        if not args.run:                                # the baseline binary, but from the instrumented build tree
+            m = re.search(r'-B\s*(\S+)', prof.get('build_cmd', ''))
+            bdir = os.path.join(root, m.group(1) if m else 'build')
+            rel = os.path.relpath(run if os.path.isabs(run) else os.path.join(root, run), bdir)
+            if not rel.startswith('..'):
+                cmd[cmd.index('--run') + 1] = '{build}/' + rel
     rc, out = sh(cmd, cwd=root)
     say(out.strip()[-1500:])
     if rc == 0:
