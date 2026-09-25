@@ -35,6 +35,8 @@ def cmd_init(args):
     os.makedirs(os.path.join(st.dir, 'tasks'), exist_ok=True); os.makedirs(os.path.join(st.dir, 'logs'), exist_ok=True)
     kb = KB.load_kb(st['kb_dir'])
     prof = kb.get('profile') or detect.profile(root)
+    for k, v in A.get('profile', {}).items():
+        prof[k] = v
     say(f"Repository: {root}  (codebase id {ident.get('id')}; KB {'found' if kb else 'new'})")
     say('Detected profile (correct anything wrong as key=value, empty line to accept):')
     for k, v in prof.items():

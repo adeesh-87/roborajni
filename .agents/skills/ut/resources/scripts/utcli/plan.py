@@ -27,7 +27,16 @@ def discover_diff(st, root, gd, base=None, uncommitted=False, rng=None):
 
 def discover_ask(st, root, gd, names):
     items, n = [], 0
-    for name in names:
+    expanded = []
+    for name in names:                                    # a file path expands to every function of its card
+        if os.path.exists(os.path.join(root, name)):
+            rc, card = sh([script('graphify.sh'), 'card', gd, name], cwd=root)
+            funcs = [m.group(1) for m in re.finditer(r'^## (\S+)\s+\([^)]*\)(.*)$', card, re.M)
+                     if 'static' not in m.group(2) and not m.group(1).endswith(('::' + m.group(1).split('::')[0], '::~' + m.group(1).split('::')[0]))]
+            expanded += [(f, name) for f in funcs] or [(name, name)]
+        else:
+            expanded.append((name, ''))
+    for name, file_hint in expanded:
         rc, out = sh(['grep', '-rnwE', name, '--include=*.c', '--include=*.cc', '--include=*.cpp', '--include=*.h', '--include=*.hpp']
                      + [os.path.join(root, p) for p in st['profile']['code_paths']])
         files = sorted({norm(os.path.relpath(l.split(':', 1)[0], root)) for l in out.splitlines() if ':' in l})
@@ -35,7 +44,7 @@ def discover_ask(st, root, gd, names):
         rc3, deps = sh([script('graphify.sh'), 'deps', gd, name], cwd=root)
         n += 1
         thits = [l for l in tests.splitlines() if re.match(r'\d+ hop', l)]
-        items.append({'id': f'W{n}', 'item': f"{files[0] if files else '?'}:{name}", 'kind': 'targeted',
+        items.append({'id': f'W{n}', 'item': f"{file_hint or (files[0] if files else '?')}:{name}", 'kind': 'targeted',
                       'tests': f'{len(thits)}: ' + '; '.join(h.split(': ', 1)[1].split('  ')[0] for h in thits[:2]) if thits else '0: none',
                       'mocks': '; '.join(l[2:].split('  [')[0] for l in deps.splitlines() if l.startswith('- '))[:120],
                       'work': 'D new tests (targeted)', 'cat': 'D', 'in_scope': '', 'priority': ''})
@@ -106,7 +115,18 @@ def make_plan(st, kb_dir, prof):
         ttype = CAT_TO_TYPE.get(w['cat'], 'add-tests')
         groups.setdefault((file, ttype), []).append(w)
     for (file, ttype), ws in sorted(groups.items(), key=lambda kv: (WAVE.get(kv[0][1], 3), kv[0][0])):
-        for chunk in [ws[i:i + 5] for i in range(0, len(ws), 5)]:
+        cards_all = read(os.path.join(kb_dir, 'modules', f'{os.path.basename(file)}.cards.md'))
+        chunks, cur, cur_cases = [], [], 0
+        for w in ws:                                    # a task holds <= 12 cases or <= 4 functions
+            fn = w['item'].split(':', 1)[1].split(' (')[0] if ':' in w['item'] else ''
+            n = len(cases_for(cards_all, fn)) if fn and ttype in ('add-tests', 'raise-coverage', 'update-tests') else 1
+            if cur and (cur_cases + n > 12 or len(cur) >= 4):
+                chunks.append(cur); cur, cur_cases = [], 0
+            cur.append(w); cur_cases += n
+        if cur:
+            chunks.append(cur)
+        prev_same_file = None
+        for chunk in chunks:
             tid += 1
             is_header_task = any(w.get('header') for w in chunk)
             funcs = [] if is_header_task else [w['item'].split(':', 1)[1].split(' (')[0] for w in chunk if ':' in w['item']]
@@ -127,12 +147,15 @@ def make_plan(st, kb_dir, prof):
                  'notes': '; '.join(notes),
                  'work_items': [w['id'] for w in chunk], 'wave': WAVE.get(ttype, 3), 'depends': [], 'status': 'TODO', 'owner': '',
                  'attempts': 0, 'touches': sorted(set(touches)), 'test_file': test_file, 'cases': cases}
+            if prev_same_file:                          # same test file: one task after the other
+                t['depends'] = [prev_same_file]
+            prev_same_file = t['id']
             tasks.append(t)
     waves = sorted({t['wave'] for t in tasks})          # renumber waves consecutively so checkpoints line up
     for t in tasks:
         t['wave'] = waves.index(t['wave']) + 1
     for t in tasks:   # earlier-wave tasks touching the same file are dependencies
-        t['depends'] = [o['id'] for o in tasks if o['wave'] < t['wave'] and set(o['touches']) & set(t['touches'])]
+        t['depends'] = sorted(set(t.get('depends', [])) | {o['id'] for o in tasks if o['wave'] < t['wave'] and set(o['touches']) & set(t['touches'])})
     st['plan'] = {'tasks': tasks, 'checkpoints': {}}
     for t in tasks:
         write_task_file(st, t, kb_dir)

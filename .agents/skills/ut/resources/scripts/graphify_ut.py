@@ -1267,10 +1267,8 @@ def cmd_card(argv):
     pc, pcpp = parsers()
     t = norm(target)
     nodes = [n for n in ids.values() if n.get('_callable') and n.get('source_file') == t
-             and n.get('kind') not in ('test', 'fixture') and '::' not in n['label'].rstrip('()') or
-             (n.get('source_file') == t and n.get('declared_at'))]
+             and n.get('kind') not in ('test', 'fixture') and n['label'].endswith('()')]
     if nodes:
-        nodes = [n for n in ids.values() if n.get('_callable') and n.get('source_file') == t and n.get('kind') not in ('test', 'fixture')]
         nodes.sort(key=lambda n: int((LOC.search(n.get('source_location') or 'L0') or LOC.search('L0')).group(1)))
         print(f'# Cards for {t} ({len(nodes)} functions)')
         for n in nodes:
