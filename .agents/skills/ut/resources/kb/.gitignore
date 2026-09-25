@@ -4,3 +4,5 @@
 */graphify/build.log
 */last-refresh.md
 */refresh.log
+# KBs of codebases without a git remote are machine-specific (id = local-<name>-<path hash>): not shared
+local-*/
