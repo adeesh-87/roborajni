@@ -16,7 +16,8 @@ Mark it IN_PROGRESS with Owner ME in status.md and in the task file; one Log lin
 
 ## 2. Load exactly the task's Inputs
 The card file for its functions, `exemplars/test.md` (+ `mock.md` if the task mocks), the tool file, and
-`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Graph questions (`"$I" card|deps|tests`):
+`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Any other code question goes to the index,
+never to grep or a whole file (types, macros and constants too): `"$I" source|refs|defs|find|list|card|deps|tests "$GD" <name>` with
 `I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"` (details: `resources/graph-queries.md`).
 Diagrams (`"$I" flow|seq "$GD" <function>`) help when the card is not enough: a coverage gap to reach (flow shows the
 path and what is NOT HIT), or collaborators to fake (seq names the existing test doubles). How to read them: `resources/diagrams.md`.

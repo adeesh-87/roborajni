@@ -33,7 +33,12 @@ functions with >= 2 mockable collaborators, at most 900 words; `--diagrams on` a
 `--answers answers.json` makes any phase non-interactive; `--yes` takes every default.
 
 The agent command receives the prompt on stdin (or use `{prompt}` for the file path). Default:
-`claude -p --permission-mode acceptEdits --allowedTools Read,Edit,Write,MultiEdit,Glob,Grep`.
+`claude -p --permission-mode acceptEdits --allowedTools 'Read,Edit,Write,MultiEdit,Bash(<skill>/resources/scripts/index.sh:*)'
+--disallowedTools 'Grep,Glob,Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(cat:*),Read(./<code path>/**)...'` (one Read
+rule per code and header path of the profile): the agent answers code questions with `index.sh source|refs|defs|find|
+card|deps` (the prompt lists them with full paths, including types, macros and constants) and can read only test, mock
+and build files. Checked with Haiku 4.5 on cvaccel: without the Read rule it fell back to reading headers; with it, it
+queried the index and finished the task on the first attempt. With another agent CLI, give it the same rules.
 Any CLI that can edit files works (Codex, Gemini CLI, aider); the prompt tells it which files it may write and to
 end with `RESULT: DONE` or `RESULT: PARTIAL <reason>`. The tool ignores claims and checks the build and tests itself.
 

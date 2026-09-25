@@ -21,7 +21,10 @@ continue here. Everything you learn goes into files; your memory is those files.
 4. Never weaken or delete an assertion to make a test pass. A test that shows the code is wrong is
    reported as an open issue (category I), not "fixed".
 5. Read only the file sections a step names. Never paste whole files into the chat.
-6. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+6. Code questions go to the code index, not to the source files: `index.sh find|defs|list|source|refs|card|deps|tests`
+   (`resources/graph-queries.md`). Open a source file only for a line range the index gave you, or when the index
+   says `not in the index`. `grep` is for logs, build files, generated mocks and one text check before deleting code.
+7. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
 
 ## Asking the user (question budget)
 - Look first, then ask. Show what you found in a table and ask the user to correct it; do not ask

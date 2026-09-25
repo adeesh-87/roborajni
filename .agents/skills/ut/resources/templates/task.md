@@ -7,6 +7,7 @@ Wave:  | Work items: W#  | Depends on:  | Status: TODO | Owner:
 
 ## Inputs (read these, nothing else)
 - Card: KB_DIR/modules/<name>.cards.md → functions: <f1, f2>
+- Code: `index.sh source KB_DIR/index <f>` per function; other code only via `index.sh refs|defs|find` (no grep)
 - Exemplar: KB_DIR/exemplars/test.md (+ mock.md)
 - Tool file: resources/tools/<tool>.md  | Playbook: resources/playbooks/<type>.md
 

@@ -129,6 +129,7 @@ def build(out_path, cdb_path, paths):
     ix.meta['notes'] = notes
     ix.meta['units'] = len(jobs)
     merge(ix, tsf, gnodes, gedges, root, scope)
+    ix.symbols.update(TS.symbols_for(root, [norm(os.path.relpath(f, root)) for f in G.collect(paths)]))
     ix.save(out_path)
     for n in notes[:10]:
         print('  ' + n)

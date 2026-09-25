@@ -8,6 +8,7 @@ Schema (version 1):
   externals  {id: {name, kind (function|library|pointer|macro|test-framework|interface), declared_in, targets [[fn_id, 'file:line']]}}
   calls      [{from, to, line, file, kind (direct|virtual|member|pointer|macro|pointer-target|virtual-target), conf}]
   inherits   [[derived_class, base_class, file]]
+  symbols    {name@file:line: {name, kind (class|struct|union|enum|enumerator|typedef|macro|var|const), file, line, end, parent?}}
 
 Outline statement tree (ordered as executed; only control flow, calls and exits are kept):
   {t: if,     l, c (condition), n (sub-conditions), then [..], else [..] | None, src?}
@@ -59,6 +60,7 @@ class Index:
         self.externals = d.setdefault('externals', {})
         self.calls = d.setdefault('calls', [])
         self.inherits = d.setdefault('inherits', [])
+        self.symbols = d.setdefault('symbols', {})      # types, enums, enumerators, typedefs, macros, globals
         self.reindex()
 
     @staticmethod
@@ -146,7 +148,7 @@ class Index:
         return {'functions': sum(1 for n in self.functions.values() if n.get('kind') == 'function'),
                 'tests': len(self.tests()), 'externals': len(self.externals), 'external_kinds': kinds,
                 'calls': len(self.calls), 'with_outline': sum(1 for n in self.functions.values() if n.get('outline') is not None),
-                'inherits': len(self.inherits)}
+                'inherits': len(self.inherits), 'symbols': len(self.symbols)}
 
     # ------------------------------------------------------------------ classes / virtual dispatch
     def subclasses(self, cls):

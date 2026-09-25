@@ -3,6 +3,18 @@
 The same commands work for every backend (clang, gcc, graphify); with the bash fallback (`MODE: codemap`) only
 card, deps and tests work. Which backend built the index: `"$I" stats "$GD"` or KB `last_graph_build`.
 
+Ask the index instead of reading or grepping source files: it answers from the compiler's (or tree-sitter's) view,
+knows overloads, tests, mocks and call lines, and prints only what you asked for.
+
+| Question | Command | Instead of |
+|----------|---------|------------|
+| Where is X defined? Functions, tests, types, enum values, macros, globals with "X" in their name | `"$I" find "$GD" 'sensor_(read|init)'` (regex) | `grep -rn X src/` |
+| Every definition of one name: overloads, mocks, fakes | `"$I" defs "$GD" sensor_read` | `grep -rn 'sensor_read\s*(' tests/` |
+| What is in this file (header too)? | `"$I" list "$GD" src/sensor.c` (types, macros, globals, functions, line ranges) | reading the file |
+| The code of one function or test | `"$I" source "$GD" sensor_read` / `"$I" source "$GD" "TEST(Sensor, Read_Timeout)"` / `name@LINE` | reading the file |
+| A struct / class / enum / typedef / macro / constant (fields, values) | `"$I" source "$GD" sensor_cfg_t` / `SENSOR_MAX` / `Status::QUEUE_FULL` | reading the header |
+| Who calls X, which tests, which pointers, what overrides it | `"$I" refs "$GD" sensor_read` (call lines included) | `grep -rnw sensor_read .` |
+
 | Question | Command |
 |----------|---------|
 | Everything I need to plan tests for a function or a file | `"$I" card "$GD" sensor_read` / `"$I" card "$GD" src/sensor.c` |

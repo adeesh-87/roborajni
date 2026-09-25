@@ -28,6 +28,13 @@ def main(argv):
         need(a, 2, 'card INDEX_JSON FUNCTION|FILE')
         from .query import cmd_card
         print(cmd_card(Index.load(a[0]), a[1]))
+    elif cmd in ('find', 'defs', 'list', 'source', 'refs'):
+        need(a, 2, f'{cmd} INDEX_JSON NAME|FILE|PATTERN')
+        from . import query as Q
+        ix = Index.load(a[0])
+        print({'find': lambda: Q.cmd_find(ix, a[1]), 'defs': lambda: Q.cmd_find(ix, a[1], exact=True),
+               'list': lambda: Q.cmd_list(ix, a[1]), 'source': lambda: Q.cmd_source(ix, a[1]),
+               'refs': lambda: Q.cmd_refs(ix, a[1])}[cmd]())
     elif cmd in ('deps', 'tests', 'impact'):
         import graphify_ut as G
         if cmd == 'impact':

@@ -10,6 +10,11 @@
 #        codemap   bash + grep, no Python (card/deps/tests only)
 #   index.sh refresh OUT_DIR                     rebuild with the last arguments; regenerate KB cards (+ diagrams); delta
 #   index.sh card    OUT_DIR FUNCTION|FILE       test-planning card (decisions, calls, callers, tests, runtime reach)
+#   index.sh find    OUT_DIR PATTERN             functions / TEST blocks / externals whose name matches (instead of grep)
+#   index.sh defs    OUT_DIR NAME                every definition of NAME: overloads, mocks, fakes
+#   index.sh list    OUT_DIR FILE                the functions of a file with line ranges (instead of reading it)
+#   index.sh source  OUT_DIR NAME[@LINE]|"TEST(G, N)"   the lines of one function or TEST block
+#   index.sh refs    OUT_DIR NAME                callers with call lines, TEST blocks, pointers, overrides, doubles
 #   index.sh deps    OUT_DIR FUNCTION|FILE       what it calls outside itself: mock/stub candidates first
 #   index.sh tests   OUT_DIR FUNCTION [HOPS]     TEST blocks that reach it through calls
 #   index.sh impact  OUT_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]
@@ -31,7 +36,7 @@ set -u
 HERE=$(cd "$(dirname "$0")" && pwd -P)
 VENV="$HERE/../vendor/graphify/.venv"
 die() { echo "index.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,34p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,39p' "$0"; exit 2; }
 CMD=$1; shift
 
 py() {
@@ -50,6 +55,22 @@ pipi() {   # pip install, from the offline wheelhouse when it exists
   local w="$HERE/../vendor/graphify/wheels"
   if [ -d "$w" ]; then "$(py)" -m pip install -q --disable-pip-version-check --no-index --find-links "$w" "$@"
   else "$(py)" -m pip install -q --disable-pip-version-check "$@"; fi
+}
+
+codemap_lookup() {   # find/defs/list/source/refs on the bash code map (functions.tsv: file name start end static kind)
+  local cm="$1/codemap" q=$2 T=$'\t' root
+  root=$(cat "$cm/SOURCE_ROOT" 2>/dev/null || pwd)
+  case $CMD in
+    find) awk -F"$T" -v p="$q" 'BEGIN{IGNORECASE=1} $2 ~ p {print "| " $2 " | " $1 ":" $3 "-" $4 " | " $6 " |"}' "$cm/functions.tsv" | head -60 ;;
+    defs) awk -F"$T" -v p="$q" '$2==p || $2 ~ ("::" p "$") {print "| " $2 " | " $1 ":" $3 "-" $4 " | " $6 " |"}' "$cm/functions.tsv" ;;
+    list) awk -F"$T" -v f="${q#./}" '$1==f {print "| " $3 "-" $4 " | " $2 " |"}' "$cm/functions.tsv" ;;
+    source) awk -F"$T" -v p="$q" '$2==p || $2 ~ ("::" p "$") {print $1 "\t" $3 "\t" $4 "\t" $2}' "$cm/functions.tsv" | head -3 |
+            while IFS=$'\t' read -r f s e n; do echo "// $n  $f:$s-$e"; src="$f"; [ -f "$src" ] || src="$root/$f"
+              awk -v s="$s" -v e="$e" 'NR>=s && NR<=e {printf "%5d  %s\n", NR, $0}' "$src"; echo; done ;;
+    refs) echo "# References to $q (bash code map: names only)"
+          awk -F"$T" -v p="${q##*::}" '$3==p || $3 ~ ("(::|\\.|->)" p "$") {print "- " $2 "  " $1}' "$cm/calls.tsv" | sort -u | head -60
+          echo "(names only: a same-named method of another class also matches)" ;;
+  esac
 }
 
 do_setup() {
@@ -129,6 +150,10 @@ case $CMD in
             [ $# -ge 2 ] || die "usage: $CMD OUT_DIR NAME [..]"
             case $(mode_of "$1") in index) o=$1; shift; run_py "$CMD" "$o/index.json" "$@" ;;
               codemap) o=$1; shift; "$HERE/codemap.sh" "$CMD" "$o/codemap" "$@" ;; *) die "no index in $1 (run: index.sh build ...)" ;; esac ;;
+  find|defs|list|source|refs)
+            [ $# -ge 2 ] || die "usage: $CMD OUT_DIR NAME|FILE|PATTERN"
+            case $(mode_of "$1") in index) o=$1; shift; run_py "$CMD" "$o/index.json" "$@" ;;
+              codemap) codemap_lookup "$@" ;; *) die "no index in $1 (run: index.sh build ...)" ;; esac ;;
   impact|flow|seq|uncovered|lsp|stats)
             [ $# -ge 1 ] || die "usage: $CMD OUT_DIR ..."; need_index "$1"; o=$1; shift; run_py "$CMD" "$o/index.json" "$@" ;;
   diagrams|scenarios)

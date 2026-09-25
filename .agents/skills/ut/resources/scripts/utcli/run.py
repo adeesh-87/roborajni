@@ -4,7 +4,12 @@ from .util import sh, script, read, write, RES, SKILL_DIR, words, norm, say
 from .frameworks import FRAMEWORKS, parse_summary, failures, first_errors
 from .state import now
 
-DEFAULT_AGENT = 'claude -p --permission-mode acceptEdits --allowedTools Read,Edit,Write,MultiEdit,Glob,Grep'
+# The agent may run ONLY index.sh for code questions; grep/find/Glob are denied so it queries the index instead.
+DEFAULT_AGENT = ("claude -p --permission-mode acceptEdits "
+                 f"--allowedTools 'Read,Edit,Write,MultiEdit,Bash({script('index.sh')}:*)' "
+                 "--disallowedTools 'Grep,Glob,Bash(grep:*),Bash(rg:*),Bash(find:*),Bash(cat:*){deny_code}'")
+# {deny_code}: Read(./<code path>/**) for every code and header path of the profile: the code under test is read
+# through `index.sh source` (test files, mocks and build files stay readable).
 
 
 def prompt_for(st, kb_dir, t, error=None, review=None):
@@ -17,6 +22,12 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
     P.append('- Expected values are literals derived from reading the code and its comments; never derived by running the code. '
              'If the code seems wrong, keep the assertion that the specification implies and say so in RESULT.')
     P.append('- One test per line of the Cases table. Finish with a line: RESULT: DONE  or  RESULT: PARTIAL <what is missing>.')
+    ix, gd = script('index.sh'), os.path.join(kb_dir, 'index')
+    P.append(f"- Everything you need about the code is below. For anything else ask the code index, never grep or open source files:\n"
+             f"  `{ix} source {gd} <function|type|macro|constant>` (its code or definition; `\"TEST(Group, Name)\"` for a test; `name@LINE` for one overload),\n"
+             f"  `{ix} refs {gd} <function>` (callers, tests, mocks, pointers), `{ix} defs {gd} <name>` (every definition, mocks included),\n"
+             f"  `{ix} find {gd} <regex>` (names), `{ix} card|deps {gd} <function>`. Reading the code folders and grep are blocked;\n"
+             f"  Read only the test, mock and build files you write.")
     P.append(f"\nRepository root: {st['repo']}\n")
     P.append('## Task\n' + read(os.path.join(st.dir, 'tasks', f"{t['id']}.md")))
     P.append('\n## Test exemplar (copy this shape)\n' + read(os.path.join(kb_dir, 'exemplars', 'test.md')))
@@ -107,6 +118,9 @@ def error_keys(error):
 
 
 def call_agent(st, prompt_path, agent_cmd):
+    prof = st['profile']
+    code = [p.strip('./') for p in prof.get('code_paths', []) + prof.get('header_paths', []) if p.strip('./')]
+    agent_cmd = agent_cmd.replace('{deny_code}', ''.join(f',Read(./{p}/**)' for p in code))
     cmd = agent_cmd.replace('{prompt}', shlex.quote(prompt_path))
     if '{prompt}' in agent_cmd:
         rc, out = sh(cmd, cwd=st['repo'], timeout=3600)

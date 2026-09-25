@@ -59,6 +59,7 @@ class TU:
         self.files = {}
         self.defs, self.decls, self.ext = {}, {}, {}
         self.binds, self.stores, self.args, self.inherits, self.fixtures = [], [], [], [], []
+        self.symbols = {}
         self.lambdas = 0
 
     # ---- source helpers
@@ -133,7 +134,7 @@ class TU:
     # ---- entry
     def run(self, args):
         ci = self.ci
-        tu = ci.Index.create().parse(self.path, args=args, options=ci.TranslationUnit.PARSE_SKIP_FUNCTION_BODIES * 0)
+        tu = ci.Index.create().parse(self.path, args=args, options=ci.TranslationUnit.PARSE_DETAILED_PROCESSING_RECORD)
         errs = [d for d in tu.diagnostics if d.severity >= 3]
         self.errors = [f'{self.rel(d.location.file.name) if d.location.file else "?"}:{d.location.line}: {d.spelling}' for d in errs[:3]]
         self.n_errors = len(errs)
@@ -156,12 +157,39 @@ class TU:
             elif k in CLASS_KINDS:
                 if ch.is_definition():
                     self.klass(ch)
+                    self.symbol(ch, {'CLASS_DECL': 'class', 'UNION_DECL': 'union'}.get(k, 'struct' if k == 'STRUCT_DECL' else 'class'))
                 self.visit_scope(ch)
+            elif k == 'ENUM_DECL' and ch.is_definition():
+                self.symbol(ch, 'enum')
+                for e in ch.get_children():
+                    if e.kind.name == 'ENUM_CONSTANT_DECL':
+                        self.symbol(e, 'enumerator', parent=ch)
+            elif k in ('TYPEDEF_DECL', 'TYPE_ALIAS_DECL'):
+                self.symbol(ch, 'typedef')
+            elif k == 'MACRO_DEFINITION':
+                self.symbol(ch, 'macro')
             elif k in SCOPE_KINDS:
                 self.visit_scope(ch)
             elif k == 'VAR_DECL':
+                self.symbol(ch, 'const' if ch.type.is_const_qualified() else 'var')
                 self.var_decl(ch, None)
                 self.expr_walk(ch, None, [])
+
+    def symbol(self, c, kind, parent=None):
+        """a named type / enum / macro / global, so agents look it up in the index instead of reading headers"""
+        if not c.spelling or c.spelling.startswith('(') or not c.location.file:
+            return
+        name = self.qual(c) if kind in ('class', 'struct', 'union', 'enum', 'typedef') else c.spelling
+        if parent is not None and parent.spelling:
+            name = f'{self.qual(parent)}::{c.spelling}'
+        lab, _ = test_label(self.src_line(c.location.file.name, c.location.line))
+        if lab:
+            return
+        rng = parent if parent is not None else c
+        f = self.rel(c.location.file.name)
+        self.symbols.setdefault(f'{name}@{f}:{c.location.line}', {
+            'name': name, 'kind': kind, 'file': f, 'line': rng.extent.start.line, 'end': rng.extent.end.line,
+            **({'at': c.location.line, 'parent': self.qual(parent)} if parent is not None else {})})
 
     def klass(self, c):
         name = self.qual(c)
@@ -601,7 +629,7 @@ class TU:
         for d in self.defs.values():
             d['globals'] = {k: sorted(v) for k, v in d['globals'].items()} if isinstance(d['globals'].get('read'), set) else d['globals']
         return {'defs': self.defs, 'decls': self.decls, 'ext': self.ext, 'binds': self.binds, 'stores': self.stores,
-                'args': self.args, 'inherits': self.inherits, 'fixtures': self.fixtures, 'errors': self.errors, 'n_errors': self.n_errors, 'file': self.rel(self.path)}
+                'args': self.args, 'inherits': self.inherits, 'fixtures': self.fixtures, 'symbols': self.symbols, 'errors': self.errors, 'n_errors': self.n_errors, 'file': self.rel(self.path)}
 
 
 def strip_parens(t):
@@ -687,6 +715,9 @@ def build(out_path, cdb_path, paths):
 
 
 def merge(ix, results, root):
+    for r in results:
+        for k, v in r.get('symbols', {}).items():
+            ix.symbols.setdefault(k, v)
     usr2id, defs = {}, {}
     for r in results:
         for u, d in r['defs'].items():

@@ -292,6 +292,83 @@ def functions_of(text, is_c, line_of=lambda l: l, read_orig=None, with_facts=Tru
     return out
 
 
+SYM_TYPES = {'class_specifier': 'class', 'struct_specifier': 'struct', 'union_specifier': 'union', 'enum_specifier': 'enum'}
+
+
+def symbols_of_file(root, rel):
+    """types, enums, enumerators, typedefs, macros and file-scope variables of one ORIGINAL file (tree-sitter)"""
+    from .model import test_label
+    pc, pcpp = parsers()
+    try:
+        src = open(os.path.join(root, rel), 'rb').read()
+    except OSError:
+        return {}
+    tree = (pc if rel.endswith('.c') else pcpp).parse(src)
+    lines = src.decode('utf-8', 'replace').splitlines()
+    out = {}
+
+    def add(name, kind, node, at=None, parent=None):
+        if not name or test_label(lines[node.start_point[0]] if node.start_point[0] < len(lines) else '')[0]:
+            return
+        l = (at or node).start_point[0] + 1
+        d = {'name': name, 'kind': kind, 'file': rel, 'line': node.start_point[0] + 1, 'end': node.end_point[0] + 1}
+        if parent:
+            d.update({'at': l, 'parent': parent})
+        out.setdefault(f'{name}@{rel}:{l}', d)
+
+    def scope_name(n):
+        parts, p = [], n.parent
+        while p is not None:
+            if p.type in ('class_specifier', 'struct_specifier') and p.child_by_field_name('name') is not None:
+                parts.insert(0, G.txt(p.child_by_field_name('name'), src))
+            p = p.parent
+        return parts
+    for n in G.walk(tree.root_node):
+        t = n.type
+        if t in SYM_TYPES and n.child_by_field_name('body') is not None:
+            nm = n.child_by_field_name('name')
+            name = G.txt(nm, src) if nm is not None else None
+            if name is None and n.parent is not None and n.parent.type == 'type_definition':
+                d = G.innermost_name(n.parent.child_by_field_name('declarator'), src)
+                name = G.txt(d, src) if d is not None else None
+            if not name:
+                continue
+            q = '::'.join(scope_name(n) + [name])
+            add(q, SYM_TYPES[t], n)
+            if t == 'enum_specifier':
+                for e in n.child_by_field_name('body').named_children:
+                    if e.type == 'enumerator' and e.child_by_field_name('name') is not None:
+                        add(f"{q}::{G.txt(e.child_by_field_name('name'), src)}", 'enumerator', n, at=e, parent=q)
+        elif t == 'type_definition':
+            d = G.innermost_name(n.child_by_field_name('declarator'), src)
+            if d is not None:
+                add(G.txt(d, src), 'typedef', n)
+        elif t == 'alias_declaration' and n.child_by_field_name('name') is not None:
+            add(G.txt(n.child_by_field_name('name'), src), 'typedef', n)
+        elif t in ('preproc_def', 'preproc_function_def') and n.child_by_field_name('name') is not None:
+            add(G.txt(n.child_by_field_name('name'), src), 'macro', n)
+        elif t == 'declaration' and n.parent is not None and n.parent.type in ('translation_unit', 'declaration_list'):
+            if any(c.type == 'function_declarator' for c in G.walk(n)):
+                continue
+            const = bool(re.search(r'\b(const|constexpr)\b', G.txt(n, src).split('=')[0]))
+            for c in n.named_children:
+                if c.type in ('identifier', 'init_declarator', 'pointer_declarator', 'array_declarator'):
+                    nm = G.innermost_name(c, src)
+                    if nm is not None and nm.type == 'identifier':
+                        add(G.txt(nm, src), 'const' if const else 'var', n)
+    return out
+
+
+def symbols_for(root, rel_files):
+    out = {}
+    for f in rel_files:
+        try:
+            out.update(symbols_of_file(root, f))
+        except Exception:  # noqa: BLE001 - a file tree-sitter cannot parse contributes nothing
+            pass
+    return out
+
+
 def attach_targets(outline, edges, index):
     """fill outline call 'to' from the index call edges of the same function (matched by line + name)"""
     by_line = {}

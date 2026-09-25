@@ -2,11 +2,12 @@
 
 For each row `F` (file `S`):
 ```sh
-"$G" tests "$GD" F        # existing tests reaching F      → column "Existing tests"
-"$G" deps  "$GD" F        # what F needs mocked            → column "Mocks affected"
-grep -rnw 'F' <test paths> <mock paths> | head -20        # confirms; sees macros and names the graph missed
+"$I" tests "$GD" F        # existing tests reaching F      → column "Existing tests"
+"$I" deps  "$GD" F        # what F needs mocked            → column "Mocks affected"
+"$I" defs  "$GD" F        # mocks / fakes / overloads named F
 ```
-Signature or behaviour changes also hit F's callers: `"$G" explain "$GD" F` → their tests may mock F.
+Signature or behaviour changes also hit F's callers: `"$I" refs "$GD" F` → their tests may mock F.
+(`I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"`)
 
 | Change kind | Tests calling F | Mocks/stubs of F | New work |
 |-------------|-----------------|------------------|----------|

@@ -74,6 +74,8 @@ def export(gdir, out_path):
             e['targets'] = tg
     ix.reindex()
     add_facts(ix, scan, root, lm)
+    files = [norm(os.path.relpath(f, root)) for f in G.collect([os.path.join(root, p) for p in paths])]
+    ix.symbols.update(TS.symbols_for(root, files))
     ix.bind_virtual_targets()
     ix.save(out_path)
     return ix
@@ -116,9 +118,20 @@ def add_facts(ix, scan, root, lm):
                 i = by_loc.get((f0, start))
                 if i is None:
                     c = by_name.get((f0, name)) or [x for x in by_name.get((f0, name.split('::')[-1]), [])]
+                    c = [x for x in c if start <= ix.functions[x]['line'] <= end]      # never pair another overload's body
                     i = c[0] if len(c) == 1 else None
                 if i is None:
-                    continue
+                    # a definition Graphify has no node for (e.g. the second overload of a name): keep it for
+                    # find/list/source/card; its calls are unknown to this backend
+                    if not f0 or name.split('::')[-1] in G.TEST_MACROS:
+                        continue
+                    i = fid(name, f0, start)
+                    if i in ix.functions:
+                        continue
+                    ix.functions[i] = {'name': name, 'file': f0, 'line': start, 'end': end, 'kind': 'function',
+                                       'cls': name.rsplit('::', 1)[0] if '::' in name else None, 'static': False,
+                                       'outline': None, 'note': 'tree-sitter only (not in the Graphify graph)'}
+                    by_loc[(f0, start)] = i
                 n = ix.functions[i]
                 if n.get('outline') is not None and n['kind'] == 'function':
                     continue
