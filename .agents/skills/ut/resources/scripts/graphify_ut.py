@@ -1521,7 +1521,11 @@ def cmd_impact(argv):
             new_ = 'D tests through its public callers (static)'
         if kind in ('modified-logic', 'signature', 'new-dependency') and not tests:
             cat = 'D ' + cat; new_ = 'D no test reaches it yet; ' + new_
-        cats = ' '.join(dict.fromkeys(cat.split()))
+        cl = list(dict.fromkeys(cat.split()))
+        if not mocks: cl = [c for c in cl if c != 'C']
+        if not tests: cl = [c for c in cl if c != 'B']
+        if not cl: cl = ['A'] if kind == 'deleted' else ['D']
+        cats = ' '.join(cl)
         it.update({'tests': tests, 'callers': callers, 'mocks': mocks, 'kind': kind, 'cat': cats.split()[0], 'cats': cats,
                    'work': '; '.join(x for x in (t_ if tests else '', m_ if mocks else '', new_) if x)})
         rows.append(it)
@@ -1556,7 +1560,7 @@ def cmd_impact(argv):
     for h in header_items:
         w += 1
         L.append(f"| W{w} | {h['file']} (L{','.join(map(str, h['lines'][:4]))}{'…' if len(h['lines']) > 4 else ''}) | type/macro ({'/'.join(h['kinds'])}) | "
-                 f"{len(h['includers_test'])} test files include it | see includers | {CATEGORY['type/macro'][0]}; {CATEGORY['type/macro'][3]} | B | | | |")
+                 f"{len(h['includers_test'])}: {'; '.join(h['includers_test'][:3]) or 'none'} | see includers | {CATEGORY['type/macro'][0]} | B | | | |")
     for st, o, n in test_files:
         w += 1
         L.append(f"| W{w} | {n} | test/mock code already {'added' if st=='A' else 'deleted' if st=='D' else 'changed'} on this range | — | — | read it before redoing this work | H | | | |")

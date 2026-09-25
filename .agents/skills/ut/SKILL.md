@@ -57,6 +57,13 @@ so the graph and the cards match the code again. One command, about a minute.
 | "my changes", "the diff", "this branch", "after the refactoring" | `discover-diff.md` |
 | a module, feature, ticket, bug, "coverage of X", "fix the build" | `discover-ask.md` |
 
+## Two ways to run this skill
+- **Tool-driven (fewest tokens):** `resources/scripts/ut` runs phases 1–5, 7, 8, 10 as scripts, asks the user the
+  same questions with defaults, and calls an agent per task with a prompt that holds only that task's inputs
+  (see `resources/scripts/README-ut-tool.md`). When the user runs the tool, you are that per-task agent: follow the
+  prompt you receive, nothing below applies.
+- **Agent-driven:** the phases below, for an agent session without the tool.
+
 ## Start
 1. Ask (one message): "1) Task folder? [`<repo>/.ut/<YYYYMMDD>-<short-name>`, created if missing]
    2) What should I work on? (the changes on this branch / a module, feature or ticket / continue the last task)"

@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# ut - launcher for the ut tool (python3 -m utcli) using the Graphify venv when present
+HERE=$(cd "$(dirname "$0")" && pwd -P)
+PY="$HERE/../vendor/graphify/.venv/bin/python"; [ -x "$PY" ] || PY="$HERE/../vendor/graphify/.venv/Scripts/python.exe"; [ -x "$PY" ] || PY=${UT_PYTHON:-python3}
+cd "$HERE" && exec "$PY" -m utcli "$@"

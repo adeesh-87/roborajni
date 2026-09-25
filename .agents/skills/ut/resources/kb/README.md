@@ -15,6 +15,8 @@ kb/
     graphify/ | codemap/   generated code graph (scripts/graphify.sh) or its bash fallback
     decompositions/        notes written by a stronger model (optional)
 ```
+When the `ut` tool builds the KB it also keeps `kb.json` (machine-readable truth) and renders `kb.md` from it;
+hand-written notes then go to `notes.md` and `modules/<name>.md`, which the tool never overwrites.
 `<codebase-id>` comes from `scripts/kb-id.sh <repo>` (based on the git `origin` URL), so every clone,
 branch and machine of the same repository finds the same folder.
 
