@@ -1553,7 +1553,8 @@ def cmd_impact(argv):
     # ---- output
     L = []
     L.append(f'# Impact of the code change ({label})')
-    L.append(f'Scope: {", ".join(rel_paths) or "whole repo"}. Generated {__import__("datetime").date.today()} by graphify.sh impact. '
+    tool = f"index.sh impact ({meta.get('backend')} index)" if str(meta.get('schema', '')).startswith('ut-index') else 'graphify.sh impact'
+    L.append(f'Scope: {", ".join(rel_paths) or "whole repo"}. Generated {__import__("datetime").date.today()} by {tool}. '
              'Every row is a fact from git, the syntax tree and the graph; the category comes from a fixed table.')
     n_notest = sum(1 for r in rows if not r['tests'] and r['kind'] != 'deleted')
     L.append(f'\nSummary: {len(code_files)} code files changed ({len([x for x in code_files if x[0]=="A"])} added, '
