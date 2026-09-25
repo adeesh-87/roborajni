@@ -55,6 +55,9 @@ def run_baseline(st, root, kb):
             cdb = norm(os.path.join(b, 'compile_commands.json'))
     prof['compile_db'] = cdb
     bins = find_test_binaries(root, prof)
+    m = re.search(r'-B\s*(\S+)', c['build'])
+    if m:                                                   # binaries of the configured build dir first
+        bins = sorted(bins, key=lambda b: 0 if b.startswith(m.group(1).rstrip('/') + '/') else 1)
     st['baseline'] = res
     st['baseline']['single_test_cmd'] = single_test_template(prof, bins)
     st['baseline']['test_binaries'] = bins

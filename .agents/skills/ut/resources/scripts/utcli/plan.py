@@ -22,7 +22,26 @@ def discover_diff(st, root, gd, base=None, uncommitted=False, rng=None):
                       'work': cells[5], 'cat': cells[6][:1], 'in_scope': '', 'priority': '',
                       'includers': re.findall(r'(\S+\.(?:cpp|cxx|cc|c)\b)', cells[3]) if cells[2].startswith('type/macro') else []})
     st['range'] = ' '.join(args)
+    items += baseline_items(st, len(items))
     return items, read(out_md).split('\n## Work items')[0]
+
+
+def baseline_items(st, n):
+    """a failing baseline build or failing tests become E / F work items on the files named in the errors"""
+    out = []
+    probs = st['baseline'].get('problems', [])
+    files = {}
+    for p in probs:
+        m = re.search(r'([\w./-]+\.(?:cpp|cc|cxx|c|hpp|h)):(\d+)', p)
+        f = m.group(1) if m else '?'
+        f = norm(os.path.relpath(f, st['repo'])) if os.path.isabs(f) else f
+        files.setdefault(f, []).append(p[:160])
+    for f, ps in files.items():
+        n += 1
+        cat = 'E' if any(p.startswith('build') for p in ps) else 'F'
+        out.append({'id': f'W{n}', 'item': f'{f}: baseline {"build" if cat == "E" else "tests"} failing', 'kind': 'baseline failure',
+                    'tests': '; '.join(ps[:2]), 'mocks': '', 'work': 'fix so the baseline builds/passes' , 'cat': cat, 'in_scope': '', 'priority': ''})
+    return out
 
 
 def discover_ask(st, root, gd, names):
@@ -104,6 +123,8 @@ def make_plan(st, kb_dir, prof):
             notes.append(f"{w['item']} was already changed on this range: read it first"); continue
         if w['kind'].startswith('deleted') and w['tests'].startswith('0') and w['mocks'] in ('none', ''):
             w['in_scope'] = 'no (nothing references it)'; continue
+        if w['kind'] == 'baseline failure':
+            groups.setdefault((w['item'].split(':')[0], 'fix-build' if w['cat'] == 'E' else 'fix-run'), []).append(dict(w, header=True)); continue
         if w['kind'].startswith('type/macro'):
             for inc in w.get('includers', []):        # a header change is checked in every test file that includes it
                 ttype = 'fix-mocks' if re.search(r'mock|stub|fake', inc, re.I) else 'update-tests'
@@ -139,7 +160,8 @@ def make_plan(st, kb_dir, prof):
             for f in funcs:
                 cases += [(f,) + c for c in cases_for(cards, f)] if ttype in ('add-tests', 'raise-coverage', 'update-tests') else []
             if is_header_task:
-                cases = [(w['item'].split(': re-check')[0], f"re-check boundary values / types after {w['item'].split('using ')[-1]}", '', 'unchanged or updated') for w in chunk]
+                cases = [(w['item'].split(': re-check')[0], f"re-check boundary values / types after {w['item'].split('using ')[-1]}", '', 'unchanged or updated')
+                         if 'baseline' not in w['kind'] else (w['item'].split(':')[0], w['tests'][:120], '', 'builds and passes') for w in chunk]
             touches = [test_file] + ([m for w in chunk for m in re.findall(r'(\S+\.(?:c|cc|cpp|h|hpp)):', w.get('mocks', ''))] if ttype == 'fix-mocks' else [])
             reg = read(os.path.join(kb_dir, 'exemplars', 'register.md'))
             touches += list({r.split(':')[0] for r in re.findall(r'^- (\S+:\d+)', reg, re.M)})[:1]

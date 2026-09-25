@@ -1512,6 +1512,11 @@ def cmd_impact(argv):
                               if not is_testside(ids[e['source']].get('source_file') or '') and ids[e['source']].get('type') != 'external'})
         mocks = mocks_of(it['name'], it['file'])
         kind = it['kind']
+        if kind == 'deleted':                       # the graph no longer knows it: grep the test paths for its name
+            short = it['name'].split('::')[-1]
+            hits = subprocess.run(['grep', '-rnw', short, '--include=*.c', '--include=*.cc', '--include=*.cpp', '--include=*.h', '--include=*.hpp']
+                                  + [os.path.join(root, p) for p in rel_paths if is_testside(p)], capture_output=True, text=True).stdout.splitlines()
+            tests = sorted({f"{norm(os.path.relpath(h.split(':', 1)[0], root))}:L{h.split(':', 2)[1]}" for h in hits if ':' in h})
         if kind == 'modified-logic' and it['newdeps']:
             kind = 'new-dependency'
         t_, m_, new_, cat = CATEGORY[kind]

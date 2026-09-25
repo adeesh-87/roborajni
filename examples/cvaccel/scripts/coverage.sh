@@ -34,7 +34,7 @@ else
     echo "== ctcwrap not found; falling back to gcov/gcovr =="
     mkdir -p coverage
 
-    cmake -S . -B build-cov -DCOVERAGE=ON -DBUILD_UNIT_TESTS=ON
+    cmake -S . -B build-cov -DCOVERAGE=ON -DCMAKE_CXX_FLAGS="--coverage -O0" -DBUILD_UNIT_TESTS=ON
     cmake --build build-cov -j
 
     # Run the unit-test binary if the tests subdirectory has produced one.
