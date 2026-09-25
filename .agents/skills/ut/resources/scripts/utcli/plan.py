@@ -33,8 +33,9 @@ def baseline_items(st, n):
     files = {}
     for p in probs:
         m = re.search(r'([\w./-]+\.(?:cpp|cc|cxx|c|hpp|h)):(\d+)', p)
-        f = m.group(1) if m else '?'
-        f = norm(os.path.relpath(f, st['repo'])) if os.path.isabs(f) else f
+        if not m or 'CMakeFiles/' in m.group(1):
+            continue                                        # make/cmake summary lines carry no source file
+        f = norm(os.path.relpath(m.group(1), st['repo'])) if os.path.isabs(m.group(1)) else m.group(1)
         files.setdefault(f, []).append(p[:160])
     for f, ps in files.items():
         n += 1
