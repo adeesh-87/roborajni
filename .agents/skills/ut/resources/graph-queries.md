@@ -9,6 +9,7 @@ Works the same when the bash fallback is in use (`MODE: codemap`), except `expla
 | Which tests already reach a function (through callers and function pointers) | `"$G" tests "$GD" sensor_read` |
 | Callers and callees of one function | `"$G" explain "$GD" sensor_read` |
 | Call chain from A to B | `"$G" path "$GD" app_main sensor_read` |
+| What changed in the code under test and which tests/mocks it hits (the pick-list) | `"$G" impact "$GD" --base origin/main --out "$TASK/impact.md" --context "$TASK/context.md"` |
 | Code changed: bring graph, testscan and all cards up to date, get the delta | `"$G" refresh "$GD"` → `KB_DIR/last-refresh.md` (see `subskills/refresh.md`) |
 
 Card lines: `Decisions` = one test per outcome (loops: 0, 1, many; `?:` both; `switch` every case + default;

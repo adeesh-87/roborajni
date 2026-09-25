@@ -22,6 +22,9 @@ Run with the Graphify venv python (graphify.sh does this). Two steps:
 
   card  GRAPH_JSON SCAN_DIR FUNCTION|FILE  test-planning card: signature, params, every decision with its
                                         line, returns, globals touched, calls, callers, existing tests
+  impact GRAPH_JSON SCAN_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]
+                                        every changed function/type in the code under test, with the tests, callers
+                                        and mocks it touches and the work category (fixed table): the pick-list
   deps  GRAPH_JSON FILE|FUNCTION        what it calls outside itself (mock/stub candidates first)
   tests GRAPH_JSON FUNCTION [HOPS=4]    test blocks that reach FUNCTION through calls (incl. via function pointers)
 """
@@ -1277,6 +1280,322 @@ def cmd_card(argv):
     print(card_for(t, cands[0] if cands else None, scan, lm, root, ids, out, inc, pc, pcpp))
 
 
+# --------------------------------------------------------------------------- impact of a code change
+def parse_funcs_text(text, is_c, pc, pcpp):
+    """functions of a file content: name -> dict(start, end, sig, body, calls, static)"""
+    src = text if isinstance(text, bytes) else text.encode('utf-8', 'replace')
+    tree = (pc if is_c else pcpp).parse(src)
+    _IS_C[id(src)] = is_c
+    out, spans = {}, []
+    for n in walk(tree.root_node):
+        if n.type != 'function_definition':
+            continue
+        nm, decl = func_name(n, src)
+        if not nm:
+            continue
+        cls = enclosing_class(n, src)
+        if cls and '::' not in nm:
+            nm = f'{cls}::{nm}'
+        body = n.child_by_field_name('body')
+        head = src[n.start_byte:(body.start_byte if body is not None else n.end_byte)].decode('utf-8', 'replace')
+        head = re.sub(r'\s+', ' ', head).strip()
+        btxt = re.sub(r'\s+', ' ', txt(body, src)) if body is not None else ''
+        out.setdefault(nm, []).append({'start': n.start_point[0] + 1, 'end': n.end_point[0] + 1, 'sig': head, 'body': btxt,
+                   'calls': {c for c, _ in callees(body, src)} if body is not None else set(),
+                   'static': bool(re.search(r'\b(static|STATIC|PRIVATE)\b', head))})
+        spans.append((n.start_point[0] + 1, n.end_point[0] + 1))
+    return out, spans
+
+
+HUNK = re.compile(r'^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@')
+
+
+def changed_lines(diff_text):
+    """new-side line numbers touched by a unified diff (-U0), and old-side deleted line numbers"""
+    new, old = set(), set()
+    for line in diff_text.splitlines():
+        m = HUNK.match(line)
+        if not m:
+            continue
+        os_, oc, ns, nc = int(m.group(1)), int(m.group(2) or 1), int(m.group(3)), int(m.group(4) or 1)
+        new |= set(range(ns, ns + max(nc, 1)))
+        old |= set(range(os_, os_ + oc))
+    return new, old
+
+
+def git(root, *args):
+    r = subprocess.run(['git', '-C', root] + list(args), capture_output=True, text=True, errors='replace')
+    return r.stdout if r.returncode == 0 else ''
+
+
+CATEGORY = {   # change kind -> (tests calling it, mocks of it, new work, category letters in priority order)
+    'added': ('none yet', 'none', 'D new tests; C a mock if other modules\' tests call it', 'D'),
+    'deleted': ('A remove (ask)', 'A remove (ask)', 'check shared mocks first', 'A'),
+    'signature': ('B update calls', 'C update every mock/stub (else the test build breaks)', '', 'C B'),
+    'modified-logic': ('B re-check expected values', 'C only if the contract changed', 'D tests for new branches', 'B D'),
+    'new-dependency': ('B tests now need the new mock', 'C create/extend the mock', 'E link errors until it exists', 'C B'),
+    'moved/renamed': ('B includes/names', 'C names', 'E build registration', 'B E'),
+    'type/macro': ('B tests using the type/limit (boundary values)', 'C mocks returning it', 'D new enum values/fields', 'B'),
+}
+
+
+def cmd_impact(argv):
+    """impact GRAPH_JSON SCAN_DIR (--base REF | --uncommitted | --range A..B) [--out FILE] [--context FILE]"""
+    a = list(argv)
+    if len(a) < 3:
+        die('usage: impact GRAPH_JSON SCAN_DIR (--base REF | --uncommitted | --range A..B) [--out FILE] [--context FILE]')
+    gpath, scan = a[0], a[1]; a = a[2:]
+    mode, ref, out_file, ctx_file = None, None, None, None
+    while a:
+        k = a.pop(0)
+        if k == '--base': mode, ref = 'base', a.pop(0)
+        elif k == '--uncommitted': mode = 'uncommitted'
+        elif k == '--range': mode, ref = 'range', a.pop(0)
+        elif k == '--out': out_file = a.pop(0)
+        elif k == '--context': ctx_file = a.pop(0)
+        else: die('unknown option ' + k)
+    if not mode:
+        die('give --base REF, --uncommitted or --range A..B')
+    base_dir = os.path.dirname(os.path.abspath(scan))
+    root = open(os.path.join(base_dir, 'SOURCE_ROOT')).read().strip()
+    args = open(os.path.join(base_dir, 'BUILD_ARGS')).read().splitlines() if os.path.exists(os.path.join(base_dir, 'BUILD_ARGS')) else []
+    paths = [l[5:] for l in args if l.startswith('path=')]
+    cwd = next((l[4:] for l in args if l.startswith('cwd=')), root)
+    rel_paths = [norm(os.path.relpath(os.path.realpath(os.path.join(cwd, p)), root)) for p in paths]
+    is_testside = lambda f: bool(re.search(r'(^|/)(test|tests|unittest|unittests|ut|mocks?|stubs?|fakes?)(/|$)|test_|_test\.|Test\.|[Mm]ock|[Ss]tub|[Ff]ake', f))
+    g, ids, out, inc = load(gpath)
+    pc, pcpp = parsers()
+
+    if mode == 'base':
+        mb = git(root, 'merge-base', ref, 'HEAD').strip() or ref
+        old_ref, diff_args, label = mb, [mb], f'branch vs {ref} (merge-base {mb[:10]})'
+    elif mode == 'range':
+        lo, _, hi = ref.partition('..'); old_ref, diff_args, label = lo, [lo, hi or 'HEAD'], f'{lo[:10]}..{(hi or "HEAD")[:10]}'
+    else:
+        old_ref, diff_args, label = 'HEAD', ['HEAD'], 'uncommitted changes (staged + unstaged + untracked)'
+    status = git(root, 'diff', '--name-status', '-M', *diff_args, '--', *(rel_paths or ['.']))
+    files = []
+    for line in status.splitlines():
+        parts = line.split('\t')
+        st = parts[0][0]
+        if st == 'R':
+            files.append(('R', parts[1], parts[2]))
+        else:
+            files.append((st, parts[1], parts[1]))
+    if mode == 'uncommitted':
+        for f in git(root, 'ls-files', '--others', '--exclude-standard', '--', *(rel_paths or ['.'])).splitlines():
+            files.append(('A', f, f))
+    files = [(st, o, n) for st, o, n in files if os.path.splitext(n)[1].lower() in EXTS or os.path.splitext(o)[1].lower() in EXTS]
+    code_files = [x for x in files if not is_testside(x[2])]
+    test_files = [x for x in files if is_testside(x[2])]
+    # headers changed OUTSIDE the scan paths (config, include/, shared headers) still matter when scope code includes them
+    outside_hdrs = []
+    if rel_paths:
+        for line in git(root, 'diff', '--name-status', '-M', *diff_args, '--', '.').splitlines():
+            parts = line.split('\t'); f = parts[-1]
+            if os.path.splitext(f)[1].lower() in ('.h', '.hh', '.hpp', '.hxx') and not any(f == p or f.startswith(p + '/') for p in rel_paths) \
+                    and not is_testside(f) and parts[0][0] != 'D':
+                outside_hdrs.append(('M', f, f))
+        code_files += outside_hdrs
+
+    items, header_items = [], []
+    for st, old_p, new_p in code_files:
+        is_c = os.path.splitext(new_p)[1].lower() == '.c'
+        old_txt = git(root, 'show', f'{old_ref}:{old_p}') if st != 'A' else ''
+        try:
+            new_txt = open(os.path.join(root, new_p), encoding='utf-8', errors='replace').read() if st != 'D' else ''
+        except OSError:
+            new_txt = ''
+        of, _ = parse_funcs_text(old_txt, is_c, pc, pcpp)
+        nf, nspans = parse_funcs_text(new_txt, is_c, pc, pcpp)
+        dtxt = git(root, 'diff', '-U0', '-M', *diff_args, '--', old_p, new_p) if st != 'A' else ''
+        nlines, olines = changed_lines(dtxt) if dtxt else (set(range(1, new_txt.count('\n') + 2)), set())
+        all_old_bodies = {d['body'] for ds in of.values() for d in ds}
+        for name in sorted(set(of) | set(nf)):
+            olds, news = list(of.get(name, [])), list(nf.get(name, []))
+            # pair identical definitions first (a function can exist in several #if branches)
+            for n in list(news):
+                for o in olds:
+                    if o['sig'] == n['sig'] and o['body'] == n['body']:
+                        olds.remove(o); news.remove(n); break
+            pairs = []
+            for n in news:                                   # changed or added definitions
+                o = next((o for o in olds if o['sig'] == n['sig']), None) or \
+                    next((o for o in olds if o['body'] == n['body']), None) or (olds[0] if olds else None)
+                if o is not None:
+                    olds.remove(o)
+                pairs.append((o, n))
+            pairs += [(o, None) for o in olds]                # deleted definitions
+            for o, n in pairs:
+                if o and not n:
+                    kind = 'deleted'
+                elif n and not o:
+                    kind = 'moved/renamed' if st == 'R' and n['body'] in all_old_bodies else 'added'
+                elif o['sig'] != n['sig']:
+                    kind = 'signature'
+                elif o['body'] != n['body']:
+                    kind = 'modified-logic'
+                else:
+                    continue
+                newdeps = sorted(n['calls'] - o['calls']) if o and n else sorted(n['calls']) if n and not o else []
+                newdeps = [d for d in newdeps if d not in NOT_CALLS and not d.startswith('member:')]
+                items.append({'file': new_p if n else old_p, 'name': name, 'kind': kind, 'line': (n or o)['start'],
+                              'end': (n or o)['end'], 'static': (n or o)['static'], 'newdeps': newdeps,
+                              'old_sig': o['sig'] if o else '', 'new_sig': n['sig'] if n else ''})
+        # changes outside any function (types, macros, declarations) — matters most in headers
+        outside = sorted(l for l in nlines if not any(s <= l <= e for s, e in nspans))
+        if outside and new_txt:
+            lines = new_txt.splitlines()
+            kinds = set()
+            for l in outside:
+                t = lines[l - 1].strip() if l - 1 < len(lines) else ''
+                if re.match(r'#\s*define', t): kinds.add('macro')
+                elif re.search(r'\b(typedef|struct|union|enum)\b', t) or re.match(r'\s*[A-Za-z_]\w*\s*[,;=]', t): kinds.add('type')
+                elif re.search(r'\w+\s*\(', t): kinds.add('declaration')
+                elif t and not t.startswith(('//', '/*', '*')): kinds.add('other')
+            if kinds & {'macro', 'type'} or (kinds == {'declaration'} and new_p.endswith(('.h', '.hpp', '.hh'))):
+                if (st, old_p, new_p) in outside_hdrs:
+                    kinds.add('outside scan paths')
+                header_items.append({'file': new_p, 'lines': outside[:12], 'kinds': sorted(kinds),
+                                     'text': [lines[l - 1].strip()[:80] for l in outside[:6] if l - 1 < len(lines)]})
+
+    # graph lookups
+    def node_for(name, file):
+        cands = [n for n in ids.values() if n.get('_callable') and n.get('source_file') == file and
+                 (n['label'] == name + '()' or n['label'] == name)]
+        return cands[0] if cands else (find(ids, name) or [None])[0]
+
+    def tests_reaching(nid, hops=4):
+        seen, frontier, found = {nid: [ids[nid]['label']]}, [nid], []
+        for depth in range(hops):
+            nxt = []
+            for cur in frontier:
+                for e in inc.get(cur, []):
+                    c = e['source']
+                    if c in seen:
+                        continue
+                    seen[c] = seen[cur] + [ids[c]['label']]
+                    n = ids[c]
+                    if n.get('kind') in ('test', 'fixture') or is_testside(n.get('source_file') or ''):
+                        found.append((depth + 1, n))
+                    nxt.append(c)
+            frontier = nxt
+        return found
+
+    def mocks_of(name, file):
+        short = name.split('::')[-1]
+        res = []
+        for n in ids.values():
+            if n.get('_callable') and n['label'] in (short + '()', name + '()') and is_testside(n.get('source_file') or '') and n.get('source_file') != file:
+                res.append(f"{n.get('source_file')}:{n.get('source_location')}")
+        # C++ interface: implementers in test paths
+        if '::' in name:
+            cls = name.rsplit('::', 1)[0]
+            for e in g['links']:
+                if e.get('relation') == 'inherits' and e['target'] in ids and ids[e['target']]['label'].split('::')[-1] == cls \
+                        and e['source'] in ids and is_testside(ids[e['source']].get('source_file') or ''):
+                    res.append(f"{ids[e['source']]['label']} ({ids[e['source']].get('source_file')})")
+        # generated / macro mocks: CMock mock_<header>.h includes, FFF fakes, Parasoft stubs
+        hdr = os.path.splitext(os.path.basename(file))[0]
+        hits = subprocess.run(['grep', '-rlE', rf'mock_{re.escape(hdr)}\.h|FAKE_(VALUE|VOID)_FUNC[A-Z_]*\s*\([^;]*\b{re.escape(short)}\b|CppTest_Stub_{re.escape(short)}\b|{re.escape(short)}_(Expect|ExpectAndReturn|Ignore|Stub)',
+                               '--include=*.c', '--include=*.cc', '--include=*.cpp', '--include=*.h', '--include=*.hpp']
+                              + [os.path.join(root, p) for p in rel_paths if is_testside(p)] , capture_output=True, text=True)
+        for h in hits.stdout.split():
+            res.append(f"{norm(os.path.relpath(h, root))} (generated/macro mock usage)")
+        return sorted(set(res))
+
+    rows, details = [], []
+    for it in items:
+        nd = node_for(it['name'], it['file']) if it['kind'] != 'deleted' else node_for(it['name'], it['file'])
+        tests, callers = [], []
+        if nd:
+            tests = sorted({f"{n['label']} ({n.get('source_file')}:{n.get('source_location')})" for _, n in tests_reaching(nd['id'])})
+            callers = sorted({f"{ids[e['source']]['label']} ({ids[e['source']].get('source_file')})" for e in inc.get(nd['id'], [])
+                              if not is_testside(ids[e['source']].get('source_file') or '') and ids[e['source']].get('type') != 'external'})
+        mocks = mocks_of(it['name'], it['file'])
+        kind = it['kind']
+        if kind == 'modified-logic' and it['newdeps']:
+            kind = 'new-dependency'
+        t_, m_, new_, cat = CATEGORY[kind]
+        if kind == 'added' and it['static']:
+            new_ = 'D tests through its public callers (static)'
+        if kind in ('modified-logic', 'signature', 'new-dependency') and not tests:
+            cat = 'D ' + cat; new_ = 'D no test reaches it yet; ' + new_
+        cats = ' '.join(dict.fromkeys(cat.split()))
+        it.update({'tests': tests, 'callers': callers, 'mocks': mocks, 'kind': kind, 'cat': cats.split()[0], 'cats': cats,
+                   'work': '; '.join(x for x in (t_ if tests else '', m_ if mocks else '', new_) if x)})
+        rows.append(it)
+    for h in header_items:
+        includers = subprocess.run(['grep', '-rlE', rf'#\s*include\s*["<]([^">]*/)?{re.escape(os.path.basename(h["file"]))}[">]',
+                                    '--include=*.c', '--include=*.cc', '--include=*.cpp', '--include=*.h', '--include=*.hpp',
+                                    os.path.join(root, '.')], capture_output=True, text=True).stdout.split()
+        includers = sorted(norm(os.path.relpath(x, root)) for x in includers)
+        h['includers_test'] = [x for x in includers if is_testside(x)]
+        h['includers_code'] = [x for x in includers if not is_testside(x)]
+
+    # ---- output
+    L = []
+    L.append(f'# Impact of the code change ({label})')
+    L.append(f'Scope: {", ".join(rel_paths) or "whole repo"}. Generated {__import__("datetime").date.today()} by graphify.sh impact. '
+             'Every row is a fact from git, the syntax tree and the graph; the category comes from a fixed table.')
+    n_notest = sum(1 for r in rows if not r['tests'] and r['kind'] != 'deleted')
+    L.append(f'\nSummary: {len(code_files)} code files changed ({len([x for x in code_files if x[0]=="A"])} added, '
+             f'{len([x for x in code_files if x[0]=="D"])} deleted, {len([x for x in code_files if x[0]=="R"])} renamed); '
+             f'{len(rows)} functions changed; {n_notest} of them reached by no test; {len(header_items)} type/macro/declaration '
+             f'changes outside functions; {len(test_files)} test/mock files already changed on this range.')
+    L.append('\n## Work items (copy into context.md; choose which to do)')
+    L.append('| W# | Code item (file:function) | Change kind | Existing tests | Mocks affected | Proposed work | Cat | In scope | Priority | Acceptance |')
+    L.append('|----|---------------------------|-------------|----------------|----------------|---------------|-----|----------|----------|------------|')
+    w = 0
+    for r in rows:
+        w += 1
+        r['w'] = w
+        L.append(f"| W{w} | {r['file']}:{r['name']} (L{r['line']}) | {r['kind']}{' (static)' if r['static'] else ''} | "
+                 f"{len(r['tests'])}: {'; '.join(r['tests'][:2]) if r['tests'] else 'none'}{' …' if len(r['tests']) > 2 else ''} | "
+                 f"{'; '.join(r['mocks'][:2]) if r['mocks'] else 'none'}{' …' if len(r['mocks']) > 2 else ''} | {r['work']} | {r['cat']} | | | |")
+    for h in header_items:
+        w += 1
+        L.append(f"| W{w} | {h['file']} (L{','.join(map(str, h['lines'][:4]))}{'…' if len(h['lines']) > 4 else ''}) | type/macro ({'/'.join(h['kinds'])}) | "
+                 f"{len(h['includers_test'])} test files include it | see includers | {CATEGORY['type/macro'][0]}; {CATEGORY['type/macro'][3]} | B | | | |")
+    for st, o, n in test_files:
+        w += 1
+        L.append(f"| W{w} | {n} | test/mock code already {'added' if st=='A' else 'deleted' if st=='D' else 'changed'} on this range | — | — | read it before redoing this work | H | | | |")
+    if rows or header_items:
+        L.append('\n## Details')
+    for r in rows:
+        L.append(f"\n### W{r['w']} {r['file']}:{r['name']}  [{r['kind']}, L{r['line']}-{r['end']}]  categories {r['cats']}")
+        if r['kind'] == 'signature':
+            L.append(f"- was: `{r['old_sig'][:120]}`"); L.append(f"- now: `{r['new_sig'][:120]}`")
+        if r['newdeps']:
+            L.append(f"- new calls (need a mock/stub if external): {', '.join(r['newdeps'])}")
+        L.append(f"- tests reaching it: {'; '.join(r['tests']) if r['tests'] else 'none'}")
+        L.append(f"- production callers (their tests may mock it): {'; '.join(r['callers']) if r['callers'] else 'none'}")
+        L.append(f"- mocks/stubs/fakes of it: {'; '.join(r['mocks']) if r['mocks'] else 'none'}")
+    for h in header_items:
+        L.append(f"\n### {h['file']} lines {', '.join(map(str, h['lines']))}  [{'/'.join(h['kinds'])}]")
+        for t in h['text']:
+            L.append(f"- `{t}`")
+        L.append(f"- test/mock files including it: {', '.join(h['includers_test']) or 'none'}")
+        L.append(f"- code files including it: {', '.join(h['includers_code'][:10]) or 'none'}")
+    text = '\n'.join(L) + '\n'
+    if out_file:
+        open(out_file, 'w', encoding='utf-8').write(text)
+        print(f'impact written: {out_file} ({len(rows)} functions, {len(header_items)} header changes, {len(test_files)} test files)')
+    else:
+        print(text)
+    if ctx_file and os.path.exists(ctx_file):
+        c = open(ctx_file, encoding='utf-8').read()
+        table = [l for l in L if l.startswith('| W')]
+        marker = '|----|---------------------------|'
+        i = c.find(marker)
+        if i >= 0:
+            j = c.find('\n', i) + 1
+            c = c[:j] + '\n'.join(table) + '\n' + c[j:]
+            c = c.replace('Discovery mode / range:', f'Discovery mode / range: diff, {label} (full list: impact.md)', 1)
+            open(ctx_file, 'w', encoding='utf-8').write(c)
+            print(f'{len(table)} work-item rows inserted into {ctx_file}')
+
+
 # --------------------------------------------------------------------------- self-test
 def cmd_mkcdb(argv):
     """mkcdb FIXTURE_DIR: write compile_commands.json for the self-test fixture with local compilers"""
@@ -1349,7 +1668,7 @@ if __name__ == '__main__':
     except (AttributeError, ValueError):
         pass
     cmds = {'mirror': cmd_mirror, 'augment': cmd_augment, 'deps': cmd_deps, 'tests': cmd_tests,
-            'mkcdb': cmd_mkcdb, 'check': cmd_check, 'card': cmd_card}
+            'mkcdb': cmd_mkcdb, 'check': cmd_check, 'card': cmd_card, 'impact': cmd_impact}
     if len(sys.argv) < 2 or sys.argv[1] not in cmds:
         print(__doc__); sys.exit(2)
     cmds[sys.argv[1]](sys.argv[2:])

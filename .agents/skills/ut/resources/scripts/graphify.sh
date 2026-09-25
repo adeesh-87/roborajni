@@ -16,6 +16,8 @@
 #                                                globals, calls, callers, existing tests
 # If Python 3.10+ / Graphify cannot be set up, build/deps/tests/card fall back to the bash code map
 # (codemap.sh) automatically and print "MODE: codemap". explain/path/query need the real graph.
+#   graphify.sh impact  OUT_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]
+#                                                what changed in the code under test and which tests/mocks it hits
 #   graphify.sh refresh OUT_DIR                  rebuild with the last build's arguments, rescan tests, regenerate the
 #                                                module cards under <KB_DIR>/modules/, write <KB_DIR>/last-refresh.md (delta)
 #   graphify.sh selftest                         build a bundled fixture and check the C/C++ fixes on THIS machine
@@ -36,7 +38,7 @@ VENV="$VENDOR/.venv"
 WHEELS="$VENDOR/wheels"
 
 die() { echo "graphify.sh: $*" >&2; exit 2; }
-[ $# -ge 1 ] || { sed -n '2,32p' "$0"; exit 2; }
+[ $# -ge 1 ] || { sed -n '2,34p' "$0"; exit 2; }
 CMD=$1; shift
 
 venv_py() {
@@ -211,6 +213,8 @@ case $CMD in
   card)    [ $# -eq 2 ] || die "usage: card OUT_DIR FUNCTION|FILE"
            case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" card "$1/out/graph.json" "$1/scan" "$2" ;;
              codemap) "$HERE/codemap.sh" card "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+  impact)  [ $# -ge 2 ] || die "usage: impact OUT_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]"
+           need_graph "$1"; ensure || exit 2; o=$1; shift; "$(venv_py)" "$HERE/graphify_ut.py" impact "$o/out/graph.json" "$o/scan" "$@" ;;
   refresh) [ $# -eq 1 ] || die "usage: refresh OUT_DIR"; ensure >/dev/null 2>&1 || true; do_refresh "$1" ;;
   selftest)
     ensure || exit 2
@@ -228,5 +232,5 @@ case $CMD in
     mkdir -p "$1" && cp "$WHEEL" "$1/"
     $py -m pip download --disable-pip-version-check --only-binary=:all: --platform "$2" --python-version "$3" -d "$1" "$WHEEL" \
       && echo "wheelhouse ready: $1 (copy it to resources/vendor/graphify/wheels on the offline machine, then run setup)" ;;
-  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|card|refresh|selftest|wheelhouse|version)" ;;
+  *) die "unknown command '$CMD' (setup|build|query|explain|path|deps|tests|card|impact|refresh|selftest|wheelhouse|version)" ;;
 esac
