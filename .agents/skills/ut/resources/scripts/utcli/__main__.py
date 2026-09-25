@@ -3,7 +3,7 @@ the agent is called only to write test code.  Run:  python3 -m utcli <command> [
 import argparse, json, os, re, sys, subprocess
 from .state import State, PHASES
 from .util import ask, say, read, write, sh, script, RES, SKILL_DIR, norm, words
-from . import detect, kb as KB, baseline, plan as PLAN, run as RUN
+from . import detect, kb as KB, baseline, plan as PLAN, run as RUN, harness as HARNESS
 from .frameworks import FRAMEWORKS, COVERAGE_TOOLS
 
 
@@ -191,9 +191,8 @@ def cmd_run(args):
 # ------------------------------------------------------------------ pilot (phase 6)
 def cmd_pilot(args):
     st = load(args); kb = KB.load_kb(st['kb_dir']); prof = st['profile']
-    if not prof.get('framework'):
-        fw = ask('No tests exist. Framework? (cpputest | gtest | unity)', 'cpputest' if not any(f.endswith('.cpp') for f in KB.scope_files(st['repo'], prof)) else 'gtest', args.yes, answers_of(args), 'framework')
-        prof['framework'] = fw; say(f"Greenfield harness: follow {os.path.join(RES, 'harness.md')} then run baseline again"); st.save()
+    if not prof.get('framework') or not prof.get('test_paths'):
+        sys.exit("No tests exist yet: run `ut harness --framework cpputest|gtest` first (creates tests/ and the CMake target), then baseline, kb, pilot")
     # pick two functions: fewest decisions without external calls, and one with a mockable dependency
     cands = []
     for m in kb.get('modules', []):
@@ -246,6 +245,15 @@ def cmd_pilot(args):
     st['pilot'] = 'done'; st.done('pilot'); st.log('tool', f'pilot approved: {test_file}'); st.save()
 
 
+def cmd_harness(args):
+    st = load(args)
+    rc, out, files = HARNESS.create(st, args.framework, args.dir)
+    say(('harness OK: ' if rc == 0 else 'harness FAILED: ') + ', '.join(files) + '\n' + ('' if rc == 0 else out[-1500:]))
+    st.log('tool', f"harness {args.framework}: {'OK' if rc == 0 else 'FAILED'}"); st.save()
+    if rc == 0:
+        say('now run: baseline, then kb, then pilot')
+
+
 def cmd_close(args):
     st = load(args); say(RUN.closeout(st, st['kb_dir']))
 
@@ -269,11 +277,12 @@ def main(argv=None):
     s = sub.add_parser('plan', help='phase 8: tasks with Cases from the cards'); opt(s)
     s = sub.add_parser('run', help='phase 9: executor loop'); opt(s); s.add_argument('--agent', default=RUN.DEFAULT_AGENT, help='command; reads the prompt on stdin, or use {prompt} for the file')
     s.add_argument('--executor', default='E1'); s.add_argument('--dry-run', action='store_true'); s.add_argument('--attempts', type=int, default=3); s.add_argument('--only', nargs='*')
+    s = sub.add_parser('harness', help='greenfield: create tests/CMakeLists.txt + runner + smoke test, hook into the root CMake, build it'); opt(s); s.add_argument('--framework', default='cpputest', choices=['cpputest', 'gtest']); s.add_argument('--dir', default='tests')
     s = sub.add_parser('close', help='phase 10'); opt(s)
     s = sub.add_parser('status'); opt(s)
     a = p.parse_args(argv)
     {'init': cmd_init, 'baseline': cmd_baseline, 'kb': cmd_kb, 'discover': cmd_discover, 'scope': cmd_scope, 'pilot': cmd_pilot,
-     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status}[a.cmd](a)
+     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness}[a.cmd](a)
 
 
 if __name__ == '__main__':
