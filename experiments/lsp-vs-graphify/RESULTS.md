@@ -14,7 +14,7 @@ $0.62 vs $0.64).
 - **Graphify fails on C++.** It resolves calls by name, and it never shows the namespace, the header that declares
   a symbol, or the complete list of an interface's pure virtual methods. It chose the wrong `const` overload, could
   not tell `Dispatcher::pump` from `CvAccelService::pump`, and has no constructor or destructor calls at all. The
-  agents then wrote fakes that did not compile: 7 of the 10 Graphify C++ runs that never built failed with
+  agents then wrote fakes that did not compile: 6 of the 10 Graphify C++ runs that never built failed with
   "`JobDesc` does not name a type", "`Dispatcher` has not been declared", or "abstract type `MockDevice`". clangd's
   `hover` answers "provided by `cvaccel/request_queue.hpp`, in namespace `cvaccel`".
 - **A plain LSP fails on embedded C.** clangd's workspace symbols do not contain macros: `find CANARD_IFACE` returns
@@ -98,15 +98,19 @@ Where the target is self-contained, both tools do equally well.
 
 Why runs failed:
 - **Graphify, C++ (10 runs never built):**
-  - 7 runs had undeclared types or namespaces, or incomplete fakes of an interface;
-  - 3 runs hit the CppUTest include-order pitfall.
+  - 6 runs had undeclared types or namespaces, or incomplete fakes of an interface;
+  - 4 runs hit the CppUTest include-order pitfall.
 - **clangd, C++ (3 failures):**
   - 1 run hit the same include-order pitfall;
-  - 2 runs had failing assertions.
+  - 2 runs had failing tests.
 - **clangd, C (7 failures):**
-  - wrong struct members;
-  - violated `assert` preconditions of the target;
-  - no test at all within 80 turns.
+  - 2 runs had wrong struct members or types;
+  - 2 runs violated `assert` preconditions of the target;
+  - 1 run failed its own leak check;
+  - 2 runs produced no test within 80 turns.
+- **Graphify, C (2 failures):**
+  - 1 run had an undeclared identifier;
+  - 1 run produced no test.
 
 The include-order pitfall: including CppUTest's new/delete macros before a standard-library header breaks the
 build. It hit both tools and is unrelated to the index. Graphify's card lists `assert` conditions as decisions
