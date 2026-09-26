@@ -1,0 +1,2536 @@
+{
+ "codebase": "cvaccel",
+ "questions": 81,
+ "scores": {
+  "grep -w": {
+   "tp": 682,
+   "fp": 2083,
+   "fn": 0,
+   "precision": 0.247,
+   "recall": 1.0,
+   "f1": 0.396,
+   "returned_per_q": 34.1,
+   "ms_per_q": 2.4
+  },
+  "grep call": {
+   "tp": 682,
+   "fp": 694,
+   "fn": 0,
+   "precision": 0.496,
+   "recall": 1.0,
+   "f1": 0.663,
+   "returned_per_q": 17.0,
+   "ms_per_q": 2.5
+  },
+  "graphify": {
+   "tp": 391,
+   "fp": 38,
+   "fn": 291,
+   "precision": 0.911,
+   "recall": 0.573,
+   "f1": 0.704,
+   "returned_per_q": 5.3,
+   "ms_per_q": 0.0
+  },
+  "clangd": {
+   "tp": 682,
+   "fp": 33,
+   "fn": 0,
+   "precision": 0.954,
+   "recall": 1.0,
+   "f1": 0.976,
+   "returned_per_q": 8.8,
+   "ms_per_q": 88.2
+  }
+ },
+ "per_function": [
+  {
+   "fn": "clientWork",
+   "at": "apps/demo_app.cpp:22",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::session",
+   "at": "client/include/cvclient/cvclient.hpp:36",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 214,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 13,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/cvclient_test.cpp:22"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::getStats",
+   "at": "client/src/cvclient.cpp:100",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::openSession",
+   "at": "client/src/cvclient.cpp:33",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "apps/demo_app.cpp:27"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::closeSession",
+   "at": "client/src/cvclient.cpp:40",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "apps/demo_app.cpp:39",
+     "apps/demo_app.cpp:74"
+    ]
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::allocMem",
+   "at": "client/src/cvclient.cpp:48",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "apps/demo_app.cpp:35"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::freeMem",
+   "at": "client/src/cvclient.cpp:56",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "apps/demo_app.cpp:73"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::postConfig",
+   "at": "client/src/cvclient.cpp:62",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "apps/demo_app.cpp:50"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::submit",
+   "at": "client/src/cvclient.cpp:76",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 21,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 18,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "apps/demo_app.cpp:56"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Client::wait",
+   "at": "client/src/cvclient.cpp:82",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::inFlight",
+   "at": "include/cvaccel/dispatcher.hpp:26",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::isRunning",
+   "at": "include/cvaccel/dispatcher.hpp:27",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "IAccelBlock::coreCount",
+   "at": "include/cvaccel/hw_block.hpp:31",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfStats::avgLatencyNs",
+   "at": "include/cvaccel/perf_monitor.hpp:26",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::core",
+   "at": "include/cvaccel/perf_monitor.hpp:34",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 134,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 7,
+    "missed": [
+     "tests/perf_monitor_test.cpp:244",
+     "tests/perf_monitor_test.cpp:37",
+     "tests/perf_monitor_test.cpp:38",
+     "tests/perf_monitor_test.cpp:46",
+     "tests/perf_monitor_test.cpp:47",
+     "tests/perf_monitor_test.cpp:94",
+     "tests/service_test.cpp:1851"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::integrityErrors",
+   "at": "include/cvaccel/perf_monitor.hpp:36",
+   "calls": 9,
+   "grep -w": {
+    "tp": 9,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 9,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::perf",
+   "at": "include/cvaccel/service.hpp:37",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 83,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "apps/demo_app.cpp:91",
+     "apps/demo_app.cpp:93"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::pool",
+   "at": "include/cvaccel/service.hpp:38",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 262,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 26,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/service_test.cpp:876"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::sessions",
+   "at": "include/cvaccel/service.hpp:39",
+   "calls": 9,
+   "grep -w": {
+    "tp": 9,
+    "fp": 89,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 9,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 9,
+    "missed": [
+     "tests/service_test.cpp:1468",
+     "tests/service_test.cpp:1541",
+     "tests/service_test.cpp:1542",
+     "tests/service_test.cpp:1584",
+     "tests/service_test.cpp:654",
+     "tests/service_test.cpp:724",
+     "tests/service_test.cpp:826",
+     "tests/service_test.cpp:858"
+    ]
+   },
+   "clangd": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimAccelBlock::submit",
+   "at": "sim/sim_accel_block.cpp:21",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 22,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 19,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimAccelBlock::isBusy",
+   "at": "sim/sim_accel_block.cpp:36",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimAccelBlock::setCompletionHandler",
+   "at": "sim/sim_accel_block.cpp:42",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimAccelBlock::failNext",
+   "at": "sim/sim_accel_block.cpp:47",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimAccelBlock::run",
+   "at": "sim/sim_accel_block.cpp:55",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::nowNs",
+   "at": "sim/sim_device.cpp:23",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::registerClient",
+   "at": "sim/sim_device.cpp:28",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "sim/sim_transport.cpp:8"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::unregisterClient",
+   "at": "sim/sim_device.cpp:35",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "sim/sim_transport.cpp:15"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::ioctlToClient",
+   "at": "sim/sim_device.cpp:8",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::poolPhysBase",
+   "at": "sim/sim_device.hpp:17",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimDevice::poolVirtBase",
+   "at": "sim/sim_device.hpp:18",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimTransport::ioctl",
+   "at": "sim/sim_transport.cpp:19",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 21,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 13,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimTransport::setWakeHandler",
+   "at": "sim/sim_transport.cpp:23",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SimTransport::fd",
+   "at": "sim/sim_transport.hpp:13",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 54,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::cancelSession",
+   "at": "src/dispatcher.cpp:128",
+   "calls": 9,
+   "grep -w": {
+    "tp": 9,
+    "fp": 11,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 9,
+    "fp": 11,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 8,
+    "missed": [
+     "tests/dispatcher_test.cpp:648",
+     "tests/dispatcher_test.cpp:668",
+     "tests/dispatcher_test.cpp:690",
+     "tests/dispatcher_test.cpp:711",
+     "tests/dispatcher_test.cpp:735",
+     "tests/dispatcher_test.cpp:757",
+     "tests/dispatcher_test.cpp:779",
+     "tests/dispatcher_test.cpp:804"
+    ]
+   },
+   "clangd": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::start",
+   "at": "src/dispatcher.cpp:18",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::pump",
+   "at": "src/dispatcher.cpp:34",
+   "calls": 32,
+   "grep -w": {
+    "tp": 32,
+    "fp": 12,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 32,
+    "fp": 12,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 29,
+    "missed": [
+     "tests/dispatcher_test.cpp:110",
+     "tests/dispatcher_test.cpp:131",
+     "tests/dispatcher_test.cpp:156",
+     "tests/dispatcher_test.cpp:174",
+     "tests/dispatcher_test.cpp:194",
+     "tests/dispatcher_test.cpp:210",
+     "tests/dispatcher_test.cpp:229",
+     "tests/dispatcher_test.cpp:252"
+    ]
+   },
+   "clangd": {
+    "tp": 32,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "blockBytesOf",
+   "at": "src/dispatcher.cpp:8",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "Dispatcher::onCompletion",
+   "at": "src/dispatcher.cpp:88",
+   "calls": 10,
+   "grep -w": {
+    "tp": 10,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 10,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::allocate",
+   "at": "src/memory_pool.cpp:15",
+   "calls": 82,
+   "grep -w": {
+    "tp": 82,
+    "fp": 14,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 82,
+    "fp": 13,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 46,
+    "fp": 0,
+    "fn": 36,
+    "missed": [
+     "tests/memory_pool_test.cpp:109",
+     "tests/memory_pool_test.cpp:110",
+     "tests/memory_pool_test.cpp:124",
+     "tests/memory_pool_test.cpp:125",
+     "tests/memory_pool_test.cpp:138",
+     "tests/memory_pool_test.cpp:139",
+     "tests/memory_pool_test.cpp:140",
+     "tests/memory_pool_test.cpp:154"
+    ]
+   },
+   "clangd": {
+    "tp": 82,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::release",
+   "at": "src/memory_pool.cpp:42",
+   "calls": 14,
+   "grep -w": {
+    "tp": 14,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 14,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::releaseAll",
+   "at": "src/memory_pool.cpp:53",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::find",
+   "at": "src/memory_pool.cpp:59",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 66,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 66,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/memory_pool_test.cpp:248",
+     "tests/memory_pool_test.cpp:249"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::physAddr",
+   "at": "src/memory_pool.cpp:64",
+   "calls": 18,
+   "grep -w": {
+    "tp": 18,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 18,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::map",
+   "at": "src/memory_pool.cpp:69",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "alignUp",
+   "at": "src/memory_pool.cpp:7",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::bytesInUse",
+   "at": "src/memory_pool.cpp:75",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/memory_pool_test.cpp:15",
+     "tests/memory_pool_test.cpp:167",
+     "tests/memory_pool_test.cpp:313"
+    ]
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::bytesInUse",
+   "at": "src/memory_pool.cpp:81",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "MemoryPool::largestFree",
+   "at": "src/memory_pool.cpp:87",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "accumulate",
+   "at": "src/perf_monitor.cpp:11",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "src/perf_monitor.cpp:41"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::timestampsOk",
+   "at": "src/perf_monitor.cpp:22",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::coreBytesOk",
+   "at": "src/perf_monitor.cpp:26",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::bytesOk",
+   "at": "src/perf_monitor.cpp:28",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::record",
+   "at": "src/perf_monitor.cpp:32",
+   "calls": 26,
+   "grep -w": {
+    "tp": 26,
+    "fp": 13,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 26,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 22,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "tests/perf_monitor_test.cpp:160",
+     "tests/perf_monitor_test.cpp:204",
+     "tests/perf_monitor_test.cpp:212",
+     "tests/perf_monitor_test.cpp:236"
+    ]
+   },
+   "clangd": {
+    "tp": 26,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::session",
+   "at": "src/perf_monitor.cpp:46",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 209,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::totalCount",
+   "at": "src/perf_monitor.cpp:51",
+   "calls": 8,
+   "grep -w": {
+    "tp": 8,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 8,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 8,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 8,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::report",
+   "at": "src/perf_monitor.cpp:57",
+   "calls": 4,
+   "grep -w": {
+    "tp": 4,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 4,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "PerfMonitor::reset",
+   "at": "src/perf_monitor.cpp:71",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::enqueue",
+   "at": "src/request_queue.cpp:13",
+   "calls": 79,
+   "grep -w": {
+    "tp": 79,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 79,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 62,
+    "fp": 0,
+    "fn": 17,
+    "missed": [
+     "tests/dispatcher_test.cpp:249",
+     "tests/request_queue_test.cpp:115",
+     "tests/request_queue_test.cpp:156",
+     "tests/request_queue_test.cpp:198",
+     "tests/request_queue_test.cpp:218",
+     "tests/request_queue_test.cpp:230",
+     "tests/request_queue_test.cpp:231",
+     "tests/request_queue_test.cpp:34"
+    ]
+   },
+   "clangd": {
+    "tp": 79,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::dequeue",
+   "at": "src/request_queue.cpp:27",
+   "calls": 15,
+   "grep -w": {
+    "tp": 15,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 15,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/request_queue_test.cpp:103",
+     "tests/request_queue_test.cpp:160",
+     "tests/service_test.cpp:1982"
+    ]
+   },
+   "clangd": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::peek",
+   "at": "src/request_queue.cpp:37",
+   "calls": 4,
+   "grep -w": {
+    "tp": 4,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 4,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::size",
+   "at": "src/request_queue.cpp:46",
+   "calls": 19,
+   "grep -w": {
+    "tp": 19,
+    "fp": 26,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 19,
+    "fp": 16,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 16,
+    "fp": 3,
+    "fn": 3,
+    "missed": [
+     "tests/request_queue_test.cpp:162",
+     "tests/request_queue_test.cpp:74",
+     "tests/service_test.cpp:1901"
+    ]
+   },
+   "clangd": {
+    "tp": 19,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::sizeTotal",
+   "at": "src/request_queue.cpp:52",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "RequestQueue::cancelSession",
+   "at": "src/request_queue.cpp:58",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 14,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 14,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "higherOrEqualPriority",
+   "at": "src/request_queue.cpp:8",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::submit",
+   "at": "src/service.cpp:111",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 21,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 18,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::getStats",
+   "at": "src/service.cpp:127",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::clientDisconnected",
+   "at": "src/service.cpp:137",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "sim/sim_transport.cpp:16"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::onHwCompletion",
+   "at": "src/service.cpp:144",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::pump",
+   "at": "src/service.cpp:150",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 43,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 43,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 1,
+    "missed": [
+     "tests/service_test.cpp:1622"
+    ]
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::queued",
+   "at": "src/service.cpp:155",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 31,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::handle",
+   "at": "src/service.cpp:18",
+   "calls": 181,
+   "grep -w": {
+    "tp": 181,
+    "fp": 106,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 181,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 63,
+    "fp": 0,
+    "fn": 118,
+    "missed": [
+     "tests/service_test.cpp:1020",
+     "tests/service_test.cpp:1026",
+     "tests/service_test.cpp:1048",
+     "tests/service_test.cpp:1054",
+     "tests/service_test.cpp:1074",
+     "tests/service_test.cpp:1080",
+     "tests/service_test.cpp:1106",
+     "tests/service_test.cpp:1112"
+    ]
+   },
+   "clangd": {
+    "tp": 181,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::openSession",
+   "at": "src/service.cpp:49",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::closeSession",
+   "at": "src/service.cpp:56",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::allocMem",
+   "at": "src/service.cpp:67",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::freeMem",
+   "at": "src/service.cpp:77",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "CvAccelService::postConfig",
+   "at": "src/service.cpp:89",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SessionManager::close",
+   "at": "src/session_manager.cpp:22",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 11,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SessionManager::find",
+   "at": "src/session_manager.cpp:29",
+   "calls": 20,
+   "grep -w": {
+    "tp": 20,
+    "fp": 57,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 20,
+    "fp": 57,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 20,
+    "missed": [
+     "src/dispatcher.cpp:106",
+     "src/dispatcher.cpp:132",
+     "src/dispatcher.cpp:81",
+     "src/service.cpp:102",
+     "src/service.cpp:121",
+     "src/service.cpp:73",
+     "src/service.cpp:83",
+     "src/session_manager.cpp:23"
+    ]
+   },
+   "clangd": {
+    "tp": 20,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SessionManager::find",
+   "at": "src/session_manager.cpp:36",
+   "calls": 10,
+   "grep -w": {
+    "tp": 10,
+    "fp": 67,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 10,
+    "fp": 67,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 18,
+    "fn": 9,
+    "missed": [
+     "tests/service_test.cpp:1468",
+     "tests/service_test.cpp:1541",
+     "tests/service_test.cpp:1542",
+     "tests/service_test.cpp:1584",
+     "tests/service_test.cpp:654",
+     "tests/service_test.cpp:724",
+     "tests/service_test.cpp:826",
+     "tests/service_test.cpp:858"
+    ]
+   },
+   "clangd": {
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SessionManager::owns",
+   "at": "src/session_manager.cpp:43",
+   "calls": 9,
+   "grep -w": {
+    "tp": 9,
+    "fp": 17,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 9,
+    "fp": 12,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/session_manager_test.cpp:135",
+     "tests/session_manager_test.cpp:136"
+    ]
+   },
+   "clangd": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "SessionManager::open",
+   "at": "src/session_manager.cpp:5",
+   "calls": 21,
+   "grep -w": {
+    "tp": 21,
+    "fp": 197,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 21,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 5,
+    "missed": [
+     "tests/session_manager_test.cpp:22",
+     "tests/session_manager_test.cpp:34",
+     "tests/session_manager_test.cpp:35",
+     "tests/session_manager_test.cpp:36",
+     "tests/session_manager_test.cpp:65"
+    ]
+   },
+   "clangd": {
+    "tp": 21,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  }
+ ]
+}

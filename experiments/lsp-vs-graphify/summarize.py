@@ -4,6 +4,7 @@ import json, sys, statistics as st
 from collections import defaultdict
 
 rows = json.load(open(sys.argv[1]))
+ARMS = [a for a in ('graphify', 'clangd', 'grep') if any(r['arm'] == a for r in rows)]
 
 
 def agg(rs):
@@ -16,7 +17,7 @@ def agg(rs):
     for r in rs:
         for k, v in r['tools'].items():
             tools[k] += v
-    q = sum(v for k, v in tools.items() if k.startswith('q '))
+    q = sum(v for k, v in tools.items() if k not in ('Edit', 'Write', 'MultiEdit', 'ut_run', 'TodoWrite'))   # looking at code
     return {'runs': n, 'done': sum(r['result'] == 'DONE' for r in rs), 'pass': sum(r['passes'] for r in rs),
             'branch_mean': st.mean(brs) if brs else 0, 'branch_full': sum(b >= 0.999 for b in brs),
             'cost': st.mean(r['cost_usd'] or 0 for r in rs), 'turns': st.mean(r['turns'] or 0 for r in rs),
@@ -30,21 +31,21 @@ for r in rows:
     by[(r['codebase'], r['arm'], r['task'])].append(r)
     by[('all', r['arm'])].append(r)
 
-print('| Codebase | Arm | Runs | Tests pass | RESULT: DONE | Branch cov. (mean) | 100% branches | Cost/run | Turns | Time/run | Tool queries | Builds | Denied |')
+print('| Codebase | Arm | Runs | Tests pass | RESULT: DONE | Branch cov. (mean) | 100% branches | Cost/run | Turns | Time/run | Code lookups | Builds | Denied |')
 print('|---|---|---|---|---|---|---|---|---|---|---|---|---|')
 for cb in sorted({r['codebase'] for r in rows}) + ['all']:
-    for arm in ('graphify', 'clangd'):
+    for arm in ARMS:
         a = agg(by[(cb, arm)])
         print(f"| {cb} | {arm} | {a['runs']} | {a['pass']}/{a['runs']} | {a['done']}/{a['runs']} | {a['branch_mean']:.0%} | {a['branch_full']}/{a['runs']} | "
               f"${a['cost']:.2f} | {a['turns']:.0f} | {a['time']:.0f} s | {a['q_calls']:.1f} | {a['builds_run']:.1f} | {a['denied']:.1f} |")
 print()
-print('| Codebase | Task | Graphify: pass, branch cov. per run | clangd: pass, branch cov. per run | Graphify $ | clangd $ |')
-print('|---|---|---|---|---|---|')
+print('| Codebase | Task | ' + ' | '.join(f'{a}: pass, branch cov. per run' for a in ARMS) + ' | ' + ' | '.join(f'{a} $' for a in ARMS) + ' |')
+print('|---|---|' + '---|' * (2 * len(ARMS)))
 for cb, task in sorted({(r['codebase'], r['task']) for r in rows}):
     cells = []
-    for arm in ('graphify', 'clangd'):
+    for arm in ARMS:
         rs = sorted(by[(cb, arm, task)], key=lambda r: r['run'])
         cells.append(' '.join(('✓' if r['passes'] else '✗') + (f"{r['coverage']['branches_taken']}/{r['coverage']['branches']}" if r.get('coverage') else '-')
                               for r in rs))
-    costs = [agg(by[(cb, arm, task)])['cost'] for arm in ('graphify', 'clangd')]
-    print(f'| {cb} | {task} | {cells[0]} | {cells[1]} | {costs[0]:.2f} | {costs[1]:.2f} |')
+    costs = [agg(by[(cb, arm, task)])['cost'] for arm in ARMS]
+    print(f'| {cb} | {task} | ' + ' | '.join(cells) + ' | ' + ' | '.join(f'{c:.2f}' for c in costs) + ' |')

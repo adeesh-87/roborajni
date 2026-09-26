@@ -65,6 +65,7 @@ timeout 60 ./agent_tests > run.log 2>&1; rc=$?; tail -40 run.log; exit $rc
     },
 }
 
+ARMS = ('graphify', 'clangd', 'grep')
 HELP = {
     'graphify': '''q card NAME          test-planning card: signature, decisions (branches) with lines, calls, callers, types
 q source NAME        the lines of one function, type, macro or constant (NAME@LINE picks an overload)
@@ -132,6 +133,14 @@ def prepare():
         os.chmod(os.path.join(d, 'ut_run.sh'), 0o755)
 
 
+def tool_text(arm, hidden, q):
+    if arm == 'grep':         # the baseline: Claude Code's own way of looking at code, no index
+        return ('Learn about the code by reading, grepping and listing any file of the repository (the Read, Grep and Glob\n'
+                'tools, or grep, find, cat, head, tail, ls in Bash).\n')
+    return (f'You cannot read, grep or list the code files ({hidden}). The ONLY way to learn about the code is this command\n'
+            f'(run it with Bash, exactly as shown, full path):\n{q} COMMAND ARG\n' + HELP[arm].replace('q ', q + ' ') + '\n')
+
+
 def prompt(cb, arm, fn, file):
     c = CODEBASES[cb]
     hidden = ', '.join(h + '/' for h in c['hidden'])
@@ -146,11 +155,7 @@ passing test. Keep each test small and name it after the behaviour it checks.
 
 Build and run the tests with: ./ut_run.sh   (prints only the compiler errors or the test results; do not pipe it)
 
-You cannot read, grep or list the code files ({hidden}). The ONLY way to learn about the code is this command
-(run it with Bash, exactly as shown, full path):
-{q} COMMAND ARG
-{HELP[arm].replace('q ', q + ' ')}
-
+{tool_text(arm, hidden, q)}
 Fix the tests until ./ut_run.sh builds and every test passes. Never change the code under test.
 Finish with one line: RESULT: DONE (tests build and pass) or RESULT: PARTIAL <reason>.
 '''
@@ -172,6 +177,10 @@ def run_one(cb, arm, fn, file, k):
     deny = ['Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch', 'Task'] + [f'Bash({x}:*)' for x in ('grep', 'rg', 'find', 'cat', 'head', 'tail', 'sed', 'awk', 'less', 'more', 'ls', 'strings', 'nl', 'od', 'xxd')] \
         + [f'Read(./{h}/**)' for h in c['hidden']] + [f'Read(/{repo}/{h}/**)' for h in c['hidden']] + [f'Read(/{base}/**)', f'Read(/{BASE}/{cb}/gfy/**)']
     allow = ['Read', 'Edit', 'Write', 'MultiEdit', f'Bash({q}:*)', 'Bash(./ut_run.sh)', 'Bash(./ut_run.sh:*)']
+    if arm == 'grep':
+        deny = ['WebFetch', 'WebSearch', 'Task', f'Read(/{base}/**)', f'Read(/{BASE}/{cb}/gfy/**)']
+        allow = ['Read', 'Edit', 'Write', 'MultiEdit', 'Grep', 'Glob', 'Bash(./ut_run.sh)', 'Bash(./ut_run.sh:*)'] + \
+            [f'Bash({x}:*)' for x in ('grep', 'rg', 'find', 'cat', 'head', 'tail', 'ls', 'sed -n', 'wc')]
     p = prompt(cb, arm, fn, file)
     open(os.path.join(d, 'prompt.txt'), 'w').write(p)
     cmd = ['claude', '-p', p, '--model', MODEL, '--session-id', str(uuid.uuid4()), '--output-format', 'stream-json', '--verbose',
@@ -187,12 +196,12 @@ def run_one(cb, arm, fn, file, k):
     print(f'{cb}/{arm}/{tag}/{k}: {status} {time.time() - t0:.0f}s', flush=True)
 
 
-def run(runs, jobs, only):
+def run(runs, jobs, only, arms=ARMS):
     todo = []
     for k in range(1, runs + 1):                      # round-robin: every task/arm gets run 1 before any run 2
         for cb, c in CODEBASES.items():
             for fn, file in c['tasks']:
-                for arm in ('graphify', 'clangd'):
+                for arm in arms:
                     if only and not f'{cb}/{arm}/{fn}'.startswith(only):
                         continue
                     todo.append((cb, arm, fn, file, k))
@@ -278,7 +287,7 @@ def score():
         for fn, file in c['tasks']:
             lo, hi = target_range(cb, fn, file)
             tag = re.sub(r'\W+', '_', fn)
-            for arm in ('graphify', 'clangd'):
+            for arm in ARMS:
                 for d in sorted(glob.glob(os.path.join(BASE, 'runs', cb, arm, tag, '*'))):
                     if not os.path.exists(os.path.join(d, 'done')):
                         continue
@@ -311,5 +320,6 @@ if __name__ == '__main__':
     ap.add_argument('--runs', type=int, default=3)
     ap.add_argument('--jobs', type=int, default=4)
     ap.add_argument('--only', default='')
+    ap.add_argument('--arms', default=','.join(ARMS))
     a = ap.parse_args()
-    {'prepare': prepare, 'run': lambda: run(a.runs, a.jobs, a.only), 'score': score}[a.cmd]()
+    {'prepare': prepare, 'run': lambda: run(a.runs, a.jobs, a.only, a.arms.split(',')), 'score': score}[a.cmd]()

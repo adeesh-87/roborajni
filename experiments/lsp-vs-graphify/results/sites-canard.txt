@@ -1,0 +1,6 @@
+== libcanard: 114 production functions, 1480 call sites (GCC)
+             precision  recall     F1  lines returned/question  ms/question
+  grep -w        0.802   0.966  0.876                     15.6          2.6
+  grep call      0.870   0.966  0.915                     14.4          2.8
+  graphify       0.999   0.725  0.840                      9.4          0.0
+  clangd         0.992   0.980  0.986                     12.8         13.1

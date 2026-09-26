@@ -1,0 +1,6 @@
+== cvaccel: 81 production functions, 682 call sites (GCC)
+             precision  recall     F1  lines returned/question  ms/question
+  grep -w        0.247   1.000  0.396                     34.1          2.4
+  grep call      0.496   1.000  0.663                     17.0          2.5
+  graphify       0.911   0.573  0.704                      5.3          0.0
+  clangd         0.954   1.000  0.976                      8.8         88.2
