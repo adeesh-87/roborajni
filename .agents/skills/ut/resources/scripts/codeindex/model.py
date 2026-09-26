@@ -1,4 +1,4 @@
-"""The code index: ONE file (index.json) that every backend writes and every query reads.
+"""The code index: ONE file (index.json) exported from the Graphify graph (be_graphify.py); every query reads it.
 
 Schema (version 1):
   meta       {schema, backend, root, paths, cdb, generated, stats, notes}

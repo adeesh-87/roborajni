@@ -33,6 +33,15 @@ Facts with counts from testscan.md, ≤ 12 lines. Example lines:
 - Headers: `extern "C" { #include }` for C headers; copyright header copied from the exemplar.
 Exemplars: exemplars/test.md, exemplars/mock.md, exemplars/register.md
 
+## Test seams (decided; use only these; change only on the user's explicit request)
+One line per need (resources/test-seams.md): `<need>: <ID> <name> (decided by user | detected in the existing tests,
+<date>, evidence file:line)`. Needs: access, replace, per-test, hardware, state. Undecided needs: `not decided`.
+- access: not decided
+- replace: not decided
+- per-test: not decided
+- hardware: not decided
+- state: not decided
+
 ## Build notes
 (quirks, slow steps, files the graph could not preprocess, flaky tests, license limits)
 

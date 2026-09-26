@@ -16,14 +16,6 @@ def main(argv):
         need(a, 2, 'export-graphify GRAPHIFY_DIR INDEX_JSON')
         from .be_graphify import export
         ix = export(a[0], a[1]); print(f"index: {a[1]}  {ix.stats()}")
-    elif cmd == 'build-clang':
-        need(a, 3, 'build-clang INDEX_JSON COMPILE_DB PATH...')
-        from .be_clang import build
-        ix = build(a[0], a[1], a[2:]); print(f"index: {a[0]}  {ix.stats()}")
-    elif cmd == 'build-gcc':
-        need(a, 3, 'build-gcc INDEX_JSON COMPILE_DB PATH...')
-        from .be_gcc import build
-        ix = build(a[0], a[1], a[2:]); print(f"index: {a[0]}  {ix.stats()}")
     elif cmd == 'card':
         need(a, 2, 'card INDEX_JSON FUNCTION|FILE')
         from .query import cmd_card
@@ -53,15 +45,6 @@ def main(argv):
     elif cmd == 'trace':
         from . import trace as T
         T.main(a)
-    elif cmd == 'lsp':
-        from . import lsp as L
-        L.main(a)
-    elif cmd == 'compare':
-        from . import compare as C
-        C.main(a)
-    elif cmd == 'detect':
-        from . import detect as D
-        D.main(a)
     elif cmd == 'check':
         from . import selfcheck as S
         S.main(a)

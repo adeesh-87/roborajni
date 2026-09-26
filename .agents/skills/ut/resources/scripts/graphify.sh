@@ -14,8 +14,7 @@
 #   graphify.sh tests   OUT_DIR FUNCTION [HOPS]  which test blocks reach FUNCTION (default 4 call hops)
 #   graphify.sh card    OUT_DIR FUNCTION|FILE    test-planning card: signature, every decision line, returns,
 #                                                globals, calls, callers, existing tests
-# If Python 3.10+ / Graphify cannot be set up, build/deps/tests/card fall back to the bash code map
-# (codemap.sh) automatically and print "MODE: codemap". explain/path/query need the real graph.
+# Needs Python 3.10+ (the skill venv); there is no fallback without it.
 #   graphify.sh impact  OUT_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]
 #                                                what changed in the code under test and which tests/mocks it hits
 #   graphify.sh refresh OUT_DIR                  rebuild with the last build's arguments, rescan tests, regenerate the
@@ -80,11 +79,6 @@ do_setup() {
 
 ensure() { [ -n "$(venv_py)" ] || ( do_setup ) >&2; [ -n "$(venv_py)" ]; }   # subshell: a failed setup must not exit
 
-# fallback: the bash code map, same commands
-fallback_build() { local out=$1; shift; echo "MODE: codemap (Graphify unavailable: $FALLBACK_REASON)"; mkdir -p "$out"; echo codemap > "$out/MODE"
-  { echo "cwd=$PWD"; echo "cdb="; for p in "$@"; do echo "path=$p"; done; } > "$out/BUILD_ARGS"
-  "$HERE/codemap.sh" build "$out/codemap" "$@"; }
-
 # rebuild with the arguments of the last build, regenerate every module's cards, write the delta
 do_refresh() {
   local gd=$1 kb args cwd cdb paths=() line
@@ -103,7 +97,6 @@ for n in g['nodes']:
     if n.get('_callable') and n.get('source_file') and n.get('kind') not in ('test', 'fixture'):
         print(f"{n.get('source_file')}	{n['label']}")
 PY
-  [ -f "$gd/codemap/functions.tsv" ] && cut -f1,2 "$gd/codemap/functions.tsv" > "$before"
   local ntests_before; ntests_before=$(grep -c . "$kb/testscan.md" 2>/dev/null | head -1)
   echo "== refresh $stamp (same arguments as the last build)"
   ( cd "$cwd" && if [ -n "$cdb" ]; then do_build --cdb "$cdb" "$gd" "${paths[@]}"; else do_build "$gd" "${paths[@]}"; fi ) | grep -E 'preprocessed|augmented|MODE|WARNING|FAILED' || true
@@ -122,7 +115,7 @@ for n in g['nodes']:
     if n.get('_callable') and n.get('source_file') and n.get('kind') not in ('test', 'fixture'):
         print(f"{n.get('source_file')}	{n['label']}")
 PY
-  else cut -f1,2 "$gd/codemap/functions.tsv" > "$after"; fi
+  fi
   comm -13 <(sort -u "$before") <(sort -u "$after") | sed 's/^/+ /' >> "$delta"
   comm -23 <(sort -u "$before") <(sort -u "$after") | sed 's/^/- /' >> "$delta"
   [ "$(comm -3 <(sort -u "$before") <(sort -u "$after") | wc -l)" = 0 ] && echo "(none)" >> "$delta"
@@ -131,9 +124,8 @@ PY
     [ -f "$f" ] || continue
     src=$(sed -n '1s/^# Cards for \([^ ]*\) .*/\1/p' "$f"); [ -n "$src" ] || continue
     tmp="$f.new"
-    { case $(mode_of "$gd") in graph) "$(venv_py)" "$HERE/graphify_ut.py" card "$gd/out/graph.json" "$gd/scan" "$src";
-                                         "$(venv_py)" "$HERE/graphify_ut.py" deps "$gd/out/graph.json" "$src" ;;
-                                 codemap) "$HERE/codemap.sh" card "$gd/codemap" "$src"; "$HERE/codemap.sh" deps "$gd/codemap" "$src" ;; esac; } > "$tmp" 2>/dev/null
+    { "$(venv_py)" "$HERE/graphify_ut.py" card "$gd/out/graph.json" "$gd/scan" "$src"
+      "$(venv_py)" "$HERE/graphify_ut.py" deps "$gd/out/graph.json" "$src"; } > "$tmp" 2>/dev/null
     if [ -s "$tmp" ]; then
       local ch; ch=$(diff <(grep -v '^Generated' "$f") <(grep -v '^Generated' "$tmp") | grep -c '^[<>]')
       printf -- '- %s: %s changed lines' "$(basename "$f")" "$ch" >> "$delta"
@@ -145,8 +137,7 @@ PY
   rm -f "$before" "$after"
   echo "delta: $delta"; sed -n '4,40p' "$delta"
 }
-mode_of() { [ -f "$1/out/graph.json" ] && echo graph || { [ -f "$1/codemap/functions.tsv" ] && echo codemap || echo none; }; }
-need_graph() { case $(mode_of "$1") in graph) return 0 ;; codemap) echo "graphify.sh: '$CMD' needs the Graphify graph; this folder has the bash code map only. Use deps/tests/card." >&2; exit 1 ;; *) echo "graphify.sh: no graph in $1 (run: graphify.sh build ...)" >&2; exit 1 ;; esac; }
+need_graph() { [ -f "$1/out/graph.json" ] || { echo "graphify.sh: no graph in $1 (run: graphify.sh build ...)" >&2; exit 1; }; }
 
 run_graphify() {   # code-only: strip every LLM credential / endpoint
   env -u ANTHROPIC_API_KEY -u ANTHROPIC_BASE_URL -u OPENAI_API_KEY -u OPENAI_BASE_URL \
@@ -197,22 +188,17 @@ case $CMD in
   setup)   do_setup ;;
   version) ensure || exit 2; run_graphify --version 2>/dev/null || "$(venv_py)" -c "import importlib.metadata as m; print('graphifyy', m.version('graphifyy'))" ;;
   build)   [ $# -ge 2 ] || die "usage: build [--cdb FILE] OUT_DIR PATH..."
-           if ensure; then do_build "$@"; else
-             FALLBACK_REASON="Python 3.10+ or package install failed"; [ "${1:-}" = "--cdb" ] && shift 2
-             fallback_build "$@"; fi ;;
+           ensure || die "Python 3.10+ and the bundled Graphify are needed (graphify.sh setup)"; do_build "$@" ;;
   query)   [ $# -ge 2 ] || die "usage: query OUT_DIR \"question\" [--budget N]"
            need_graph "$1"; ensure || exit 2; o=$1; q=$2; shift 2; run_graphify query "$q" --graph "$o/out/graph.json" "$@" ;;
   explain) [ $# -ge 2 ] || die "usage: explain OUT_DIR NAME"; need_graph "$1"; ensure || exit 2; run_graphify explain "$2" --graph "$1/out/graph.json" ;;
   path)    [ $# -ge 3 ] || die "usage: path OUT_DIR A B"; need_graph "$1"; ensure || exit 2; run_graphify path "$2" "$3" --graph "$1/out/graph.json" ;;
   deps)    [ $# -eq 2 ] || die "usage: deps OUT_DIR FILE|FUNCTION"
-           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
-             codemap) "$HERE/codemap.sh" deps "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+           need_graph "$1"; ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" deps "$1/out/graph.json" "$2" ;;
   tests)   [ $# -ge 2 ] || die "usage: tests OUT_DIR FUNCTION [HOPS]"
-           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
-             codemap) "$HERE/codemap.sh" tests "$1/codemap" "$2" ${3:-} ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+           need_graph "$1"; ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" tests "$1/out/graph.json" "$2" ${3:-} ;;
   card)    [ $# -eq 2 ] || die "usage: card OUT_DIR FUNCTION|FILE"
-           case $(mode_of "$1") in graph) ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" card "$1/out/graph.json" "$1/scan" "$2" ;;
-             codemap) "$HERE/codemap.sh" card "$1/codemap" "$2" ;; *) die "no graph in $1 (run: graphify.sh build ...)" ;; esac ;;
+           need_graph "$1"; ensure || exit 2; "$(venv_py)" "$HERE/graphify_ut.py" card "$1/out/graph.json" "$1/scan" "$2" ;;
   impact)  [ $# -ge 2 ] || die "usage: impact OUT_DIR --base REF|--uncommitted|--range A..B [--out FILE] [--context FILE]"
            need_graph "$1"; ensure || exit 2; o=$1; shift; "$(venv_py)" "$HERE/graphify_ut.py" impact "$o/out/graph.json" "$o/scan" "$@" ;;
   refresh) [ $# -eq 1 ] || die "usage: refresh OUT_DIR"; ensure >/dev/null 2>&1 || true; do_refresh "$1" ;;

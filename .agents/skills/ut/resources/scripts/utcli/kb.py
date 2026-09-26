@@ -44,6 +44,9 @@ def render_kb(kb_dir, kb):
     conv = kb.get('conventions', {})
     L += ['', f"## Conventions  (approved: {conv.get('approved', 'no')})"] + [f'- {x}' for x in conv.get('lines', [])]
     L += ['Exemplars: exemplars/test.md, exemplars/mock.md, exemplars/register.md']
+    from .seams import render as render_seams
+    L += ['', '## Test seams (decided; use only these; change only on the user\'s explicit request)']
+    L += render_seams(kb.get('seams', {})) + ['Catalogue and how-to: resources/test-seams.md']
     L += ['', '## Modules', '| Module | File | Tests | Cards |', '|---|---|---|---|']
     for m in kb.get('modules', []):
         L.append(f"| {m['name']} | {m['file']} | {m.get('tests', '')} | modules/{m['name']}.cards.md |")
@@ -64,21 +67,10 @@ def scan_paths(prof):
     return seen
 
 
-def detect_backends(root, cdb):
-    """index.sh detect -> dict (viable backends, recommendation)"""
-    import json as _json
-    rc, out = sh([script('index.sh'), 'detect', root] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + ['--json'], cwd=root)
-    try:
-        return _json.loads(out[out.index('{'):])
-    except ValueError:
-        return {'recommended': 'graphify', 'viable': ['graphify', 'codemap'], 'backends': {}, 'why': 'detection failed: ' + out[-200:]}
-
-
-def build_graph(kb_dir, root, prof, cdb=None, backend=None):
-    """build the code index (kb/<id>/index/index.json) with the chosen backend"""
+def build_graph(kb_dir, root, prof, cdb=None):
+    """build the code index (kb/<id>/index/index.json) from the Graphify graph"""
     gd = index_dir(kb_dir)
-    backend = backend or prof.get('index_backend') or 'auto'
-    cmd = [script('index.sh'), 'build', '--backend', backend] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + [gd] + scan_paths(prof)
+    cmd = [script('index.sh'), 'build'] + (['--cdb', os.path.join(root, cdb)] if cdb and cdb != 'none' else []) + [gd] + scan_paths(prof)
     rc, out = sh(cmd, cwd=root)
     return rc, out, gd
 
@@ -176,14 +168,8 @@ def make_exemplars(kb_dir, root, prof, scan):
 def module_cards(kb_dir, root, prof, gd, files):
     mods = []
     os.makedirs(os.path.join(kb_dir, 'modules'), exist_ok=True)
-    ir = index_root(gd)
-    if ir:                                           # a real index: all cards in one call (paths relative to the index root)
-        sh([script('index.sh'), 'kb-cards', gd, kb_dir] + [norm(os.path.relpath(os.path.join(root, f), ir)) for f in files], cwd=root)
-    else:                                            # bash code map fallback: card + deps per file
-        for f in files:
-            rc, card = sh([script('index.sh'), 'card', gd, f], cwd=root)
-            rc2, deps = sh([script('index.sh'), 'deps', gd, f], cwd=root)
-            write(os.path.join(kb_dir, 'modules', f'{os.path.basename(f)}.cards.md'), card + '\n' + deps)
+    ir = index_root(gd) or root                      # all cards in one call (paths relative to the index root)
+    sh([script('index.sh'), 'kb-cards', gd, kb_dir] + [norm(os.path.relpath(os.path.join(root, f), ir)) for f in files], cwd=root)
     for f in files:
         name = os.path.basename(f)
         card = read(os.path.join(kb_dir, 'modules', f'{name}.cards.md'))

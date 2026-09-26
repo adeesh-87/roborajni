@@ -1,7 +1,7 @@
 # Phase 3 — Knowledge
 
 Goal: `KB_DIR` holds everything a test writer needs about THIS codebase, in the form a small model uses best:
-one real example to copy, counted facts, one card per function and diagrams. At most one question (the index backend).
+one real example to copy, counted facts, one card per function and diagrams. No questions in this phase.
 
 ## 1. KB folder
 ```sh
@@ -17,15 +17,11 @@ KB exists with `Conventions approved on <date>` and the code did not change much
 ## 2. Code index (always; local; seconds to a minute)
 ```sh
 I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"
-"$I" setup clang                               # once per machine (Python 3.10+); graphify-only machines: "$I" setup
-"$I" detect . --cdb <compile DB from KB Commands>          # which backends work here + the recommended one
-"$I" build --backend <recommended> --cdb <compile DB> "$GD" <code paths> <header paths> <test paths> <mock paths>
+"$I" setup                                     # once per machine (Python 3.10+)
+"$I" build --cdb <compile DB from KB Commands> "$GD" <code paths> <header paths> <test paths> <mock paths>   # omit --cdb if none
 ```
-Backend rule (no question unless it is a real trade-off): `clang` when detect says it parses cleanly; else ask ONCE
-"Index backend? gcc = exact calls from your own compiler | graphify = tolerant parse, no compile [<recommended>]"
-when both work; else whatever works (`codemap` last). No compile DB → `graphify` (omit `--cdb`). Record the backend
-in KB `Build notes`. Check the output for `parsed WITH errors` / `FAILED` lines: record those files in `Build notes`.
-Differences between backends: `resources/index-backends.md`. How to ask the index: `resources/graph-queries.md`.
+Check the output for `preprocessed with compile flags` (good) and `not preprocessed` / syntax warnings: record those
+files in KB `Build notes`. How to ask the index: `resources/graph-queries.md`.
 
 ## 3. How the existing tests are written
 ```sh
@@ -42,6 +38,11 @@ Write:
 - KB `Conventions`: ≤ 12 lines of facts with counts from testscan (file name pattern, test name pattern, fixture use,
   top asserts, mock API, `extern "C"`, statics access). Mark `DRAFT (from N files); approved: no`.
 No tests exist → write `greenfield` in Conventions; the pilot will create the exemplars.
+
+Test seams already in use (evidence table at the end of `resources/test-seams.md`; grep is right here: it looks at
+test and build files): for each hit write KB `Test seams` `<need>: <ID> ... (detected in the existing tests, <date>,
+evidence file:line)`. Two techniques for one need → record the first, name the other under it ("also in old tests; do
+not use for new tests") and tell the user in one line.
 
 ## 4. Module cards and diagrams (in-scope code only)
 For the in-scope source files `F...` (from Config paths and the request):

@@ -16,14 +16,17 @@ Mark it IN_PROGRESS with Owner ME in status.md and in the task file; one Log lin
 
 ## 2. Load exactly the task's Inputs
 The card file for its functions, `exemplars/test.md` (+ `mock.md` if the task mocks), the tool file, and
-`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Any other code question goes to the index,
-never to grep or a whole file (types, macros and constants too): `"$I" source|refs|defs|find|list|card|deps|tests "$GD" <name>` with
+`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Any other code question goes to the index
+first (types, macros and constants too); grep and reading code files are the LAST resort (graph-queries.md, "Order of
+looking at code"): `"$I" source|refs|defs|find|list|card|deps|tests "$GD" <name>` with
 `I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"` (details: `resources/graph-queries.md`).
 Diagrams (`"$I" flow|seq "$GD" <function>`) help when the card is not enough: a coverage gap to reach (flow shows the
 path and what is NOT HIT), or collaborators to fake (seq names the existing test doubles). How to read them: `resources/diagrams.md`.
 
 ## 3. Work
-Follow the playbook. Write one test per `Cases` line, copying the exemplar's shape. Register new files like
+The task needs to call static/private code, mock in one test but not another, fake registers or reset hidden state →
+use the technique KB `Test seams` records for that need (how-to: `resources/test-seams.md`). Not decided → stop that
+part, ask the orchestrator/user (never pick one yourself), note it in the task file. Follow the playbook. Write one test per `Cases` line, copying the exemplar's shape. Register new files like
 `exemplars/register.md` shows. (parallel: only write paths in `Touches`; a missing path → PARTIAL, note it.)
 
 ## 4. Build and check

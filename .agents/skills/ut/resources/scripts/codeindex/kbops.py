@@ -50,7 +50,7 @@ def refresh(out_dir):
     ixp = os.path.join(out_dir, 'index.json')
     before = functions(Index.load(ixp)) if os.path.exists(ixp) else []
     stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
-    cmd = [os.path.join(SCRIPTS, 'index.sh'), 'build', '--backend', a.get('backend', 'auto')] + \
+    cmd = [os.path.join(SCRIPTS, 'index.sh'), 'build'] + \
           (['--cdb', a['cdb']] if a.get('cdb') else []) + [out_dir] + a['path']
     r = subprocess.run(cmd, cwd=a.get('cwd') or None, capture_output=True, text=True, errors='replace')
     print('\n'.join(l for l in (r.stdout + r.stderr).splitlines() if re.search(r'index:|FAILED|WARNING|error', l))[:2000])
@@ -59,7 +59,7 @@ def refresh(out_dir):
     ix = Index.load(ixp)
     after = functions(ix)
     kb = os.path.dirname(out_dir)
-    L = [f'# Last refresh: {stamp}', f"Index rebuilt with backend {ix.meta.get('backend')} and the arguments of the last build: {' '.join(a['path'])}"
+    L = [f'# Last refresh: {stamp}', f"Index rebuilt with the arguments of the last build: {' '.join(a['path'])}"
          + (f" (compile DB: {a['cdb']})" if a.get('cdb') else ''), '', '## Functions added / removed since the previous index']
     add = sorted(set(after) - set(before)); rem = sorted(set(before) - set(after))
     L += [f'+ {x}' for x in add] + [f'- {x}' for x in rem] or ['(none)']
@@ -88,7 +88,7 @@ def refresh(out_dir):
         L.append(f'\nDiagrams regenerated: {sum(1 for r in rows if r[3])} flowcharts, {sum(1 for r in rows if r[4])} sequences, {len(sc)} scenarios.')
     open(os.path.join(kb, 'last-refresh.md'), 'w', encoding='utf-8').write('\n'.join(L) + '\n')
     with open(os.path.join(kb, 'refresh.log'), 'a', encoding='utf-8') as fh:
-        fh.write(f'{stamp} refresh ({ix.meta.get("backend")}): +{len(add)} -{len(rem)} functions; cards regenerated\n')
+        fh.write(f'{stamp} refresh: +{len(add)} -{len(rem)} functions; cards regenerated\n')
     print(f"delta: {os.path.join(kb, 'last-refresh.md')}")
     print('\n'.join(L[3:40]))
 

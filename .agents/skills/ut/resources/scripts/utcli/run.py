@@ -27,7 +27,14 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
              f"  `{ix} source {gd} <function|type|macro|constant>` (its code or definition; `\"TEST(Group, Name)\"` for a test; `name@LINE` for one overload),\n"
              f"  `{ix} refs {gd} <function>` (callers, tests, mocks, pointers), `{ix} defs {gd} <name>` (every definition, mocks included),\n"
              f"  `{ix} find {gd} <regex>` (names), `{ix} card|deps {gd} <function>`. Reading the code folders and grep are blocked;\n"
-             f"  Read only the test, mock and build files you write.")
+             f"  Read only the test, mock and build files you write. If the index cannot answer a question, say which one in RESULT.")
+    from .seams import render as render_seams
+    from .kb import load_kb
+    seams = load_kb(kb_dir).get('seams', {})
+    P.append('- Test seams below are DECIDED for this project: use only these techniques, never another one. If the task needs '
+             'a seam whose need is "not decided" (e.g. calling a static/private function, mocking in one test but not another), '
+             'do not improvise: finish with RESULT: PARTIAL needs seam <need>.')
+    P.append('\n## Test seams (decided)\n' + '\n'.join(render_seams(seams)))
     P.append(f"\nRepository root: {st['repo']}\n")
     P.append('## Task\n' + read(os.path.join(st.dir, 'tasks', f"{t['id']}.md")))
     P.append('\n## Test exemplar (copy this shape)\n' + read(os.path.join(kb_dir, 'exemplars', 'test.md')))
@@ -76,7 +83,7 @@ def diagrams_for(st, kb_dir, t, cards):
     from .plan import card_block
     """flowchart when branches matter (coverage task, >= 4 decisions); sequence when collaborators matter (mock task,
     >= 2 interface/external/pointer calls). Always generated fresh from the index (includes the last coverage run)."""
-    # default off: in the A/B run on cvaccel the diagrams did not improve results (resources/index-backends.md)
+    # default off: in the A/B run on cvaccel the diagrams did not improve results (resources/diagrams.md)
     mode = st.get('diagrams') or st['profile'].get('prompt_diagrams', 'off')
     gd = os.path.join(kb_dir, 'index')
     if mode == 'off' or not os.path.exists(os.path.join(gd, 'index.json')):

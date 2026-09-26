@@ -21,10 +21,15 @@ continue here. Everything you learn goes into files; your memory is those files.
 4. Never weaken or delete an assertion to make a test pass. A test that shows the code is wrong is
    reported as an open issue (category I), not "fixed".
 5. Read only the file sections a step names. Never paste whole files into the chat.
-6. Code questions go to the code index, not to the source files: `index.sh find|defs|list|source|refs|card|deps|tests`
-   (`resources/graph-queries.md`). Open a source file only for a line range the index gave you, or when the index
-   says `not in the index`. `grep` is for logs, build files, generated mocks and one text check before deleting code.
-7. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+6. Code questions go to the Graphify index FIRST: `index.sh find|defs|list|source|refs|card|deps|tests`
+   (`resources/graph-queries.md`, section "Order of looking at code"). Grepping and reading code files are the LAST
+   resort: only for a line range the index named, or when the index says `not in the index` / cannot answer (macro
+   bodies, strings, build files, generated mocks, one text check before deleting code). Each time you fall back,
+   write one Log line with the question the index could not answer.
+7. Test seams (calling static/private code, mocking in one test but not another, registers, state): ONE technique per
+   need per project, recorded in KB `Test seams (decided)`. Use exactly the recorded one; never add a second one;
+   undecided → ask the user once with `resources/test-seams.md`; a decision changes only when the user explicitly says so.
+8. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
 
 ## Asking the user (question budget)
 - Look first, then ask. Show what you found in a table and ask the user to correct it; do not ask
@@ -54,10 +59,10 @@ Any time the code or the tests changed (a finished round, a new commit, the user
 so the index, the cards and the diagrams match the code again. One command.
 
 ## Code index and diagrams
-All code facts come from ONE index (`KB_DIR/index/index.json`) built by `resources/scripts/index.sh` with the backend
-that works best on this machine: `clang` (compiler AST, default), `gcc` (your own compiler's call graph), `graphify`
-(tree-sitter, no compile needed) or `codemap` (bash). Phase 3 picks it (`resources/index-backends.md`). Every query
-(`card`, `deps`, `tests`, `impact`) and view is the same whatever the backend. Views are Mermaid TEXT for agents:
+All code facts come from ONE index (`KB_DIR/index/index.json`): the bundled Graphify graph with the ut fixes
+(preprocessed with the compile DB, TEST blocks, function-pointer targets, access, types and macros), built by
+`resources/scripts/index.sh` in phase 3. Queries: `find`, `defs`, `list`, `source`, `refs`, `card`, `deps`, `tests`,
+`impact` (`resources/graph-queries.md`). Views are Mermaid TEXT for agents:
 `flow` (branches of a function, with coverage counts), `seq` (calls in order, with existing test doubles),
 `scenarios` (one sequence per entry point), `trace` (what a test really called). Reading them: `resources/diagrams.md`.
 

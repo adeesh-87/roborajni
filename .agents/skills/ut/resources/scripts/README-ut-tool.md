@@ -6,14 +6,14 @@ list of a code change, scope, the plan with a Cases table per task, the executor
 retry, checkpoint, refresh) and the close-out. The agent is called only to write or fix test code, once per task,
 with a prompt of about 1,500–1,800 words that contains only that task's inputs.
 
-Requirements: Python 3.10+ (the skill venv is used when present: run `index.sh setup clang` once), git, bash.
+Requirements: Python 3.10+ (the skill venv is used when present: run `index.sh setup` once), git, bash.
 The skill (`SKILL.md`) stays the path for driving an agent without the tool; both read the same resource files.
 
 ```sh
 UT=.agents/skills/ut/resources/scripts/ut
 $UT init     --task .ut/2026-09-25-uart --repo .            # phase 1: shows the detected profile, asks 5 questions (--yes = defaults)
 $UT baseline --task .ut/2026-09-25-uart                     # phase 2: build + run, compile DB, commands into the KB
-$UT kb       --task .ut/2026-09-25-uart [--files src/uart.c] # phase 3: code index (backend chosen here), testscan, exemplars, conventions, cards, diagrams
+$UT kb       --task .ut/2026-09-25-uart [--files src/uart.c] # phase 3: code index (Graphify), testscan, exemplars, conventions, cards, diagrams
 $UT discover --task .ut/2026-09-25-uart --base origin/main   # phase 4: impact list (or --uncommitted, --range A..B, --names f1 f2)
 $UT scope    --task .ut/2026-09-25-uart                     # phase 5: which items, acceptance; decides the pilot
 $UT pilot    --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 6: two tests, reviewed by you, become the exemplar
@@ -21,13 +21,14 @@ $UT coverage --task .ut/2026-09-25-uart --cmd "<coverage build+run>" --gcov-dir 
 $UT plan     --task .ut/2026-09-25-uart                     # phase 8: tasks/Tnn.md with Cases from the cards (coverage tasks: the missing outcomes)
 $UT run      --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 9: the loop; --dry-run writes the prompts only; --diagrams auto|on|off
 $UT close    --task .ut/2026-09-25-uart                     # phase 10: final build, summary, refresh
-$UT index    --task .ut/2026-09-25-uart --backend gcc       # rebuild the code index with another backend (--compare gcc: diff only)
 $UT trace    --task .ut/2026-09-25-uart                     # runtime sequence per TEST; cards gain "reached at run time"
+$UT seams    --task .ut/2026-09-25-uart [--set access=A2] [--options per-test]   # test seams decided for this project
 ```
-Code index: `ut kb` runs `index.sh detect` and uses `clang` when libclang parses the code cleanly, otherwise asks once
-between `gcc` and `graphify` when both work (`resources/index-backends.md`). Set `index_backend=<name>` in the profile
-to skip detection. Diagrams are generated into `KB_DIR/diagrams/` (`diagrams=off` in the profile skips that). They are
-NOT put into executor prompts by default (`prompt_diagrams=off`, from the A/B run in `resources/index-backends.md`);
+Code index: `ut kb` builds the Graphify index (`index.sh build`). Test seams (resources/test-seams.md): `ut kb`
+records the techniques the existing tests already use; `ut plan` asks once when a task needs static/private access and
+none is recorded; every prompt carries the decisions, and the agent reports `PARTIAL needs seam <need>` instead of
+improvising. Only `ut seams --set` changes a decision. Diagrams are generated into `KB_DIR/diagrams/` (`diagrams=off` in the profile skips that). They are
+NOT put into executor prompts by default (`prompt_diagrams=off`, from the A/B run in `resources/diagrams.md`);
 `ut run --diagrams auto` adds a flowchart for coverage tasks and branchy functions (>= 4 decisions) and a sequence for
 functions with >= 2 mockable collaborators, at most 900 words; `--diagrams on` adds both for every function.
 `--answers answers.json` makes any phase non-interactive; `--yes` takes every default.

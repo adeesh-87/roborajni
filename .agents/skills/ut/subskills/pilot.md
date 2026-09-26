@@ -28,6 +28,8 @@ setup/teardown, comments or headers. [approve as is]
 Apply corrections, rebuild, rerun, show again. After the third round, take what is there.
 
 ## 5. Save the approved style
+- A test seam the pilot needed (e.g. how the tests reach a static function) and the user approved → KB `Test seams`
+  `<need>: <ID> (decided by user in the pilot, <date>)`. From now on every task uses it.
 - `KB_DIR/exemplars/test.md` ← the approved file verbatim, annotated per `resources/templates/exemplar.md`.
 - `KB_DIR/exemplars/mock.md` ← the mock/stub used, verbatim, with the test lines that drive it.
 - `KB_DIR/exemplars/register.md` ← the exact registration lines.

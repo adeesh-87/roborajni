@@ -18,8 +18,7 @@ It writes `TASK/impact.md` (summary, work-item table, details per item) and inse
 context.md `Work items`. Each row: file:function, change kind (added, deleted, signature, modified-logic,
 new-dependency, moved/renamed, type/macro), tests reaching it, mocks/stubs/fakes of it, proposed work, category.
 Rows for test/mock files already changed on the branch are marked H: read them, do not redo that work.
-Bash fallback (`MODE: codemap`): `impact` is unavailable; list changed functions with
-`git diff -W <base> -- <file>` and fill the columns with `deps`/`tests` from the graph queries.
+`impact` failed (index missing or stale) → `"$I" refresh "$GD"` and run it again.
 
 ## 3. Present
 Show the summary line and the table grouped by category. Do not read the details unless a row is unclear.

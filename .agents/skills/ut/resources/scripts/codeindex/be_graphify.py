@@ -76,6 +76,16 @@ def export(gdir, out_path):
     add_facts(ix, scan, root, lm)
     files = [norm(os.path.relpath(f, root)) for f in G.collect([os.path.join(root, p) for p in paths])]
     ix.symbols.update(TS.symbols_for(root, files))
+    access = {}
+    for f in files:                                   # private / protected methods: tests cannot call them directly
+        try:
+            access.update(TS.access_of_file(root, f))
+        except Exception:  # noqa: BLE001
+            pass
+    for n in ix.functions.values():
+        a = access.get(n['name']) or access.get('::'.join(n['name'].split('::')[-2:]))
+        if a and n.get('kind') == 'function':
+            n['access'] = a
     ix.bind_virtual_targets()
     ix.save(out_path)
     return ix

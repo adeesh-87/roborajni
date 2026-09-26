@@ -359,6 +359,38 @@ def symbols_of_file(root, rel):
     return out
 
 
+def access_of_file(root, rel):
+    """Class::method -> 'private' | 'protected' for methods declared or defined inside class bodies of one file"""
+    if rel.endswith('.c'):
+        return {}
+    _, pcpp = parsers()
+    try:
+        src = open(os.path.join(root, rel), 'rb').read()
+    except OSError:
+        return {}
+    out = {}
+    for n in G.walk(pcpp.parse(src).root_node):
+        if n.type not in ('class_specifier', 'struct_specifier') or n.child_by_field_name('body') is None \
+                or n.child_by_field_name('name') is None:
+            continue
+        cls = G.txt(n.child_by_field_name('name'), src)
+        acc = 'private' if n.type == 'class_specifier' else 'public'
+        for c in n.child_by_field_name('body').named_children:
+            if c.type == 'access_specifier':
+                acc = G.txt(c, src).strip().rstrip(':').strip()
+                continue
+            if c.type in ('field_declaration', 'function_definition', 'declaration', 'template_declaration'):
+                d = c.child_by_field_name('declarator')
+                while d is not None and d.type != 'function_declarator':
+                    d = d.child_by_field_name('declarator') or next((x for x in d.named_children if x.type.endswith('declarator')), None)
+                if d is None:
+                    continue
+                nm = G.innermost_name(d, src)
+                if nm is not None and acc in ('private', 'protected'):
+                    out[f'{cls}::{G.txt(nm, src)}'] = acc
+    return out
+
+
 def symbols_for(root, rel_files):
     out = {}
     for f in rel_files:

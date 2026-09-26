@@ -3,7 +3,7 @@ the agent is called only to write test code.  Run:  python3 -m utcli <command> [
 import argparse, json, os, re, sys, subprocess
 from .state import State, PHASES
 from .util import ask, say, read, write, sh, script, RES, SKILL_DIR, norm, words
-from . import detect, kb as KB, baseline, plan as PLAN, run as RUN, harness as HARNESS
+from . import detect, kb as KB, baseline, plan as PLAN, run as RUN, harness as HARNESS, seams as SEAMS
 from .frameworks import FRAMEWORKS, COVERAGE_TOOLS
 
 
@@ -103,16 +103,16 @@ def cmd_kb(args):
     st = load(args); root = st['repo']; prof = st['profile']; kb = KB.load_kb(st['kb_dir'])
     ident = detect.kb_id(root)
     kb.update({'id': ident.get('id'), 'remote': ident.get('remote'), 'roots': root, 'profile': prof})
-    backend = choose_backend(args, st, prof, root)
-    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), backend)
-    say('\n'.join(l for l in out.splitlines() if re.search(r'index:|backend|preprocessed|augmented|MODE|WARNING|FAILED|translation units|flags borrowed', l)))
-    if rc != 0 and backend != 'graphify':
-        say(f'index build with {backend} FAILED; falling back to graphify')
-        backend = 'graphify'
-        rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), backend)
-    prof['index_backend'] = backend
-    kb['last_graph_build'] = f"{baseline.now()} (backend {backend}; {'compile DB' if prof.get('compile_db', 'none') != 'none' else 'no compile DB'})"
+    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'))
+    say('\n'.join(l for l in out.splitlines() if re.search(r'index:|preprocessed|augmented|WARNING|FAILED', l)))
+    kb['last_graph_build'] = f"{baseline.now()} ({'compile DB' if prof.get('compile_db', 'none') != 'none' else 'no compile DB'})"
     scan = KB.testscan(st['kb_dir'], root, prof)
+    SEAMS.merge_detected(kb, SEAMS.detect(root, prof))          # techniques the existing tests use = the decision
+    for l in SEAMS.render(kb['seams']):
+        if 'not decided' not in l:
+            say('test seam ' + l[2:])
+    if any(d.get('also_seen') for d in kb['seams'].values()):
+        say('The existing tests mix techniques for one need; new tests use the recorded one. Change it with: ut seams --set need=ID')
     ex = KB.make_exemplars(st['kb_dir'], root, prof, scan)
     conv = kb.get('conventions', {})
     if conv.get('approved', 'no') == 'no':
@@ -122,7 +122,7 @@ def cmd_kb(args):
         files = [f for f in files if any(f.startswith(x) or f == x for x in args.files)]
     kb['modules'] = KB.module_cards(st['kb_dir'], root, prof, gd, files)
     st['kb_modules'] = kb['modules']
-    if prof.get('diagrams', 'auto') != 'off' and backend != 'codemap':
+    if prof.get('diagrams', 'auto') != 'off':
         say(KB.make_diagrams(st['kb_dir'], root))
     kb['updated'] = baseline.now()
     KB.save_kb(st['kb_dir'], kb)
@@ -132,45 +132,6 @@ def cmd_kb(args):
             fh.write(f"| {kb['id']} | {kb.get('remote', '')} | {root} | | {kb['updated']} | {kb['updated']} |\n")
     say(f"KB: {st['kb_dir']}  exemplar: {ex or 'none (greenfield)'}  modules: {len(kb['modules'])}  conventions: {len(kb['conventions']['lines'])} lines")
     st.done('knowledge'); st.log('tool', f"knowledge: {len(kb['modules'])} module cards"); st.save()
-
-
-def choose_backend(args, st, prof, root):
-    """the index backend: the profile's choice, else detection; ONE question only when the choice is a real trade-off"""
-    want = prof.get('index_backend') or 'auto'
-    if want != 'auto':
-        return want
-    d = KB.detect_backends(root, prof.get('compile_db'))
-    rec, viable = d.get('recommended', 'graphify'), d.get('viable', [])
-    say('Index backends on this machine: ' + ', '.join(f"{b} {'OK' if v.get('ok') else 'no (' + v.get('note', '')[:60] + ')'}"
-                                                      for b, v in d.get('backends', {}).items()))
-    choice = rec
-    if rec != 'clang' and 'gcc' in viable and 'graphify' in viable:      # a real trade-off: ask once
-        choice = ask('Index backend? gcc = exact calls from your own compiler (compiles every unit once); '
-                     'graphify = tolerant tree-sitter parse (no compile needed)', rec, args.yes, answers_of(args), 'index_backend')
-    say(f"index backend: {choice} ({d.get('why', '') if choice == rec else 'your choice'})")
-    st.decide('index backend', choice)
-    return choice
-
-
-# ------------------------------------------------------------------ index (switch backend / compare)
-def cmd_index(args):
-    st = load(args); prof = st['profile']; root = st['repo']
-    if args.compare:
-        other = os.path.join(st['kb_dir'], f'index-{args.compare}')
-        rc, out = sh([script('index.sh'), 'build', '--backend', args.compare] + (['--cdb', os.path.join(root, prof['compile_db'])]
-                     if prof.get('compile_db', 'none') != 'none' else []) + [other] + KB.scan_paths(prof), cwd=root)
-        rc, out = sh([script('index.sh'), 'compare', KB.index_dir(st['kb_dir']), other], cwd=root)
-        write(os.path.join(st.dir, f'compare-{args.compare}.md'), out)
-        say(out[:3000]); return
-    prof['index_backend'] = args.backend
-    rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'), args.backend)
-    say(out.strip().splitlines()[-1] if out.strip() else out)
-    kb = KB.load_kb(st['kb_dir']); kb['profile'] = prof
-    kb['modules'] = KB.module_cards(st['kb_dir'], root, prof, gd, [m['file'] for m in kb.get('modules', [])])
-    if prof.get('diagrams', 'auto') != 'off':
-        say(KB.make_diagrams(st['kb_dir'], root))
-    KB.save_kb(st['kb_dir'], kb)
-    st.decide('index backend', args.backend); st.save()
 
 
 # ------------------------------------------------------------------ coverage (phase 7, scripted)
@@ -290,6 +251,7 @@ def cmd_scope(args):
 def cmd_plan(args):
     st = load(args)
     tasks = PLAN.make_plan(st, st['kb_dir'], st['profile'])
+    decide_access(args, st, tasks)
     reasons = PLAN.complexity(st)
     for t in tasks:
         say(f"  {t['id']} w{t['wave']} {t['type']:<14} {t['file']:<28} {len(t['cases'])} cases  touches {', '.join(t['touches'])}")
@@ -300,6 +262,39 @@ def cmd_plan(args):
         if ok != 'yes':
             say('edit tasks/*.md or state.json and run plan again'); return
     st.done('plan', f'{len(tasks)} tasks'); st.log('tool', f'plan: {len(tasks)} tasks'); st.save()
+
+
+def decide_access(args, st, tasks):
+    """static/private functions in the plan and no access technique decided yet: ask ONCE, record, stick to it"""
+    kb = KB.load_kb(st['kb_dir'])
+    if 'access' in kb.get('seams', {}):
+        return
+    hit = [t['id'] for t in tasks if SEAMS.needs_access(read(os.path.join(st['kb_dir'], 'modules', f"{os.path.basename(t['file'])}.cards.md")),
+                                                     t['functions'], t.get('lines'))]
+    if not hit:
+        return
+    opts = SEAMS.options('access', st['permissions'].get('production_code') == 'yes')
+    say(f"Tasks {', '.join(hit)} test static/private code. How should tests reach it? (asked once; the project keeps the answer)")
+    for sid in opts:
+        say(f"  {sid} {SEAMS.CATALOG[sid][1]}: {SEAMS.CATALOG[sid][3]}")
+    a = ask('Access technique', 'A1', args.yes, answers_of(args), 'seam_access').strip().upper()
+    SEAMS.set_choice(kb, 'access', a if a in opts else 'A1', by='user' if not args.yes else 'default accepted (--yes)')
+    KB.save_kb(st['kb_dir'], kb)
+    st.decide('test seam access', a); say(f"access: {kb['seams']['access']['choice']} recorded in the KB")
+
+
+def cmd_seams(args):
+    """show the decided test seams; --set need=ID changes one (only on the user's explicit request)"""
+    st = load(args); kb = KB.load_kb(st['kb_dir'])
+    for kv in args.set or []:
+        need, _, sid = kv.partition('=')
+        rec = SEAMS.set_choice(kb, need.strip(), sid.strip().upper())
+        st.decide(f'test seam {need}', sid); say(f"{need} = {rec['choice']}" + (f" (was {rec['previous']})" if rec.get('previous') else ''))
+    KB.save_kb(st['kb_dir'], kb); st.save()
+    say('Test seams (resources/test-seams.md):'); say('\n'.join(SEAMS.render(kb.get('seams', {}))))
+    if args.options:
+        for sid in SEAMS.options(args.options, st['permissions'].get('production_code') == 'yes'):
+            say(f"  {sid} {SEAMS.CATALOG[sid][1]}: {SEAMS.CATALOG[sid][3]}")
 
 
 # ------------------------------------------------------------------ run (phase 9)
@@ -409,8 +404,9 @@ def main(argv=None):
     s.add_argument('--diagrams', choices=['auto', 'on', 'off'], help='Mermaid diagrams in the prompts (default: the profile, auto)')
     s = sub.add_parser('harness', help='greenfield: create tests/CMakeLists.txt + runner + smoke test, hook into the root CMake, build it'); opt(s); s.add_argument('--framework', default='cpputest', choices=['cpputest', 'gtest']); s.add_argument('--dir', default='tests')
     s = sub.add_parser('close', help='phase 10'); opt(s)
-    s = sub.add_parser('index', help='rebuild the code index with another backend, or compare two backends'); opt(s)
-    s.add_argument('--backend', default='clang', choices=['clang', 'gcc', 'graphify', 'codemap']); s.add_argument('--compare', choices=['clang', 'gcc', 'graphify'])
+    s = sub.add_parser('seams', help='test seams decided for this project (static/private access, per-test mocking, ...)'); opt(s)
+    s.add_argument('--set', nargs='*', help='need=ID, e.g. access=A2 per-test=C2 (the user explicitly changes a decision)')
+    s.add_argument('--options', choices=list(SEAMS.NEEDS), help='list the techniques for one need')
     s = sub.add_parser('coverage', help='phase 7: run coverage, import it, annotate flowcharts, add work items'); opt(s)
     s.add_argument('--cmd', dest='cov_cmd', help='coverage build+run command'); s.add_argument('--lcov'); s.add_argument('--gcov-dir'); s.add_argument('--ctc'); s.add_argument('--json')
     s = sub.add_parser('trace', help='runtime sequence per TEST (-finstrument-functions); cards gain runtime reach'); opt(s)
@@ -419,7 +415,7 @@ def main(argv=None):
     a = p.parse_args(argv)
     {'init': cmd_init, 'baseline': cmd_baseline, 'kb': cmd_kb, 'discover': cmd_discover, 'scope': cmd_scope, 'pilot': cmd_pilot,
      'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness,
-     'index': cmd_index, 'coverage': cmd_coverage, 'trace': cmd_trace}[a.cmd](a)
+     'coverage': cmd_coverage, 'trace': cmd_trace, 'seams': cmd_seams}[a.cmd](a)
 
 
 if __name__ == '__main__':
