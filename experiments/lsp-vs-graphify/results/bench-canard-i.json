@@ -1,0 +1,789 @@
+{
+ "codebase": "libcanard-I",
+ "functions": 684,
+ "edges": {
+  "named": 2049
+ },
+ "virtual_sites": 0,
+ "pointer_sites": 10,
+ "arms": {
+  "graphify": {
+   "load_s": 0.0,
+   "query_ms": 0.0,
+   "no_answer": {},
+   "scores": {
+    "callees-prod": {
+     "tp": 187,
+     "fp": 1,
+     "fn": 0,
+     "precision": 0.995,
+     "recall": 1.0,
+     "f1": 0.997
+    },
+    "ctor/dtor": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "virtual": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "callers-prod": {
+     "tp": 187,
+     "fp": 1,
+     "fn": 0,
+     "precision": 0.995,
+     "recall": 1.0,
+     "f1": 0.997
+    },
+    "callers-test": {
+     "tp": 885,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "callees-test": {
+     "tp": 1859,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "def": {
+     "tp": 114,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    }
+   },
+   "failures": {
+    "callees-prod": [
+     {
+      "fn": "crc_add_chain",
+      "at": "libcanard/canard.c:210",
+      "missed": [],
+      "extra": [
+       "crc_add_chain@libcanard/canard.c:210"
+      ]
+     }
+    ],
+    "callers-prod": [
+     {
+      "fn": "crc_add_chain",
+      "at": "libcanard/canard.c:210",
+      "missed": [],
+      "extra": [
+       "crc_add_chain@libcanard/canard.c:210"
+      ]
+     }
+    ]
+   }
+  },
+  "clangd": {
+   "load_s": 0.3,
+   "query_ms": 37.7,
+   "no_answer": {},
+   "scores": {
+    "callees-prod": {
+     "tp": 186,
+     "fp": 11,
+     "fn": 1,
+     "precision": 0.944,
+     "recall": 0.995,
+     "f1": 0.969
+    },
+    "ctor/dtor": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "virtual": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "callers-prod": {
+     "tp": 187,
+     "fp": 11,
+     "fn": 0,
+     "precision": 0.944,
+     "recall": 1.0,
+     "f1": 0.971
+    },
+    "callers-test": {
+     "tp": 885,
+     "fp": 2,
+     "fn": 0,
+     "precision": 0.998,
+     "recall": 1.0,
+     "f1": 0.999
+    },
+    "callees-test": {
+     "tp": 1851,
+     "fp": 9,
+     "fn": 8,
+     "precision": 0.995,
+     "recall": 0.996,
+     "f1": 0.995
+    },
+    "def": {
+     "tp": 112,
+     "fp": 2,
+     "fn": 0,
+     "precision": 0.982,
+     "recall": 1.0,
+     "f1": 0.991
+    }
+   },
+   "failures": {
+    "callers-prod": [
+     {
+      "fn": "cavl2_trivial_factory",
+      "at": "lib/cavl2/cavl2.h:316",
+      "missed": [],
+      "extra": [
+       "rx_subscribe@libcanard/canard.c:1757",
+       "tx_make_pending@libcanard/canard.c:504",
+       "tx_push@libcanard/canard.c:735"
+      ]
+     },
+     {
+      "fn": "rx_session_cavl_compare",
+      "at": "libcanard/canard.c:1288",
+      "missed": [],
+      "extra": [
+       "rx_session_update@libcanard/canard.c:1491"
+      ]
+     },
+     {
+      "fn": "rx_session_factory",
+      "at": "libcanard/canard.c:1300",
+      "missed": [],
+      "extra": [
+       "rx_session_update@libcanard/canard.c:1491"
+      ]
+     },
+     {
+      "fn": "rx_subscription_cavl_compare",
+      "at": "libcanard/canard.c:1563",
+      "missed": [],
+      "extra": [
+       "rx_find_subscription@libcanard/canard.c:1568",
+       "rx_subscribe@libcanard/canard.c:1757"
+      ]
+     },
+     {
+      "fn": "crc_add_chain",
+      "at": "libcanard/canard.c:210",
+      "missed": [],
+      "extra": [
+       "crc_add_chain@libcanard/canard.c:210"
+      ]
+     },
+     {
+      "fn": "tx_cavl_compare_pending_order",
+      "at": "libcanard/canard.c:485",
+      "missed": [],
+      "extra": [
+       "tx_make_pending@libcanard/canard.c:504"
+      ]
+     },
+     {
+      "fn": "tx_cavl_compare_deadline",
+      "at": "libcanard/canard.c:495",
+      "missed": [],
+      "extra": [
+       "tx_push@libcanard/canard.c:735"
+      ]
+     },
+     {
+      "fn": "popcount_emulated",
+      "at": "libcanard/canard.c:95",
+      "missed": [],
+      "extra": [
+       "popcount@libcanard/canard.c:107"
+      ]
+     }
+    ],
+    "callees-prod": [
+     {
+      "fn": "popcount",
+      "at": "libcanard/canard.c:107",
+      "missed": [],
+      "extra": [
+       "popcount_emulated@libcanard/canard.c:95"
+      ]
+     },
+     {
+      "fn": "rx_session_update",
+      "at": "libcanard/canard.c:1491",
+      "missed": [],
+      "extra": [
+       "rx_session_cavl_compare@libcanard/canard.c:1288",
+       "rx_session_factory@libcanard/canard.c:1300"
+      ]
+     },
+     {
+      "fn": "rx_find_subscription",
+      "at": "libcanard/canard.c:1568",
+      "missed": [],
+      "extra": [
+       "rx_subscription_cavl_compare@libcanard/canard.c:1563"
+      ]
+     },
+     {
+      "fn": "rx_subscribe",
+      "at": "libcanard/canard.c:1757",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "rx_subscription_cavl_compare@libcanard/canard.c:1563"
+      ]
+     },
+     {
+      "fn": "canard_ingest_frame",
+      "at": "libcanard/canard.c:2071",
+      "missed": [
+       "canard_kind_version@libcanard/canard.h:107"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "crc_add_chain",
+      "at": "libcanard/canard.c:210",
+      "missed": [],
+      "extra": [
+       "crc_add_chain@libcanard/canard.c:210"
+      ]
+     },
+     {
+      "fn": "tx_make_pending",
+      "at": "libcanard/canard.c:504",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "tx_cavl_compare_pending_order@libcanard/canard.c:485"
+      ]
+     },
+     {
+      "fn": "tx_push",
+      "at": "libcanard/canard.c:735",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "tx_cavl_compare_deadline@libcanard/canard.c:495"
+      ]
+     }
+    ],
+    "callers-test": [
+     {
+      "fn": "popcount",
+      "at": "libcanard/canard.c:107",
+      "missed": [],
+      "extra": [
+       "test_popcount_intrinsics@tests/src/test_intrusive_util.c:86"
+      ]
+     },
+     {
+      "fn": "popcount_emulated",
+      "at": "libcanard/canard.c:95",
+      "missed": [],
+      "extra": [
+       "test_popcount_emulated@tests/src/test_intrusive_util.c:85"
+      ]
+     }
+    ],
+    "callees-test": [
+     {
+      "fn": "test_canard_new_invalid_params",
+      "at": "tests/src/test_api_lifecycle.cpp:256",
+      "missed": [],
+      "extra": [
+       "mock_now@tests/src/test_api_lifecycle.cpp:91",
+       "mock_tx@tests/src/test_api_lifecycle.cpp:92"
+      ]
+     },
+     {
+      "fn": "test_err_oom_on_publish",
+      "at": "tests/src/test_api_lifecycle.cpp:591",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169",
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "test_canard_new_validation_branches",
+      "at": "tests/src/test_api_lifecycle.cpp:914",
+      "missed": [],
+      "extra": [
+       "mock_now@tests/src/test_api_lifecycle.cpp:91",
+       "mock_tx@tests/src/test_api_lifecycle.cpp:92"
+      ]
+     },
+     {
+      "fn": "test_unsubscribe_within_callback",
+      "at": "tests/src/test_api_rx.cpp:522",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169",
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "dummy_alloc_mem",
+      "at": "tests/src/test_api_tx.cpp:12",
+      "missed": [
+       "dummy_alloc@tests/src/helpers.h:48"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "dummy_free_mem",
+      "at": "tests/src/test_api_tx.cpp:13",
+      "missed": [
+       "dummy_free@tests/src/helpers.h:55"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "test_canard_publish_oom",
+      "at": "tests/src/test_api_tx.cpp:254",
+      "missed": [],
+      "extra": [
+       "dummy_alloc_mem@tests/src/test_api_tx.cpp:12",
+       "dummy_free_mem@tests/src/test_api_tx.cpp:13"
+      ]
+     },
+     {
+      "fn": "mem_pool_new",
+      "at": "tests/src/test_api_tx_queue.cpp:85",
+      "missed": [
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "mem_pool_make",
+      "at": "tests/src/test_api_tx_queue.cpp:94",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "fixture_init",
+      "at": "tests/src/test_intrusive_rx_session.c:75",
+      "missed": [],
+      "extra": [
+       "on_message_capture@tests/src/test_intrusive_rx_session.c:47"
+      ]
+     },
+     {
+      "fn": "test_popcount_emulated",
+      "at": "tests/src/test_intrusive_util.c:85",
+      "missed": [],
+      "extra": [
+       "popcount_emulated@libcanard/canard.c:95"
+      ]
+     },
+     {
+      "fn": "test_popcount_intrinsics",
+      "at": "tests/src/test_intrusive_util.c:86",
+      "missed": [],
+      "extra": [
+       "popcount@libcanard/canard.c:107"
+      ]
+     }
+    ],
+    "def": [
+     {
+      "fn": "cavl2_find_or_insert",
+      "at": "lib/cavl2/cavl2.h:436",
+      "got": [
+       [
+        "lib/cavl2/cavl2.h",
+        119
+       ]
+      ]
+     },
+     {
+      "fn": "cavl2_remove",
+      "at": "lib/cavl2/cavl2.h:474",
+      "got": [
+       [
+        "lib/cavl2/cavl2.h",
+        139
+       ]
+      ]
+     }
+    ]
+   }
+  },
+  "clangd-graph": {
+   "load_s": 33.4,
+   "query_ms": 0.0,
+   "no_answer": {},
+   "scores": {
+    "callees-prod": {
+     "tp": 187,
+     "fp": 10,
+     "fn": 0,
+     "precision": 0.949,
+     "recall": 1.0,
+     "f1": 0.974
+    },
+    "ctor/dtor": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "virtual": {
+     "tp": 0,
+     "fp": 0,
+     "fn": 0,
+     "precision": 1.0,
+     "recall": 1.0,
+     "f1": 1.0
+    },
+    "callers-prod": {
+     "tp": 178,
+     "fp": 10,
+     "fn": 9,
+     "precision": 0.947,
+     "recall": 0.952,
+     "f1": 0.949
+    },
+    "callers-test": {
+     "tp": 885,
+     "fp": 2,
+     "fn": 0,
+     "precision": 0.998,
+     "recall": 1.0,
+     "f1": 0.999
+    },
+    "callees-test": {
+     "tp": 1851,
+     "fp": 9,
+     "fn": 8,
+     "precision": 0.995,
+     "recall": 0.996,
+     "f1": 0.995
+    },
+    "def": {
+     "tp": 112,
+     "fp": 2,
+     "fn": 0,
+     "precision": 0.982,
+     "recall": 1.0,
+     "f1": 0.991
+    }
+   },
+   "failures": {
+    "callers-prod": [
+     {
+      "fn": "cavl2_trivial_factory",
+      "at": "lib/cavl2/cavl2.h:316",
+      "missed": [],
+      "extra": [
+       "rx_subscribe@libcanard/canard.c:1757",
+       "tx_make_pending@libcanard/canard.c:504",
+       "tx_push@libcanard/canard.c:735"
+      ]
+     },
+     {
+      "fn": "cavl2_find_or_insert",
+      "at": "lib/cavl2/cavl2.h:436",
+      "missed": [
+       "cavl2_find@lib/cavl2/cavl2.h:127",
+       "rx_session_update@libcanard/canard.c:1491",
+       "rx_subscribe@libcanard/canard.c:1757",
+       "tx_make_pending@libcanard/canard.c:504",
+       "tx_push@libcanard/canard.c:735"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "cavl2_remove",
+      "at": "lib/cavl2/cavl2.h:474",
+      "missed": [
+       "canard_unsubscribe@libcanard/canard.c:1891",
+       "cavl2_remove_if@lib/cavl2/cavl2.h:167",
+       "rx_session_destroy@libcanard/canard.c:1318",
+       "tx_retire@libcanard/canard.c:517"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "rx_session_cavl_compare",
+      "at": "libcanard/canard.c:1288",
+      "missed": [],
+      "extra": [
+       "rx_session_update@libcanard/canard.c:1491"
+      ]
+     },
+     {
+      "fn": "rx_session_factory",
+      "at": "libcanard/canard.c:1300",
+      "missed": [],
+      "extra": [
+       "rx_session_update@libcanard/canard.c:1491"
+      ]
+     },
+     {
+      "fn": "rx_subscription_cavl_compare",
+      "at": "libcanard/canard.c:1563",
+      "missed": [],
+      "extra": [
+       "rx_find_subscription@libcanard/canard.c:1568",
+       "rx_subscribe@libcanard/canard.c:1757"
+      ]
+     },
+     {
+      "fn": "tx_cavl_compare_pending_order",
+      "at": "libcanard/canard.c:485",
+      "missed": [],
+      "extra": [
+       "tx_make_pending@libcanard/canard.c:504"
+      ]
+     },
+     {
+      "fn": "tx_cavl_compare_deadline",
+      "at": "libcanard/canard.c:495",
+      "missed": [],
+      "extra": [
+       "tx_push@libcanard/canard.c:735"
+      ]
+     },
+     {
+      "fn": "popcount_emulated",
+      "at": "libcanard/canard.c:95",
+      "missed": [],
+      "extra": [
+       "popcount@libcanard/canard.c:107"
+      ]
+     }
+    ],
+    "callees-prod": [
+     {
+      "fn": "popcount",
+      "at": "libcanard/canard.c:107",
+      "missed": [],
+      "extra": [
+       "popcount_emulated@libcanard/canard.c:95"
+      ]
+     },
+     {
+      "fn": "rx_session_update",
+      "at": "libcanard/canard.c:1491",
+      "missed": [],
+      "extra": [
+       "rx_session_cavl_compare@libcanard/canard.c:1288",
+       "rx_session_factory@libcanard/canard.c:1300"
+      ]
+     },
+     {
+      "fn": "rx_find_subscription",
+      "at": "libcanard/canard.c:1568",
+      "missed": [],
+      "extra": [
+       "rx_subscription_cavl_compare@libcanard/canard.c:1563"
+      ]
+     },
+     {
+      "fn": "rx_subscribe",
+      "at": "libcanard/canard.c:1757",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "rx_subscription_cavl_compare@libcanard/canard.c:1563"
+      ]
+     },
+     {
+      "fn": "tx_make_pending",
+      "at": "libcanard/canard.c:504",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "tx_cavl_compare_pending_order@libcanard/canard.c:485"
+      ]
+     },
+     {
+      "fn": "tx_push",
+      "at": "libcanard/canard.c:735",
+      "missed": [],
+      "extra": [
+       "cavl2_trivial_factory@lib/cavl2/cavl2.h:316",
+       "tx_cavl_compare_deadline@libcanard/canard.c:495"
+      ]
+     }
+    ],
+    "callers-test": [
+     {
+      "fn": "popcount",
+      "at": "libcanard/canard.c:107",
+      "missed": [],
+      "extra": [
+       "test_popcount_intrinsics@tests/src/test_intrusive_util.c:86"
+      ]
+     },
+     {
+      "fn": "popcount_emulated",
+      "at": "libcanard/canard.c:95",
+      "missed": [],
+      "extra": [
+       "test_popcount_emulated@tests/src/test_intrusive_util.c:85"
+      ]
+     }
+    ],
+    "callees-test": [
+     {
+      "fn": "test_canard_new_invalid_params",
+      "at": "tests/src/test_api_lifecycle.cpp:256",
+      "missed": [],
+      "extra": [
+       "mock_now@tests/src/test_api_lifecycle.cpp:91",
+       "mock_tx@tests/src/test_api_lifecycle.cpp:92"
+      ]
+     },
+     {
+      "fn": "test_err_oom_on_publish",
+      "at": "tests/src/test_api_lifecycle.cpp:591",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169",
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "test_canard_new_validation_branches",
+      "at": "tests/src/test_api_lifecycle.cpp:914",
+      "missed": [],
+      "extra": [
+       "mock_now@tests/src/test_api_lifecycle.cpp:91",
+       "mock_tx@tests/src/test_api_lifecycle.cpp:92"
+      ]
+     },
+     {
+      "fn": "test_unsubscribe_within_callback",
+      "at": "tests/src/test_api_rx.cpp:522",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169",
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "dummy_alloc_mem",
+      "at": "tests/src/test_api_tx.cpp:12",
+      "missed": [
+       "dummy_alloc@tests/src/helpers.h:48"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "dummy_free_mem",
+      "at": "tests/src/test_api_tx.cpp:13",
+      "missed": [
+       "dummy_free@tests/src/helpers.h:55"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "test_canard_publish_oom",
+      "at": "tests/src/test_api_tx.cpp:254",
+      "missed": [],
+      "extra": [
+       "dummy_alloc_mem@tests/src/test_api_tx.cpp:12",
+       "dummy_free_mem@tests/src/test_api_tx.cpp:13"
+      ]
+     },
+     {
+      "fn": "mem_pool_new",
+      "at": "tests/src/test_api_tx_queue.cpp:85",
+      "missed": [
+       "instrumented_allocator_new@tests/src/helpers.h:147"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "mem_pool_make",
+      "at": "tests/src/test_api_tx_queue.cpp:94",
+      "missed": [
+       "instrumented_allocator_make_resource@tests/src/helpers.h:169"
+      ],
+      "extra": []
+     },
+     {
+      "fn": "fixture_init",
+      "at": "tests/src/test_intrusive_rx_session.c:75",
+      "missed": [],
+      "extra": [
+       "on_message_capture@tests/src/test_intrusive_rx_session.c:47"
+      ]
+     },
+     {
+      "fn": "test_popcount_emulated",
+      "at": "tests/src/test_intrusive_util.c:85",
+      "missed": [],
+      "extra": [
+       "popcount_emulated@libcanard/canard.c:95"
+      ]
+     },
+     {
+      "fn": "test_popcount_intrinsics",
+      "at": "tests/src/test_intrusive_util.c:86",
+      "missed": [],
+      "extra": [
+       "popcount@libcanard/canard.c:107"
+      ]
+     }
+    ],
+    "def": [
+     {
+      "fn": "cavl2_find_or_insert",
+      "at": "lib/cavl2/cavl2.h:436",
+      "got": [
+       [
+        "lib/cavl2/cavl2.h",
+        119
+       ]
+      ]
+     },
+     {
+      "fn": "cavl2_remove",
+      "at": "lib/cavl2/cavl2.h:474",
+      "got": [
+       [
+        "lib/cavl2/cavl2.h",
+        139
+       ]
+      ]
+     }
+    ]
+   }
+  }
+ }
+}
