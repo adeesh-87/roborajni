@@ -1,7 +1,7 @@
 # Experiment: clangd (LSP) vs Graphify as the code index of the ut skill
 
 Question: does a plain language server give an agent better answers about C/C++ code than the Graphify index the
-skill uses today? Two parts. The results are in [RESULTS.md](RESULTS.md).
+skill uses today, and are either better than plain grep? Three parts. The results are in [RESULTS.md](RESULTS.md).
 
 1. **Fact benchmark.** Every function in two codebases. Both tools answer who it calls, who calls it (production code
    and tests), and where it is defined. The answers are scored against the call graph GCC itself emits
@@ -11,6 +11,8 @@ skill uses today? Two parts. The results are in [RESULTS.md](RESULTS.md).
    identical in both arms: the task text, the build script and the permissions. Reading, grepping and listing code
    files is denied in both arms. Each run is scored on build, pass, branch coverage of the target (gcov), cost and
    turns.
+3. **Grep baseline.** A third agent arm has no index tool and may read, grep and list any file.
+   `bench_sites.py` scores "which lines call F?" for grep, Graphify and clangd against GCC's call sites.
 
 ## Codebases
 | | cvaccel | libcanard |
@@ -32,6 +34,8 @@ skill uses today? Two parts. The results are in [RESULTS.md](RESULTS.md).
   - `prepare` makes stripped copies (all existing tests deleted) and builds both indexes.
   - `run` does the Haiku runs.
   - `score` rebuilds each run's tests and computes gcov branch coverage of the target.
+- `bench_sites.py NAME GT GRAPHIFY_INDEX ROOT CDB_DIR OUT.json DIR...`: the call-site benchmark with grep as the
+  baseline.
 - `summarize.py results.json`: Markdown tables of the agent runs.
 - `results/`: raw benchmark output (`bench-*.txt`, `bench-*.json` with every miss and false positive) and
   `agent-results.json`.
