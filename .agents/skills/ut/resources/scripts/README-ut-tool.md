@@ -17,7 +17,7 @@ $UT kb       --task .ut/2026-09-25-uart [--files src/uart.c] # phase 3: code ind
 $UT discover --task .ut/2026-09-25-uart --base origin/main   # phase 4: impact list (or --uncommitted, --range A..B, --names f1 f2)
 $UT scope    --task .ut/2026-09-25-uart                     # phase 5: which items, acceptance; decides the pilot
 $UT pilot    --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 6: two tests, reviewed by you, become the exemplar
-$UT coverage --task .ut/2026-09-25-uart --cmd "<coverage build+run>" --gcov-dir build-cov   # phase 7: import (or --lcov / --ctc profile.txt), gaps -> work items
+$UT coverage --task .ut/2026-09-25-uart --cmd "<coverage build+run>" --gcov-dir build-cov   # phase 7: import (or --lcov / --ctc profile.txt / --llvm ut.profdata --object BIN for MC/DC), gaps -> work items
 $UT plan     --task .ut/2026-09-25-uart                     # phase 8: tasks/Tnn.md with Cases from the cards (coverage tasks: the missing outcomes)
 $UT run      --task .ut/2026-09-25-uart --agent "claude -p ..." # phase 9: the loop; --dry-run writes the prompts only; --diagrams auto|on|off
 $UT close    --task .ut/2026-09-25-uart                     # phase 10: final build, summary, refresh

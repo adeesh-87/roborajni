@@ -141,10 +141,11 @@ def cmd_coverage(args):
     cmds = kb.setdefault('commands', {})
     cmd = args.cov_cmd or cmds.get('coverage', {}).get('cmd')
     imp = [x for x in (['--lcov', args.lcov] if args.lcov else ['--gcov-dir', args.gcov_dir] if args.gcov_dir else
-                       ['--ctc', args.ctc] if args.ctc else ['--json', args.json] if args.json else [])]
+                       ['--ctc', args.ctc] if args.ctc else ['--json', args.json] if args.json else
+                       ['--llvm', args.llvm] if args.llvm else [])]
     imp = imp or (cmds.get('coverage_import', {}).get('cmd', '').split(' ', 1) if cmds.get('coverage_import') else [])
     if not imp:
-        sys.exit('give the report to import: --lcov FILE | --gcov-dir BUILD_DIR | --ctc profile.txt | --json FILE '
+        sys.exit('give the report to import: --lcov FILE | --gcov-dir BUILD_DIR | --ctc profile.txt | --llvm PROFDATA --object BIN | --json FILE '
                  '(and --cmd "coverage build+run command" to produce it)')
     if cmd:
         say(f'running: {cmd}')
@@ -154,11 +155,17 @@ def cmd_coverage(args):
             sys.exit(f'coverage command FAILED (rc {rc}); see logs/coverage-run.log')
         cmds['coverage'] = {'cmd': cmd, 'verified': baseline.now()}
     gd = KB.index_dir(st['kb_dir'])
-    rc, out = sh([script('index.sh'), 'cov-import', gd, imp[0], os.path.join(root, imp[1]) if not os.path.isabs(imp[1]) else imp[1]], cwd=root)
+    absp = lambda p: p if os.path.isabs(p) else os.path.join(root, p)
+    objs = [x for o in (args.object or []) for x in ('--object', absp(o))] if imp[0] == '--llvm' else []
+    if imp[0] == '--llvm' and not objs:
+        prev = cmds.get('coverage_import', {}).get('objects') or []
+        objs = [x for o in prev for x in ('--object', absp(o))]
+    rc, out = sh([script('index.sh'), 'cov-import', gd, imp[0], absp(imp[1])] + objs, cwd=root)
     say(out.strip())
     if rc != 0:
         sys.exit('import FAILED')
-    cmds['coverage_import'] = {'cmd': f'{imp[0]} {imp[1]}', 'verified': baseline.now()}
+    cmds['coverage_import'] = {'cmd': f'{imp[0]} {imp[1]}', 'verified': baseline.now(),
+                               **({'objects': args.object or cmds.get('coverage_import', {}).get('objects', [])} if imp[0] == '--llvm' else {})}
     KB.save_kb(st['kb_dir'], kb)
     say(KB.make_diagrams(st['kb_dir'], root))
     rc, gaps = sh([script('index.sh'), 'uncovered', gd], cwd=root)
@@ -409,6 +416,8 @@ def main(argv=None):
     s.add_argument('--options', choices=list(SEAMS.NEEDS), help='list the techniques for one need')
     s = sub.add_parser('coverage', help='phase 7: run coverage, import it, annotate flowcharts, add work items'); opt(s)
     s.add_argument('--cmd', dest='cov_cmd', help='coverage build+run command'); s.add_argument('--lcov'); s.add_argument('--gcov-dir'); s.add_argument('--ctc'); s.add_argument('--json')
+    s.add_argument('--llvm', help='merged .profdata of a clang source-based coverage build (MC/DC with -fcoverage-mcdc)')
+    s.add_argument('--object', nargs='*', help='with --llvm: the test binaries that produced the profile')
     s = sub.add_parser('trace', help='runtime sequence per TEST (-finstrument-functions); cards gain runtime reach'); opt(s)
     s.add_argument('--run', help='test command; {build} = the trace build dir'); s.add_argument('--no-build', action='store_true')
     s = sub.add_parser('status'); opt(s)
