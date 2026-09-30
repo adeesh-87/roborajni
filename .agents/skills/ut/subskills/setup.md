@@ -54,6 +54,7 @@ docs from 3 → context.md section 2. Write `Resources to load` from the table b
 | Parasoft C/C++test | `tools/parasoft-cpptest.md` |
 | Testwell CTC++ | `tools/ctc.md` |
 | gcov / lcov / gcovr / llvm-cov | `tools/gcov-lcov.md` |
+| MC/DC with clang 18+ (also the local stand-in when the project's MC/DC tool, e.g. CTC++, is not available) | `tools/llvm-mcdc.md` |
 | CMake / Make / Ceedling / scripts | `tools/build-systems.md` |
 | none of the above | write `none: learn from the repo, record in KB Build notes` |
 Tick phase 1.

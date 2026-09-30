@@ -179,7 +179,7 @@ def make_plan(st, kb_dir, prof):
                         for w in chunk if ':' in w['item']}
             for f in funcs:
                 if ttype == 'raise-coverage' and gaps_of.get(f):      # only the outcomes the coverage run never took
-                    cases += [(f, gap_case(g), '', 'the outcome the code gives for it') for g in gaps_of[f]]
+                    cases += [(f, gap_case(g), '', 'the outcome the code gives for it') for g in gaps_of[f] if gap_case(g)]
                     continue
                 cases += [(f,) + c for c in cases_for(cards, f, lines_of.get(f))] if ttype in ('add-tests', 'raise-coverage', 'update-tests') else []
             if is_header_task:
@@ -216,6 +216,11 @@ def gap_case(g):
     m = re.match(r'L(\d+) (?:if|\?:) \((.*)\): (?:only )?(\d+/\d+) (?:branch|condition) outcomes hit', g)
     if m:
         return f'L{m.group(1)} ({m.group(2)}): each sub-condition must decide the outcome alone ({m.group(3)} outcomes hit so far)'
+    m = re.match(r'L(\d+) MC/DC \S+ in \((.*)\): `(.*)` not shown independent: (.*)$', g)
+    if m:
+        return f'L{m.group(1)} MC/DC of `{m.group(3)}` in ({m.group(2)}): {m.group(4)}'
+    if ' is a compile-time constant' in g:
+        return None
     m = re.match(r'L(\d+) loop \((.*)\) body never runs', g)
     if m:
         return f'L{m.group(1)} loop ({m.group(2)}) runs at least once'

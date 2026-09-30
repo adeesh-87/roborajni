@@ -1,6 +1,6 @@
 ---
 name: ut
-description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps a per-codebase knowledge base and a task folder (status.md, context.md) so work can be resumed and split across parallel executor agents.
+description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, clang llvm-cov incl. MC/DC, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps a per-codebase knowledge base and a task folder (status.md, context.md) so work can be resumed and split across parallel executor agents.
 ---
 
 # ut — unit test task driver

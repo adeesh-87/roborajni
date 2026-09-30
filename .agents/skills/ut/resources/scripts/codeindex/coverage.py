@@ -1,4 +1,5 @@
-"""cov-import INDEX_JSON (--lcov FILE | --gcov-dir DIR | --ctc PROFILE_TXT | --json FILE) [--out FILE]
+"""cov-import INDEX_JSON (--lcov FILE | --gcov-dir DIR | --ctc PROFILE_TXT | --llvm PROFDATA --object BIN [--object BIN]
+                         | --json FILE) [--out FILE]
 Normalizes a coverage report into coverage.json next to the index:
   {source, generated, files: {repo-relative path: {lines: {L: hits}, branches: {L: [taken, ...]}, decisions: {L: [true, false]}}}}
 Decision outcomes are then read per outline decision by outcome() (used by the flowcharts and `uncovered`).
@@ -8,10 +9,14 @@ Sources:
   gcov-dir a build tree with .gcda files: runs `gcov --json-format --stdout` (gcc 9+)
   ctc      Testwell CTC++ execution profile listing (ctcpost -p profile.txt): per line hits, and true/false counts of
            decisions. Parsed from the documented column layout; check the first import against ctc2html once.
+  llvm     clang source-based coverage: the merged .profdata and the test binaries that produced it. Built with
+           -fcoverage-mcdc (clang 18+) it adds MC/DC per decision, with the test vector that completes each missing
+           independence pair (codeindex/mcdc.py). Lines and branches come from llvm-cov export -format=lcov.
   json     the normalized format above (convert any other tool to it)
 """
 import datetime, gzip, json, os, re, subprocess, sys, tempfile
 from .model import Index, norm, decisions, flatten, is_testside
+from . import mcdc as MCDC
 
 
 def rel_to(root, p, base=None):
@@ -125,7 +130,15 @@ def main(a):
     root = ix.meta['root']
     kind, src = a[1], a[2]
     out = a[a.index('--out') + 1] if '--out' in a else os.path.join(os.path.dirname(os.path.abspath(a[0])), 'coverage.json')
-    files = {'--lcov': from_lcov, '--gcov-dir': from_gcov_dir, '--ctc': from_ctc}.get(kind, lambda p, r: json.load(open(p))['files'])(src, root)
+    if kind == '--llvm':
+        objs = [a[i + 1] for i, x in enumerate(a) if x == '--object']
+        if not objs:
+            sys.exit('cov-import --llvm PROFDATA needs --object TEST_BINARY (repeat for more binaries)')
+        files = MCDC.from_llvm(src, objs, root, rel_to, from_lcov)
+        for fc in files.values():
+            fc.setdefault('mcdc', {})
+    else:
+        files = {'--lcov': from_lcov, '--gcov-dir': from_gcov_dir, '--ctc': from_ctc}.get(kind, lambda p, r: json.load(open(p))['files'])(src, root)
     files = {k: v for k, v in files.items() if k}
     cov = {'source': kind.lstrip('-'), 'from': os.path.abspath(src), 'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'),
            'files': files}
@@ -134,6 +147,8 @@ def main(a):
     print(f"coverage: {out}  ({len(files)} files; source {cov['source']})")
     print(f"decision outcomes: {s['hit']}/{s['total']} hit in {s['functions']} functions with decisions; "
           f"{len(s['never'])} functions never executed; {len(s['gaps'])} functions with missing outcomes")
+    if s['mcdc_total']:
+        print(f"MC/DC: {s['mcdc_hit']}/{s['mcdc_total']} conditions shown independent in {s['mcdc_decisions']} decisions")
     return cov
 
 
@@ -210,6 +225,8 @@ def gaps_of(fn, fc):
                 out.append((d['l'], f"{d['t']} ({cond}) never TRUE"))
             if o.get('F') == 0:
                 out.append((d['l'], f"{d['t']} ({cond}) never FALSE"))
+            if fc.get('mcdc') and str(d['l']) in fc['mcdc']:
+                continue                               # MC/DC measured for this decision: its gaps say more below
             if o.get('partial') and not o.get('all0'):
                 out.append((d['l'], f"{d['t']} ({cond}): only {o['partial']}"))
             m = re.match(r'(\d+)/(\d+)', o.get('conds') or '')
@@ -224,11 +241,21 @@ def gaps_of(fn, fc):
             for v, n in o['cases'].items():
                 if n == 0:
                     out.append((d['l'], f"switch ({cond}) case {v} never taken"))
+    if fc.get('mcdc') is not None:                     # MC/DC measured (llvm-cov): conditions without an independence pair
+        for l, decs in sorted(fc['mcdc'].items(), key=lambda kv: int(kv[0])):
+            if fn['line'] <= int(l) <= fn['end']:
+                for dec in decs:
+                    out += MCDC.gaps(dec)
+        for d in decisions(fn.get('outline') or []):
+            if d.get('n', 1) > MCDC.MAX_CONDITIONS_CLANG18:
+                out.append((d['l'], f"{d['t']} ({d.get('c', '')}): {d['n']} conditions, not measured by clang 18 (max "
+                                    f"{MCDC.MAX_CONDITIONS_CLANG18}); CTC++ measures it: derive its independence pairs by hand"))
     return out
 
 
 def summary(ix, cov):
     total = hit = funcs = 0
+    mt = mh = md = 0
     never, gaps = [], {}
     for i, n in ix.functions.items():
         if n.get('kind') != 'function' or not n.get('outline'):
@@ -249,10 +276,17 @@ def summary(ix, cov):
             for v in (o.get('cases') or {}).values():
                 if v is not None:
                     total += 1; hit += v > 0
+        for l, decs in (fc.get('mcdc') or {}).items():
+            if n['line'] <= int(l) <= n['end'] and not is_testside(n['file']):
+                for dec in decs:
+                    md += 1
+                    mt += len(dec['conditions'])
+                    mh += sum(1 for c in dec['conditions'] if c['covered'])
         g = gaps_of(n, fc)
         if g:
             gaps[i] = g
-    return {'total': total, 'hit': hit, 'functions': funcs, 'never': never, 'gaps': gaps}
+    return {'total': total, 'hit': hit, 'functions': funcs, 'never': never, 'gaps': gaps,
+            'mcdc_total': mt, 'mcdc_hit': mh, 'mcdc_decisions': md}
 
 
 def cmd_uncovered(a):
@@ -265,7 +299,8 @@ def cmd_uncovered(a):
     s = summary(ix, cov)
     sel = lambda i: want is None or ix.functions[i]['file'] == want or ix.functions[i]['name'] in (want, want.split('::')[-1]) \
         or ix.functions[i]['name'].split('::')[-1] == want
-    print(f"# Coverage gaps ({cov['source']}, {cov['generated']}): {s['hit']}/{s['total']} decision outcomes hit")
+    print(f"# Coverage gaps ({cov['source']}, {cov['generated']}): {s['hit']}/{s['total']} decision outcomes hit"
+          + (f"; MC/DC {s['mcdc_hit']}/{s['mcdc_total']} conditions shown independent" if s['mcdc_total'] else ''))
     never = [i for i in s['never'] if sel(i) and not is_testside(ix.functions[i]['file'])]
     if never:
         print('\n## Functions never executed by the tests')

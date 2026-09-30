@@ -1,6 +1,9 @@
 # Phase 7 — Coverage
 
 Goal: a list of concrete gaps with an action each → context.md `Coverage gaps`. Load the coverage tool file.
+MC/DC target and clang 18+ available (or the project's MC/DC tool, e.g. CTC++, not available here) → measure and
+iterate with `resources/tools/llvm-mcdc.md`: its gap lines name the condition values of each missing test. The
+project tool stays the acceptance measure; the tool file says what to confirm once.
 
 ## 1. Report
 KB `Commands` has verified coverage rows → run them (delete old data files first; the tool file says which).
@@ -15,6 +18,7 @@ Put the report into the code index; it maps every count onto the decisions of ea
 ```sh
 I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"
 "$I" cov-import "$GD" --gcov-dir <coverage build dir>     # or --lcov file.info | --ctc profile.txt (ctcpost -p) | --json file
+#                                                          # MC/DC: --llvm ut.profdata --object <test binary> (tools/llvm-mcdc.md)
 "$I" uncovered "$GD" > "$TASK/coverage-gaps.md"           # never-run functions + never-taken outcomes, per function
 "$I" diagrams "$GD" "$KB_DIR/diagrams"                     # flowcharts now show "Nx" / "NOT HIT" on every edge
 ```

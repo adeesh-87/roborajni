@@ -18,7 +18,7 @@
 #   index.sh seq     OUT_DIR FUNCTION [--depth 1] Mermaid sequence text (calls in order, alt/loop, test doubles)
 #   index.sh diagrams  OUT_DIR DEST_DIR          flow/seq files for every function worth one + scenarios + INDEX.md
 #   index.sh scenarios OUT_DIR DEST_DIR          one sequence per entry point + SCENARIOS.md
-#   index.sh cov-import OUT_DIR --lcov F | --gcov-dir BUILD_DIR | --ctc profile.txt | --json F
+#   index.sh cov-import OUT_DIR --lcov F | --gcov-dir BUILD_DIR | --ctc profile.txt | --llvm PROFDATA --object BIN | --json F
 #   index.sh uncovered  OUT_DIR [FILE|FUNCTION]  never-run functions and never-taken decision outcomes
 #   index.sh trace   OUT_DIR --run "CMD" [--cmake SRC --build-dir DIR --cmake-args ".." --target T | --build "CMD {cflags} {ldflags}"]
 #                                                runtime sequence per TEST (what really ran); runtime reach in the cards

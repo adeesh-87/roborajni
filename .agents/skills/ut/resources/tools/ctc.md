@@ -49,6 +49,10 @@ follows the documented column layout (hits/true, false, line); compare the first
   in one column marks the missing outcome; untested.txt lists exactly those lines.
 - For each gap write `file:line`, the condition text and which outcome (true/false, which condition) is missing.
 
+## No CTC++ where the agent works
+Measure MC/DC with clang 18+ instead (`llvm-mcdc.md`): the same tests, the same condition vectors. That file lists
+what to confirm once against CTC++ (decision set, pairing rule, decisions with more than 6 conditions).
+
 ## Excluding code (only with user approval)
 ```c
 #pragma CTC SKIP
