@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """makercheck.py KB_DIR REPO : checks what an agent following SKILL-MAKER.md produced. Every FAIL says what to fix.
+makercheck.py --skeleton learnings : the table for KB_DIR/learnings.md, one row per learning of resources/learnings.md.
 Run it at the end of SKILL-MAKER.md and fix until it prints `ALL PASS`. (The checks come from the mistakes a small
 model made in a trial run: invented defaults, an atypical exemplar, an empty mock exemplar, dropped hazards, a
 wrong stub mode, a shallow index spot-check, a run command that was never run.)"""
 import json, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+SKILL_DIR = os.path.realpath(os.path.join(HERE, '..', '..'))
+LEARN = os.path.join(SKILL_DIR, 'resources', 'learnings.md')
 SEAM_DEFAULTS = {'access': 'A1', 'replace': 'B1', 'per-test': 'C5', 'hardware': 'D1', 'state': 'E4'}
 res = []
 
@@ -40,7 +43,31 @@ def exists_verbatim(repo, dirs, block):
     return False, None
 
 
+def learnings():
+    """[(ID, first sentence)] from resources/learnings.md"""
+    out = []
+    for l in open(LEARN, errors='replace'):
+        m = re.match(r'^\| (L\d+) \| (.+?) \|', l)
+        if m:
+            t = re.split(r'(?<=[.:;])\s', m.group(2))[0]
+            out.append((m.group(1), t if len(t) <= 110 else t[:110].rsplit(' ', 1)[0] + ' …'))
+    return out
+
+
+def table_rows(text):
+    return [[c.strip() for c in l.strip().strip('|').split('|')] for l in text.splitlines()
+            if l.startswith('|') and not re.match(r'^\|\s*-', l)]
+
+
 def main(a):
+    if a[:2] == ['--skeleton', 'learnings']:
+        print('# Learnings: verdicts for this codebase\n\nOne row per learning of `resources/learnings.md` (read it for the full '
+              'text and the check). Applies: yes / no / partly / unknown. Evidence: file:line, a command and its result, or a '
+              'count. The project rule is what agents do here; it wins over the generic docs.\n')
+        print('| ID | Learning | Applies | Evidence | Project rule |\n|---|---|---|---|---|')
+        for i, t in learnings():
+            print(f'| {i} | {t} | | | |')
+        return 0
     if len(a) < 2:
         print(__doc__); sys.exit(2)
     kb, repo = os.path.abspath(a[0]), os.path.abspath(a[1])
@@ -54,7 +81,7 @@ def main(a):
     for t in ('Toolchain', 'Build notes', 'Stubs', 'Coverage', 'Change hazards', 'Index spot-check'):
         check(f'notes.md has "## {t}"', section(notes, t) is not None, f'add the section to {kb}/notes.md (SKILL-MAKER.md)')
     check('SETUP-REPORT.md has Questions and Checklist', bool(re.search(r'Question', report)) and bool(re.search(r'Checklist', report)),
-          'write REPORT per steps 11-12')
+          'write REPORT per steps 10 and 14')
     kbmd = os.path.join(kb, 'kb.md')
     check('kb.md <= 120 lines', os.path.exists(kbmd) and sum(1 for _ in open(kbmd)) <= 120, 'move details to notes.md / modules/')
 
@@ -171,7 +198,126 @@ def main(a):
         check('notes Coverage lists >= 3 decisions (file:line) for the CTC++ cross-check', len(re.findall(r'[\w/.-]+\.(?:cpp|cxx|cc|c):\d+', cov)) >= 3,
               'list 3-5 decisions with 2+ conditions (file:line) under "cross-check pending"')
 
-    # 10. repository untouched
+    # 10. workarounds: every category found by workarounds.py has a row with where, and a rule
+    wpath = os.path.join(kb, 'workarounds.md')
+    wtext = open(wpath).read() if os.path.exists(wpath) else ''
+    check('workarounds.md exists (step 8b)', bool(wtext), 'run workarounds.py and write KB_DIR/workarounds.md from resources/templates/workarounds.md')
+    if wtext:
+        wo = subprocess.run([sys.executable, os.path.join(HERE, 'workarounds.py'), repo, '--code'] + prof.get('code_paths', []) + prof.get('header_paths', [])
+                            + ['--tests'] + tdirs, capture_output=True, text=True).stdout
+        cats = re.findall(r'^- \*\*(.+?)\*\*', wo, re.M)
+        miss = [c for c in cats if c.lower() not in wtext.lower()]
+        check(f'workarounds.md has a row for every workarounds.py category ({len(cats)})', not miss, f'add rows for: {", ".join(miss)}')
+        rows = [r for r in table_rows(wtext) if len(r) >= 6 and r[0] != '#']
+        bad = [r[0] for r in rows if not re.search(r'[\w/.-]+:\d+|[\w/.-]+\.(?:txt|cmake|mk|yml|c|cpp|h|hpp)\b|[0-9a-f]{7}', r[2]) or not r[4] or r[4].startswith('<')]
+        check('every workarounds.md row has a Where (file:line or commit) and a Rule for new tests', rows and not bad,
+              f'rows {", ".join(bad[:6])}: fill Where and Rule (copy / never / ask / not a workaround: <reason>)')
+
+    # 11. learnings: a verdict with evidence for every ID
+    lpath = os.path.join(kb, 'learnings.md')
+    ltext = open(lpath).read() if os.path.exists(lpath) else ''
+    check('learnings.md exists (step 8c)', bool(ltext), f'python3 {HERE}/makercheck.py --skeleton learnings > {lpath}, then fill it')
+    if ltext:
+        rows = {r[0]: r for r in table_rows(ltext) if r and re.match(r'L\d+$', r[0])}
+        ids = [i for i, _ in learnings()]
+        miss = [i for i in ids if i not in rows]
+        bad = [i for i in ids if i in rows and (len(rows[i]) < 5 or rows[i][2].lower().split(' ')[0] not in ('yes', 'no', 'partly', 'unknown')
+                                                or not rows[i][3])]
+        norule = [i for i in ids if i in rows and len(rows[i]) >= 5 and rows[i][2].lower().startswith(('yes', 'partly')) and len(rows[i][4]) < 8]
+        pend = [i for i in ids if i in rows and 'pending' in ' '.join(rows[i]).lower()]
+        check(f'learnings.md has all {len(ids)} learnings, each with a verdict and evidence', not miss and not bad,
+              f'missing {", ".join(miss[:8])}; no verdict or evidence: {", ".join(bad[:8])}')
+        check('every "yes"/"partly" learning has a project rule', not norule, f'write the rule agents follow here: {", ".join(norule[:8])}')
+        check('no learning is left "pending study"', not pend, f'fill {", ".join(pend)} from the study findings (step 11)')
+
+    # 12. codebase map
+    cpath = os.path.join(kb, 'codebase.md')
+    ctext = open(cpath).read() if os.path.exists(cpath) else ''
+    check('codebase.md made by codemap.py (step 9)', 'Generated by codemap.py' in ctext, f'python3 {HERE}/codemap.py {kb} > {cpath}')
+    if ctext:
+        check('codebase.md <= 250 lines', len(ctext.splitlines()) <= 250, 'it is a map: shorten the agent sections, link to modules/')
+        comps = re.findall(r'^\| `([^`]+)` \|', section(ctext, 'Components') or '', re.M)
+        purp = section(ctext, 'Purpose of each component') or ''
+        nop = [c for c in comps if not re.search(r'^- `?' + re.escape(c) + r'`?\b.*\(source:', purp, re.M)]
+        check('codebase.md: every component has a purpose line with (source: ...)', comps and not nop, f'add: {", ".join(nop[:6])}')
+        for t in ('Domain words', 'Rules the code relies on', 'How the tests map to the code'):
+            sec = section(ctext, t) or ''
+            check(f'codebase.md "{t}" is filled', len(re.findall(r'^- ', sec, re.M)) >= 1, f'write the section (step 9); "- none: <why>" if empty')
+
+    # 13. the change-impact study on this codebase
+    sj = os.path.join(kb, 'study', 'study.json')
+    check('study/study.json exists (step 11)', os.path.exists(sj), 'follow resources/impact-study.md')
+    if os.path.exists(sj):
+        try:
+            st = json.load(open(sj))
+        except ValueError as e:
+            st = None
+            check('study.json is valid JSON', False, str(e))
+        if st:
+            sys.path.insert(0, HERE)
+            import impactstudy
+            cat = impactstudy.catalog()
+            sc = st.get('scenarios', [])
+            ids = {x.get('id') for x in sc}
+            miss = [i for i in cat if i not in ids]
+            check(f'study covers every reference ID ({len(cat)}), as a scenario or "na"', not miss, f'missing: {", ".join(miss)}')
+            live = [x for x in sc if not x.get('na')]
+            resd = os.path.join(kb, 'study', 'results')
+            got = {x['id']: json.load(open(os.path.join(resd, x['id'] + '.json'))) for x in live if os.path.exists(os.path.join(resd, x['id'] + '.json'))}
+            check(f'every scenario has a result ({len(got)}/{len(live)})', len(got) == len(live),
+                  f'impactstudy.py run: {", ".join(x["id"] for x in live if x["id"] not in got)[:120]}')
+            inc = [i for i, r in got.items() if r.get('prod_errors')]
+            check('no scenario with an incomplete edit (production code must compile)', not inc, f'add edits, run --force: {", ".join(inc)}')
+            nol = [x['id'] for x in live if len(x.get('lesson', '')) < 20]
+            check('every scenario has a lesson', not nol, f'write "lesson" for {", ".join(nol[:10])}')
+            nona = [x['id'] for x in sc if x.get('na') is not None and len(str(x.get('na'))) < 10]
+            check('every "na" says why', not nona, f'{", ".join(nona)}')
+            nexp = [x['id'] for x in live if x.get('expect') not in impactstudy.OUTCOMES or not x.get('why')]
+            check('every scenario has "why" and a prediction ("expect")', not nexp, f'{", ".join(nexp[:10])}')
+            ps = [x for x in live if x['id'] not in cat]
+            check('3+ scenarios from the project history (P*), or "history": <why none>', len(ps) >= 3 or len(str(st.get('history', ''))) > 10,
+                  'resources/impact-study.md step 3')
+            check('3+ findings', len(st.get('findings') or []) >= 3, 'write "findings" in study.json')
+            for f in ('STUDY.md', 'change-impact.md'):
+                fp = os.path.join(kb, f)
+                txt = open(fp).read() if os.path.exists(fp) else ''
+                newest = max([os.path.getmtime(os.path.join(resd, i + '.json')) for i in got] + [os.path.getmtime(sj)]) if got else 0
+                fresh = txt and os.path.getmtime(fp) >= newest and all(f'| {i} |' in txt for i in got)
+                check(f'{f} generated from the current results', bool(fresh),
+                      f'python3 {HERE}/impactstudy.py report {sj}{" --short" if f != "STUDY.md" else ""} > {fp}')
+
+    # 14. the project skill and the project playbooks
+    kid = os.path.basename(os.path.normpath(kb))
+    cands = []
+    for d in sorted(os.listdir(os.path.dirname(SKILL_DIR))):
+        sp_ = os.path.join(os.path.dirname(SKILL_DIR), d, 'SKILL.md')
+        if os.path.realpath(os.path.dirname(sp_)) != SKILL_DIR and os.path.exists(sp_) and kid in open(sp_, errors='replace').read():
+            cands.append(sp_)
+    check(f'a project skill next to ut names this KB ({kid})', bool(cands), f'step 12: create {os.path.dirname(SKILL_DIR)}/ut-<project>/SKILL.md')
+    if cands:
+        t = open(cands[0], errors='replace').read()
+        check('project skill has frontmatter name and description', bool(re.search(r'^---\s*\nname:\s*\S+.*\ndescription:\s*\S.{40,}', t, re.S)),
+              'start with --- / name: ut-<project> / description: <trigger words> / ---')
+        check('project skill <= 80 lines', len(t.splitlines()) <= 80, 'point to KB files instead of copying them')
+        rules = re.findall(r'^\d+\.\s.*$', section(t, 'Always') or '', re.M)
+        nosrc = [r[:40] for r in rules if not re.search(r'\([^)]*(?:KB|\.md|notes|study|seams|Commands)[^)]*\)\s*\.?\s*$', r)]
+        check('project skill "Always" has 1-12 rules, each ending with its KB source', 1 <= len(rules) <= 12 and not nosrc,
+              f'{len(rules)} rules; without a source: {"; ".join(nosrc[:3])}')
+        refs = set(re.findall(r'`((?:modules/)?[\w-]+\.md)`', section(t, 'Load when') or ''))
+        gone = [r for r in refs if not os.path.exists(os.path.join(kb, r)) and not os.path.exists(os.path.join(SKILL_DIR, r))
+                and not r.startswith(('resources/', 'SKILL'))]
+        check('every KB file the project skill loads exists', not gone, f'missing in {kb}: {", ".join(gone)}')
+    gen = sorted(os.path.splitext(f)[0] for f in os.listdir(os.path.join(SKILL_DIR, 'resources', 'playbooks')) if f.endswith('.md'))
+    pb = section(report, 'Playbooks') or ''
+    missp = [g for g in gen if not re.search(r'\b' + re.escape(g) + r'\b', pb)]
+    check(f'REPORT "## Playbooks" has a line for each generic playbook ({len(gen)})', not missp, f'add "<name>: same" or "<name>: KB override (<why>)" for {", ".join(missp)}')
+    kpb = os.path.join(kb, 'playbooks')
+    over = sorted(os.path.splitext(f)[0] for f in os.listdir(kpb) if f.endswith('.md')) if os.path.isdir(kpb) else []
+    said = re.findall(r'([\w-]+):\s*KB override', pb)
+    check('KB playbooks match the overrides named in REPORT', sorted(set(said)) == over and all(o in gen for o in over),
+          f'files: {over or "none"}; REPORT says: {said or "none"}; an override has the name of a generic playbook')
+
+    # 15. repository untouched
     gs = subprocess.run(['git', '-C', repo, 'status', '--porcelain'], capture_output=True, text=True).stdout
     dirty = [l for l in gs.splitlines() if not re.search(r'\s(build[\w-]*|\.ut)/?$', l.strip())]
     check('repository unchanged (git status: only build folders)', not dirty, 'restore: ' + ', '.join(dirty[:4]))

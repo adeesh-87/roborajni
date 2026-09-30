@@ -16,7 +16,8 @@ Mark it IN_PROGRESS with Owner ME in status.md and in the task file; one Log lin
 
 ## 2. Load exactly the task's Inputs
 The card file for its functions, `exemplars/test.md` (+ `mock.md` if the task mocks), the tool file, and
-`resources/playbooks/<type>.md`. Nothing else, unless the playbook says so. Any other code question goes to the index
+`resources/playbooks/<type>.md`, then `KB_DIR/playbooks/<type>.md` if it exists (it wins where they differ).
+Nothing else, unless the playbook says so. Any other code question goes to the index
 first (types, macros and constants too); grep and reading code files are the LAST resort (graph-queries.md, "Order of
 looking at code"): `"$I" source|refs|defs|find|list|card|deps|tests "$GD" <name>` with
 `I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"` (details: `resources/graph-queries.md`).
@@ -34,7 +35,8 @@ part, ask the orchestrator/user (never pick one yourself), note it in the task f
 <build>             > "$TASK/logs/$ME-Tnn-build.log" 2>&1; echo "exit=$?"
 <single-test cmd>   > "$TASK/logs/$ME-Tnn-run.log"   2>&1; echo "exit=$?"
 ```
-Failure → read the FIRST error; load `resources/tools/errors/<tool>.md` (once); fix; retry. Max 3 attempts per
+Failure → read the FIRST error; search `KB_DIR/workarounds.md` for its text, then load
+`resources/tools/errors/<tool>.md` (once); fix; retry. Max 3 attempts per
 distinct error, then BLOCKED / PARTIAL with the error text in the task file. Never weaken an assertion.
 Expected value disagrees with the code → do not change the test; open issue (category I); PARTIAL.
 All pass → run the whole group of that module once.

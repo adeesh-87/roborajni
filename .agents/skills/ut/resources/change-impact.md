@@ -5,7 +5,8 @@ hand-written fakes, plus a `--wrap` + CppUMock stub binary and a small C module)
 would: production code and its callers updated until it compiled, tests left untouched. Then the tests were built and run.
 Every row was run, none is a guess. The IDs (B2, T9, W3, ...) are the ones `hazards.py` and `wrapcheck.py` print.
 
-Use it to decide, for a diff, what will break, what will stay silent, and what the task must check or add.
+Use it to decide, for a diff, what will break, what will stay silent, and what the task must check or add. A
+codebase with its own study (`KB_DIR/change-impact.md`, made with `resources/impact-study.md`) uses that one instead.
 
 ## Summary
 

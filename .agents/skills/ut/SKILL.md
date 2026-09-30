@@ -30,6 +30,11 @@ continue here. Everything you learn goes into files; your memory is those files.
    need per project, recorded in KB `Test seams (decided)`. Use exactly the recorded one; never add a second one;
    undecided → ask the user once with `resources/test-seams.md`; a decision changes only when the user explicitly says so.
 8. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+9. This codebase's KB wins over the generic files where both exist: `KB_DIR/playbooks/<type>.md` is read after
+   `resources/playbooks/<type>.md`; `KB_DIR/change-impact.md` replaces `resources/change-impact.md`;
+   `KB_DIR/learnings.md` holds the project's verdict on each generic learning. On any build, link or run error, search
+   `KB_DIR/workarounds.md` for the error text before `resources/tools/errors/`. `KB_DIR/codebase.md` is the code map
+   (components, hotspots, rules the code relies on).
 
 ## Asking the user (question budget)
 - Look first, then ask. Show what you found in a table and ask the user to correct it; do not ask

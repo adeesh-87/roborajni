@@ -1,11 +1,21 @@
-# ut skill maker: fill the ut skill with real data from one codebase
+# ut skill maker: turn the ut skill into a skill for one real codebase
 
 Read this if you are an AI agent that was given this file, the `ut` skill folder, and a C/C++ repository. Your job:
-make the skill ready for THAT repository by filling its knowledge base with facts you have verified in the
-repository. Later agents, some of them small models, will write and fix unit tests from what you record, so
-record facts, not guesses.
+make the skill ready for THAT repository. Later agents, some of them small models, will write and fix unit tests
+from what you record, so record facts, not guesses.
 
-**You are done only when `python3 "$S/makercheck.py" "$KB_DIR" "$REPO"` prints `ALL PASS`** (step 10). It checks your
+The result has three layers:
+1. **What the skill already knows** (do not rewrite it): how to use the code index, clangd and llvm-cov; CppUTest and
+   its pitfalls; test seams; shared `--wrap` stubs; what code changes do to tests. It is all in `resources/`, and
+   `resources/learnings.md` lists every learning with a way to check it in a codebase. Read that list first:
+   it tells you what to look for.
+2. **What is true for this codebase** (you write it, in `KB_DIR`): commands, exemplars, conventions, the team's design
+   choices for tests and stubs, the workarounds it already uses and why, a map of the code, a verdict on every
+   learning, and the change-impact study re-run on this code with its own examples.
+3. **The project skill** (you design it): a short `ut-<project>` skill next to `ut` that triggers on this project and
+   says which KB file to read when. It also has project playbooks where the generic ones do not fit.
+
+**You are done only when `python3 "$S/makercheck.py" "$KB_DIR" "$REPO"` prints `ALL PASS`** (step 13). It checks your
 work and says what to fix for each FAIL. If it crashes, write the error into REPORT and do not report the work as done.
 
 ## Names
@@ -30,7 +40,7 @@ Write real absolute paths in every command; shell variables are not kept between
    new folders (`build-ut*`, `build-mcdc`). If a step needs a scratch test file, create it, build it, then delete it,
    and write in `REPORT` that you did. **Keep the build folders** when you finish: test-writing agents and
    `makercheck.py` use the binaries and objects in them. Never `rm -rf` them as a final cleanup.
-4. **Ask little.** Collect every question until step 11 and ask them in ONE message: at most 8, each with a default in
+4. **Ask little.** Collect every question until step 10 and ask them in ONE message: at most 8, each with a default in
    `[brackets]`. Ask earlier only when a step cannot continue (for example, you cannot build at all).
 5. **Keep it short.** `kb.md` is generated and stays under 120 lines. Details go to `$KB_DIR/notes.md` and
    `$KB_DIR/modules/<name>.md`. Examples go to `$KB_DIR/exemplars/`, copied verbatim from the repository.
@@ -41,6 +51,8 @@ Write real absolute paths in every command; shell variables are not kept between
    `"$S/ut" baseline --task "$TASK" --yes --run "<cmd>"` (also `--build`, `--clean`, `--env-setup`); it replaces the
    stored command and verifies it. Record a seam with `"$S/ut" seams --task "$TASK" --set need=ID --by "<who>"`. Your
    own notes go to `notes.md`, `modules/`, `exemplars/` and REPORT.
+9. **Every fact about this codebase goes into `KB_DIR`**, never into the generic files of `resources/`. A generic file
+   that is wrong for this codebase gets a verdict in `learnings.md` (step 8c) or a project playbook (step 12).
 
 ## What you produce (definition of done)
 | File | Made by | Must contain |
@@ -52,6 +64,11 @@ Write real absolute paths in every command; shell variables are not kept between
 | `KB_DIR/testscan.md`, `index/`, `modules/*.cards.md`, `diagrams/` | `ut kb` | generated |
 | `KB_DIR/notes.md` | you | Toolchain, Build notes, Stubs, Coverage, Change hazards, Index spot-check (sections below) |
 | `KB_DIR/modules/<name>.md` | you | purpose, files, tests, how to test, for the main modules |
+| `KB_DIR/workarounds.md` | step 8b | every workaround and test design choice: where, why, rule for new tests, the error it prevents |
+| `KB_DIR/learnings.md` | step 8c | a verdict with evidence for every learning in `resources/learnings.md` |
+| `KB_DIR/codebase.md` | step 9 | the code map: `codemap.py` facts, plus purpose, domain words, rules and test mapping |
+| `KB_DIR/study/`, `STUDY.md`, `change-impact.md` | step 11 | the change-impact study on this code, with lessons and findings |
+| `<skills>/ut-<project>/SKILL.md`, `KB_DIR/playbooks/` | step 12 | the project skill and the project playbooks |
 | `REPORT` | you | log, verified vs unverified, questions and answers, final checklist |
 
 ---
@@ -177,7 +194,7 @@ REPORT. Do not "fix" build files in the repository.
 ```sh
 "$S/ut" seams --task "$TASK"                 # shows the recorded decisions
 ```
-A need with no evidence stays `not decided`. It goes into the questions (step 11) with exactly these defaults, never
+A need with no evidence stays `not decided`. It goes into the questions (step 10) with exactly these defaults, never
 "not needed":
 | Need | Default | Question |
 |---|---|---|
@@ -274,17 +291,138 @@ Each line tells a later diff task what to check:
 - a changed constant → literal values;
 - a changed interface → fakes.
 
-## Step 9. Modules
-For the 5–10 most important production files (ask the user in step 11 if unclear; default: the largest files that have
-tests), create `modules/<name>.md` from `resources/templates/module.md`:
-- purpose in 1 line, from the header comment or docs, with its source;
+## Step 8b. Workarounds and design choices already made
+The team has already fought the problems in `resources/learnings.md`. Find how, and why:
+```sh
+python3 "$S/workarounds.py" "$REPO" --code <code paths> <header paths> --tests <test paths> <mock paths> \
+    --build <test build files and folders, CI scripts>
+```
+Create `$KB_DIR/workarounds.md` from `resources/templates/workarounds.md`:
+- **One row per category line of the output.** Every category stays. A category that is not a workaround gets a row
+  whose "Rule" says `not a workaround: <reason>`.
+- **One more row per comment or commit in the output that explains a choice** not covered by a category row.
+- **Where:** the file:line. Read the lines around it.
+- **Why:** the comment next to it; otherwise the commit that added it: `git -C "$REPO" log -L <n>,<n>:<file> --format='%h %s' -n 3`,
+  or `git -C "$REPO" log -S '<text>' --format='%h %s' -- <file>`. Nothing explains it → `unknown`, and a question.
+- **Rule for new tests:** `copy`, `never`, or `ask`, plus what exactly to copy.
+- **Error:** the exact message this workaround prevents or causes, from the commit, the comment, or the matching row
+  of `resources/tools/errors/*.md`. Test agents search this file with the error text they get, so write the text as
+  the tool prints it (`undefined reference to`, `Memory leak(s) found`, …).
+
+## Step 8c. A verdict on every learning
+```sh
+python3 "$S/makercheck.py" --skeleton learnings > "$KB_DIR/learnings.md"
+```
+Fill every row from what you recorded in steps 3–8b. Columns: Applies (`yes`, `no`, `partly` or `unknown`), Evidence
+(file:line, a command with its result, or a count) and Project rule (what agents do HERE).
+- `yes` and `partly` need a rule an agent can follow, e.g. "new C stubs declare `__typeof__`; old ones stay as they
+  are (the team's choice, question 4)". The project rule wins over the generic docs.
+- `no` says why the situation cannot happen, e.g. "no C++ in the code paths: `find src -name '*.cpp' | wc -l` = 0".
+- `unknown` goes into the questions; its evidence says what you looked at, e.g. "no CI file found".
+- L22–L25 are settled by your own study: write `pending study` now and fill them after step 11.
+
+## Step 9. The codebase map, and the main modules
+The code map gives a test writer the code's shape in one file: its components, how they call each other, where a
+change spreads, what is untested, and the rules the code relies on. It is built in two passes. First the facts the
+index can count:
+```sh
+python3 "$S/codemap.py" "$KB_DIR" > "$KB_DIR/codebase.md"      # after the coverage import of step 7
+```
+The components must be the units the team talks about (directories, libraries, drivers). If they are not, re-run
+with `--depth N` and say which depth in REPORT.
+
+Then write the four sections marked `(agent)`. Every line ends with its source:
+- **Purpose of each component:** one line per component row. Sources, in order: the file header comment of its main
+  file, a README or doc in its folder, doxygen `@file` / `@brief`, the `card` of its entry points.
+- **Domain words:** abbreviations and terms that appear in 3+ names or comments. Explain them from comments and docs.
+  Terms you cannot explain go into ONE question.
+- **Rules the code relies on:** look for asserts, "must" / "only" / "before" in comments, init functions, critical
+  sections and locks, ISR or task context, `volatile`, ownership (who frees). Each rule gets the file:line that shows
+  it and what a test must do about it, e.g. "call `uart_init()` in setup".
+- **How the tests map to the code:** the test binaries and what each links (the link lines in the build folder);
+  components that are tested only through others (TESTs reaching them, but no test file of their own); fixtures
+  shared across files.
+
+For C++, ask clangd what the index cannot show: the namespace and the header that provides a name, and the
+implementations of an interface (every fake breaks when it changes):
+```sh
+python3 "$S/clangd.py" "$REPO" "$REPO/build-ut" warm                # once: clangd's index, in build-ut/.cache
+python3 "$S/clangd.py" "$REPO" "$REPO/build-ut" hover <Class>        # "provided by <header>", namespace
+python3 "$S/clangd.py" "$REPO" "$REPO/build-ut" impl <Iface::method> # implementations, fakes included
+```
+Keep `codebase.md` under 250 lines: a map, not a copy of the code.
+
+Then, for the 5–10 most important production files (the hotspots and the components with the most TESTs, or what the
+user names), create `modules/<name>.md` from `resources/templates/module.md`:
+- purpose in 1 line, with its source;
 - files, and test files (`"$S/index.sh" tests ...`);
 - the cards file;
 - "how to test": fixture, fakes and stubs used, seams, from the existing tests.
 If a module is large or tricky (state machines, ISR/RTOS, protocol parsing, more than 40 functions), say so in REPORT:
 `resources/templates/decompose-codebase.md` lets a stronger model write deeper notes later.
 
-## Step 10. Validate what you made
+## Step 10. Questions for the user (ONE message)
+Only what the files could not answer, at most 8 questions, each with a default. Typical ones:
+1. Test seams not decided: "<need>: which technique? [<default from test-seams.md>]" (one line per need).
+2. "Is `exemplars/test.md` (<file>) the style every new test should copy? [yes]"
+3. Shared stubs: "Tests that want the real function call `mock("<fn>").ignoreOtherCalls()` (strict). Keep it? [yes]"
+4. "Must every stub declare `__real_`/`__wrap_` with `__typeof__(fn)`? It turns C signature changes into compile
+   errors. [yes, for new stubs]"
+5. Coverage: "Official measure and target? [CTC++, MC/DC, 100 % of the changed code]" and "May agents use clang 18
+   MC/DC locally as the stand-in? [yes]"
+6. Test agents' access: "May test-writing agents read code files after asking the index first? [yes]". On small code,
+   agents that could read wrote better tests (`resources/learnings.md` L01). The tool's default denies reading code;
+   `ut run --agent` takes the command to use.
+7. Workarounds whose reason you could not find (step 8b), in one question: "Why does <file:line> do <x>? [keep it,
+   reason unknown]". Also: "Do agents need to know about any other workaround, for example in a wiki or CI? [no]"
+8. Hazards, domain words or learnings you could not settle (steps 8, 8c, 9), and anything that failed to build or run.
+Record each answer where it belongs:
+- seams: `"$S/ut" seams --task "$TASK" --set need=ID` (the user's answer). If the user cannot answer now and you were told
+  to go on with defaults: `... --set need=ID --by "default, not confirmed by the user"`;
+- conventions: KB `Conventions (approved on <date>)`;
+- workarounds and learnings: the row in `workarounds.md` / `learnings.md`, with "asked: <date>" as the source;
+- everything else: notes.md.
+Then record the answers in REPORT.
+
+Ask the questions before step 11: the study runs for a while, and the user can answer meanwhile.
+
+## Step 11. The change-impact study, on this codebase
+`resources/change-impact.md` says what 46 kinds of change did to the tests of a toy codebase. Re-run the study on
+this codebase so every row has a real example from it, plus rows for changes from the team's own git history.
+Follow `resources/impact-study.md`. In short:
+1. `$KB_DIR/study/study.json`: the build in `build-study` with gcov and keep-going, the test binaries, and one
+   scenario per reference ID. Each scenario is a real target in this code, or `na` with the reason.
+2. Add 3–6 `P` scenarios replayed from the git history. They cover the kinds of change the team really makes.
+3. Write `why` and `expect` for each scenario before running.
+4. `impactstudy.py setup`, then `check` until OK, then `run` (background it; it resumes).
+5. `EDIT INCOMPLETE` means the edit is not finished yet: add edits for the named production files, then `--force`.
+6. Write a `lesson` per scenario (real files, stubs and tests here) and 3–6 `findings`.
+7. `report > $KB_DIR/STUDY.md` and `report --short > $KB_DIR/change-impact.md`.
+Then fill L22–L25 in `learnings.md` from the findings, and add each hazard line the study confirmed to notes.md
+`Change hazards` as `confirmed by <ID>`.
+
+## Step 12. Design the project skill
+The `ut` skill stays generic. The project skill is a short entry point that makes an agent pick up this project's
+knowledge at the right moment:
+1. Create `<SKILL_DIR>/../ut-<project>/SKILL.md` from `resources/templates/project-skill.md`, where `<project>` is a
+   short lower-case name.
+   - **description:** the words a user or an agent would use about this code: the repository name, 3–6 component
+     or product names from `codebase.md`, the test binaries. That is how the skill gets picked.
+   - **Always:** at most 12 rules. Take the ones that decide whether a new test builds and matches the team's style:
+     commands, exemplar, registration, seams, stub mode, the top workarounds (`copy` / `never` rows), the hazards
+     the study confirmed. Each rule names its KB source.
+   - **Load when:** keep the table. Remove a row only if its file does not exist.
+   - At most 80 lines. It points to KB files and never copies them.
+2. Read each generic playbook (`resources/playbooks/*.md`) against what you found. Where this project does it
+   differently, write `$KB_DIR/playbooks/<same name>.md` with ONLY the differences and their sources. Examples: stubs
+   are the shared `--wrap` files, so `fix-mocks` differs; tests are registered in two lists, so `add-tests` differs.
+   Record one line per playbook in REPORT `## Playbooks`, in the form `<name>: same` or `<name>: KB override (<why>)`.
+   The ut tool and executors read the KB playbook after the generic one.
+3. Dry-run the project skill as a new agent would. Read only its SKILL.md, and for 3 situations (a new test for a
+   hotspot function, a link error, a diff that changes a struct), check that the rules and the "Load when" rows
+   lead to the right KB file. Fix what does not. Record the 3 checks in REPORT.
+
+## Step 13. Validate what you made
 First run the checker, and fix what it reports until it prints `ALL PASS`:
 ```sh
 python3 "$S/makercheck.py" "$KB_DIR" "$REPO"
@@ -309,35 +447,16 @@ Also dry-run one real task to see what a test-writing agent would receive:
 Read the prompt. Every fact in it must be right: include lines, fixture, seam, stub names. Fix the KB where it is not,
 never the prompt.
 
-## Step 11. Questions for the user (ONE message)
-Only what the files could not answer, at most 8 questions, each with a default. Typical ones:
-1. Test seams not decided: "<need>: which technique? [<default from test-seams.md>]" (one line per need).
-2. "Is `exemplars/test.md` (<file>) the style every new test should copy? [yes]"
-3. Shared stubs: "Tests that want the real function call `mock("<fn>").ignoreOtherCalls()` (strict). Keep it? [yes]"
-4. "Must every stub declare `__real_`/`__wrap_` with `__typeof__(fn)`? It turns C signature changes into compile
-   errors. [yes, for new stubs]"
-5. Coverage: "Official measure and target? [CTC++, MC/DC, 100 % of the changed code]" and "May agents use clang 18
-   MC/DC locally as the stand-in? [yes]"
-6. Test agents' access: "May test-writing agents read code files after asking the index first? [yes]". On small code,
-   agents that could read wrote better tests (experiments/lsp-vs-graphify/RESULTS.md). The tool's default denies
-   reading code; `ut run --agent` takes the command to use.
-7. Hazards you could not settle (step 8).
-8. Anything that failed to build or run (step 3).
-Record each answer where it belongs:
-- seams: `"$S/ut" seams --task "$TASK" --set need=ID` (the user's answer). If the user cannot answer now and you were told
-  to go on with defaults: `... --set need=ID --by "default, not confirmed by the user"`;
-- conventions: KB `Conventions (approved on <date>)`;
-- everything else: notes.md.
-Then record the answers in REPORT.
-
-## Step 12. Final report
+## Step 14. Final report
 Finish `REPORT` with:
 - **The last output of makercheck.py**, verbatim.
 - **Checklist** (each ✓ or ✗ with the reason): toolchain recorded; profile; build, run and one-group commands verified;
   compile DB includes tests; index built and spot-checked; exemplar, register and mock verified by the smoke test;
   seams decided or asked; stubs checked (wrapcheck); coverage commands (official measure verified or UNVERIFIED;
-  clang MC/DC baseline); hazards reviewed; modules; dry-run prompt correct; repository unchanged.
+  clang MC/DC baseline); hazards reviewed; workarounds with reasons; learnings with verdicts; codebase map; study
+  (scenarios run, n/a, predictions right); project skill and playbooks; dry-run prompt correct; repository unchanged.
 - **Unverified** items, each with what is needed to verify it.
-- **Next**: "the skill is ready: start a task with `SKILL.md` (agent-driven) or `resources/scripts/ut init` (tool-driven)".
+- **Next**: "the skill is ready: ask for unit-test work on <project> (the `ut-<project>` skill picks it up), or run
+  `resources/scripts/ut init` (tool-driven)".
 
 Keep the KB folder with the skill (`resources/kb/README.md` says how). Every later task reads it and adds to it.

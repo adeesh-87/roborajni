@@ -59,6 +59,9 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
         body = read(os.path.join(st['repo'], t['test_file']))
         P.append(f"\n## Current test file {t['test_file']} ({len(body.splitlines())} lines; add to it)\n```cpp\n{body[:6000]}\n```")
     P.append('\n## Playbook\n' + read(os.path.join(RES, 'playbooks', f"{t['type']}.md")))
+    kpb = read(os.path.join(kb_dir, 'playbooks', f"{t['type']}.md"))
+    if kpb:
+        P.append('\n## Project playbook (this codebase; wins where it differs from the playbook above)\n' + kpb)
     tool_md = read(os.path.join(RES, FRAMEWORKS[fw]['tool_md']))
     P.append('\n## Framework syntax\n' + tool_md)
     if error:
@@ -67,6 +70,11 @@ def prompt_for(st, kb_dir, t, error=None, review=None):
         rows = [l for l in errs.splitlines() if l.startswith('| ') and any(k in l for k in error_keys(error))]
         if rows:
             P.append('Known causes for these messages:\n' + '\n'.join(rows[:6]))
+        wk = read(os.path.join(kb_dir, 'workarounds.md'))
+        wkeys = error_keys(error) - {'error'}
+        wrows = [l for l in wk.splitlines() if l.startswith('| ') and any(k.lower() in l.lower() for k in wkeys)]
+        if wrows:
+            P.append('This project already handles these messages (KB workarounds.md; follow its rule):\n' + '\n'.join(wrows[:6]))
         P.append('Fix the cause in the files you may write. Do not weaken or delete an assertion to make a test pass.')
     if review:
         P.append('\n## The user reviewed your test file and asks for these changes:\n' + review + '\nApply them to the same file.')

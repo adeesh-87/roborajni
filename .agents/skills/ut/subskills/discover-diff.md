@@ -20,6 +20,11 @@ new-dependency, moved/renamed, type/macro), tests reaching it, mocks/stubs/fakes
 Rows for test/mock files already changed on the branch are marked H: read them, do not redo that work.
 `impact` failed (index missing or stale) → `"$I" refresh "$GD"` and run it again.
 
+Then check the silent kinds. For each row whose change kind appears in `KB_DIR/change-impact.md` (this codebase's
+study; else `resources/change-impact.md`) as `⬜ nothing` or `🟪 crash`, add that row's lesson to the work item. For
+each changed file named in notes.md `Change hazards`, add that hazard line. These are the changes no build or test
+failure will report.
+
 ## 3. Present
 Show the summary line and the table grouped by category. Do not read the details unless a row is unclear.
 More than 40 rows → write `complex` next to the Work items header (the planner escalates). Tick phase 4.
