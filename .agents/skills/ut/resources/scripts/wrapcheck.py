@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """wrapcheck.py REPO BUILD_DIR [--stubs DIR ...] [--link-cmd FILE ...] : consistency of --wrap stubs (the shared
 __wrap_fn / __real_fn pattern) with the link flags and the compiled code. Each finding names the failure it prevents
-(the IDs are the scenarios of experiments/change-impact/STUDY.md).
+(the IDs are rows of resources/change-impact.md).
 
   flag without stub      --wrap=fn but no __wrap_fn definition           -> link error: undefined __wrap_fn   (W4)
   stub without flag      __wrap_fn defined but fn not wrapped           -> link error on __real_fn, or the stub never runs (W5)

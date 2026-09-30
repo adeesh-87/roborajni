@@ -6,6 +6,8 @@ For each row `F` (file `S`):
 "$I" deps  "$GD" F        # what F needs mocked            → column "Mocks affected"
 "$I" defs  "$GD" F        # mocks / fakes / overloads named F
 ```
+What each kind of change did to real tests (compile error, failing test, or silent), and what to check for the silent
+ones: `resources/change-impact.md`.
 Signature or behaviour changes also hit F's callers: `"$I" refs "$GD" F` → their tests may mock F.
 (`I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"`)
 

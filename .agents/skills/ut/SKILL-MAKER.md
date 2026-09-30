@@ -258,6 +258,8 @@ Read `resources/tools/ctc.md` and `resources/tools/llvm-mcdc.md` first.
      `L93`, and prefer decisions with 2+ conditions.
 
 ## Step 8. Change hazards (where a change breaks tests silently)
+First read `$SKILL_DIR/resources/change-impact.md`: 46 kinds of change and what each did to the tests (compile
+error, link error, failing test, crash, or nothing). The IDs in the scanner output (T3, T6, T9, H3, W3, ...) are its rows.
 ```sh
 python3 "$S/hazards.py" "$REPO" --code <code paths> <header paths> --tests <test paths> <mock paths>
 ```

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """hazards.py REPO --code DIR... --tests DIR... : places where a code change breaks tests silently or confusingly, found
-by text scan (scenario IDs refer to experiments/change-impact/STUDY.md). Prints Markdown for KB notes.md
+by text scan (scenario IDs are rows of resources/change-impact.md). Prints Markdown for KB notes.md
 "Change hazards"; every line has file:line so a later task can check it after a change.
 
   test source list   the test build lists production sources itself: a new source file links in the app, not in the tests (H3)
