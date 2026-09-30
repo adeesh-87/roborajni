@@ -106,8 +106,10 @@ def score():
                 continue
             if m.get('type') == 'result':
                 res = m
-        rc, out = sh('./mcdc.sh', repo, env=dict(os.environ, UT_SCRIPTS=SCRIPTS, MCDC_VIEW='raw'))
-        m = re.search(r'MC/DC of src/: (\d+) conditions, (\d+) not shown independent', out)
+        rc, out = sh('./mcdc.sh', repo, env=dict(os.environ, UT_SCRIPTS=SCRIPTS))
+        _, rep = sh('llvm-cov report build-mcdc/tests/unit_tests -instr-profile=build-mcdc/ut.profdata -show-mcdc-summary src/*.cpp | tail -1', repo)
+        t = rep.split()
+        m = re.match(r'(\d+) (\d+)', f'{t[-3]} {t[-2]}') if len(t) >= 3 else None
         tests = re.search(r'^(OK|Errors) \((\d+) tests?[^)]*\)', out, re.M)
         changed = sh('git status --porcelain -- src include client tests', repo)[1].split('\n')
         illegal = [c for c in changed if c.strip() and 'tests/mcdc_test.cpp' not in c]
