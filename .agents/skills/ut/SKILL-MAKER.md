@@ -102,8 +102,10 @@ Make each one work in a NEW build folder and record the exact command:
    then `cmake --build build-ut -j`. For Make: `bear -- make <target>` writes `compile_commands.json` (install bear if
    allowed). No way to get one → record `compile_db: none`: the index then parses without the build's flags, which
    misses macros and `#if` branches. Say so in Build notes.
-2. **Run all tests.** Record the summary line exactly. Examples: `OK (215 tests, 215 ran, ...)` for CppUTest,
-   `[  PASSED  ] 42 tests.` for gtest.
+2. **Run all tests.** The run command must name the real binary path (`ls <path>` must succeed). Record the summary
+   line exactly: `OK (215 tests, 215 ran, ...)` for CppUTest, `[  PASSED  ] 42 tests.` for gtest.
+   **Several test executables:** the main one holds most test files. Put it in the run command, and list the others
+   with their purpose in Build notes.
 3. **Run one group or test.** CppUTest `-sg <Group>` / `-sn <Name>`; gtest `--gtest_filter=Group.*`; Unity: one
    executable per file.
 4. **The compile DB must include the TEST files.** Check with
@@ -122,21 +124,30 @@ REPORT. Do not "fix" build files in the repository.
 "$S/index.sh" stats "$KB_DIR/index"
 ```
 - The build output must say `preprocessed with compile flags`. Files reported as `not preprocessed` go to Build notes.
-- **Spot-check before anyone trusts the index.** Pick 3 production functions: one C function with calls, one C++
-  method called on a local object, and one function that calls through an interface or a function pointer. For each:
-  1. run `"$S/index.sh" card "$KB_DIR/index" <name>`, then `deps` and `refs`;
-  2. read the function's source lines (`"$S/index.sh" source ...`);
-  3. compare: every call in the source should be under Calls, and every caller you can find with grep under Callers.
-  Record the result in notes.md `## Index spot-check` as `<function>: calls 5/5, callers 3/4 (missed: <x>, reason)`.
-- What we measured on other codebases: Graphify answers were near-perfect on C, but in C++ it confused same-named
-  methods of different classes, picked the wrong const overload, and missed constructor calls. If your spot-check
-  shows misses like these, write in notes.md: "C++: confirm callers/callees by reading the named lines".
+- **Spot-check the index before anyone trusts it:**
+  ```sh
+  python3 "$S/spotcheck.py" "$KB_DIR" "$REPO" <F1> <F2> <F3> <F4> <F5>
+  ```
+  Choose 5 production functions that tests call. In C++, include at least 2 methods whose name also exists in another
+  class (`"$S/index.sh" defs "$KB_DIR/index" <short name>` shows 2+ definitions).
+  - Paste the script's lines verbatim into notes.md `## Index spot-check`.
+  - For each line that says `INDEX MAY MISS CALLERS`: read 2 of the listed TESTs, then add a line
+    `confirmed: the index misses <N> TEST callers of <F> (<why, e.g. calls on a local object>)`, or `not confirmed: <why>`.
+  - Any confirmed miss: add the line "C++: the index can miss callers of methods called on objects; confirm test
+    callers with a text search" to KB Conventions.
+  - Background: on other codebases, Graphify was near-perfect on C. In C++ it confused same-named methods of
+    different classes, picked the wrong const overload, and missed constructor calls.
 
 ## Step 5. How tests are written here (exemplars and conventions)
 `ut kb` drafted `testscan.md`, `exemplars/*.md` and KB `Conventions`. Check and complete them:
-1. **Exemplar.** It must be a real test file that follows the most common style (see the counts in testscan.md), copied
-   verbatim, cut to at most 80 lines, with each part labelled in a comment column. Replace the draft if it picked an
-   atypical file.
+1. **Exemplar.** Choose it by these rules, in order:
+   - it comes from the test executable with the most test files;
+   - it uses the fixture, assert and double style that most test files use (testscan.md counts);
+   - it is NOT a file that exists to test a special mechanism (wrap stubs, include-source, a timing harness), unless
+     most test files do the same;
+   - it is short, with 3–10 tests.
+   Copy it verbatim, cut to at most 80 lines, with each part labelled in a comment column. The draft from `ut kb` is
+   only a candidate: replace it when it breaks a rule.
 2. **Register.** Record the exact lines that add a test file to the build, with `file:line`. Several test executables
    → describe which one a new test for module X joins.
 3. **Conventions.** At most 12 lines, each with a count ("61 of 68 test names follow `<Func>_<Cond>_<Expected>`").
@@ -156,7 +167,15 @@ REPORT. Do not "fix" build files in the repository.
 ```sh
 "$S/ut" seams --task "$TASK"                 # shows the recorded decisions
 ```
-A need with no evidence stays `not decided`: put it into the questions (step 11) with the default from test-seams.md.
+A need with no evidence stays `not decided`. It goes into the questions (step 11) with exactly these defaults, never
+"not needed":
+| Need | Default | Question |
+|---|---|---|
+| access (static / private / anonymous namespace) | A1 test through the public callers | `access: which technique? [A1]` |
+| replace (a collaborator, whole binary) | B1 link-seam (C), B2 interface injection (C++ with interfaces) | `replace: which technique? [B1 or B2]` |
+| per-test (mock in one test, real in another) | C5 separate binaries (C1 if a function pointer exists) | `per-test: which technique? [C5]` |
+| hardware (registers, HAL macros) | D1 register header seam | `hardware: which technique? [D1]` |
+| state (file-static state between tests) | E4 call the public init in setup() | `state: which technique? [E4]` |
 Never set a seam yourself. `ut seams --set` is only for the user's answer.
 
 ### 6b. Shared `--wrap` stubs (if the project uses `__wrap_` / `__real_`)
@@ -172,7 +191,14 @@ Inventory them in notes.md `## Stubs`:
   - no wrapped function is inline or weak in the objects that call it (then the wrap is silently bypassed);
   - C stubs declare `__real_`/`__wrap_` with `__typeof__(fn)`.
   Findings are facts for the report. Do not fix them in the repository.
-- **The mode each stub uses**, found by reading 3 stubs and 3 tests that use them:
+- **The mode each stub uses.** Decide it by commands, not by impression:
+  ```sh
+  grep -n "expectedCallsLeft" <stub files>          # any hit -> lenient; none -> strict
+  grep -rn "ignoreOtherCalls" <test paths> | head   # how strict-mode tests ask for the real function
+  grep -rn "ignoreOtherParameters" <test paths> | head
+  ```
+  Write `mode: strict` or `mode: lenient` in notes.md `## Stubs` with the grep evidence, then fill this table by
+  reading 3 stubs and 3 tests that use them:
   | Question | Record |
   |---|---|
   | Strict or lenient? | Strict: `actualCall` always; tests that want the real function call `mock("<scope>").ignoreOtherCalls()`. Lenient: the stub checks `expectedCallsLeft()` first. |
@@ -182,10 +208,15 @@ Inventory them in notes.md `## Stubs`:
   | Output parameters | `withOutputParameter` in the stub + `withOutputParameterReturning` in tests? |
   | No-real functions | Stubs without `__real_` (hardware, OS): list them |
   | Teardown | `mock().checkExpectations(); mock().clear();` in every group, or a plugin |
-- **Exemplar.** `exemplars/mock.md` holds one real stub verbatim, plus one test that mocks it, one that spies (the real
-  function runs and the call is checked), and one that lets the real function run.
+- **Exemplar (required whenever the tests use any test double).** `exemplars/mock.md` holds one real stub verbatim,
+  plus 3 excerpts from real tests, each copied with `file:line`:
+  - a test that mocks it (expectation with a return value);
+  - one that spies (expectation without a return value: the real function runs and the call is checked);
+  - one that lets the real function run (`ignoreOtherCalls`).
+  A kind that no test uses yet: write `none in the tests yet`. Never leave the file empty when doubles exist.
 - **Other styles** (link-seam fakes, CMock, gMock, hand-written interface fakes): same inventory. Where are they, and
   is there one shared fake per interface or one per test file? `hazards.py` in step 8 lists the interface fakes.
+  mock.md then holds one real fake verbatim, plus the test lines that set it up and check it.
 
 ## Step 7. Coverage and MC/DC
 Read `resources/tools/ctc.md` and `resources/tools/llvm-mcdc.md` first.
@@ -194,7 +225,8 @@ Read `resources/tools/ctc.md` and `resources/tools/llvm-mcdc.md` first.
    - CTC++ installed here: run it once on the test build and record the TER totals.
    - Not installed: record the commands `UNVERIFIED: CTC++ not on this machine`.
 2. **The local MC/DC stand-in (clang 18+).** Only if clang ≥ 18 and llvm-cov exist (step 0): build the TEST target in
-   `build-mcdc` with `-O0 -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc`, run it, merge, and import:
+   `build-mcdc` with `-O0 -fprofile-instr-generate -fcoverage-mapping -fcoverage-mcdc`. Save the build output:
+   `cmake --build build-mcdc ... 2>&1 | tee "$TASK/mcdc-build.log"`. Then run, merge and import:
    ```sh
    LLVM_PROFILE_FILE="$REPO/build-mcdc/ut-%p.profraw" <test binary>
    llvm-profdata merge -sparse "$REPO"/build-mcdc/*.profraw -o "$REPO/build-mcdc/ut.profdata"
@@ -204,21 +236,26 @@ Read `resources/tools/ctc.md` and `resources/tools/llvm-mcdc.md` first.
    Record in notes.md `## Coverage`:
    - the build command;
    - the `MC/DC: x/y conditions` line;
-   - the compile warnings `exceeds max (6)`: decisions that clang 18 cannot measure and CTC++ will;
+   - the count of compile warnings `exceeds max (6)` (`grep -c "exceeds max" "$TASK/mcdc-build.log"`), written as
+     `exceeds max (6) warnings: N`, and the file:line of each: decisions that clang 18 cannot measure and CTC++ will;
    - any `constant folded` conditions.
    If the build needs a flag or a library it does not have (for example `libclang-rt-18-dev` on Ubuntu), write the fix
    into Build notes.
 3. **Cross-check** (llvm-mcdc.md, "Relation to CTC++"):
    - CTC++ available: compare 3–5 decisions and record "clang MC/DC matches CTC++: yes / deviations: ...".
-   - Otherwise list those 5 decisions (file:line) under "cross-check pending", so a person with CTC++ can do it later.
+   - Otherwise list those 5 decisions under "cross-check pending", as `src/x.cpp:93  (!blk || blk->owner != a.session)`,
+     so a person with CTC++ can do it later. Take them from the `uncovered` lines: file from `(file:line)`, line from
+     `L93`, and prefer decisions with 2+ conditions.
 
 ## Step 8. Change hazards (where a change breaks tests silently)
 ```sh
 python3 "$S/hazards.py" "$REPO" --code <code paths> <header paths> --tests <test paths> <mock paths>
 ```
-Paste the output into notes.md `## Change hazards`, then review each line. Delete false alarms, marked with the reason
-(for example "the 64s in memory tests are sizes, not kMemAlign"). Keep the true ones. Each line tells a later
-diff task what to check:
+Paste the output into notes.md `## Change hazards`, then review each line:
+- **Every line stays.** A false alarm keeps its line and gets `false alarm: <reason>` added, for example "the 64s in
+  memory tests are sizes, not kMemAlign". Never delete a line, and never shorten the list to "the main ones".
+- A true line gets `confirmed` plus 1 example from the code or the tests.
+Each line tells a later diff task what to check:
 - new source files → the test source list;
 - a count that grows → sized tables;
 - reordered struct fields → positional initialisers;
@@ -236,7 +273,11 @@ If a module is large or tricky (state machines, ISR/RTOS, protocol parsing, more
 `resources/templates/decompose-codebase.md` lets a stronger model write deeper notes later.
 
 ## Step 10. Validate what you made
-Run each check and record `PASS` / `FAIL: <why>` in REPORT:
+First run the checker, and fix what it reports until it prints `ALL PASS`:
+```sh
+python3 "$S/makercheck.py" "$KB_DIR" "$REPO"
+```
+Then run each check below and record `PASS` / `FAIL: <why>` in REPORT:
 ```sh
 "$S/index.sh" selftest                                   # the index tooling works on this machine
 "$S/index.sh" card "$KB_DIR/index" <a production function>   # a card with decisions, calls, callers, tests
@@ -276,6 +317,7 @@ Then record the answers in REPORT.
 
 ## Step 12. Final report
 Finish `REPORT` with:
+- **The last output of makercheck.py**, verbatim.
 - **Checklist** (each ✓ or ✗ with the reason): toolchain recorded; profile; build, run and one-group commands verified;
   compile DB includes tests; index built and spot-checked; exemplar, register and mock verified by the smoke test;
   seams decided or asked; stubs checked (wrapcheck); coverage commands (official measure verified or UNVERIFIED;
