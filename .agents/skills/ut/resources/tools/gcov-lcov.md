@@ -56,6 +56,10 @@ llvm-cov report ./tests -instr-profile=tests.profdata src/       # summary
 llvm-cov show   ./tests -instr-profile=tests.profdata src/sensor.c -show-branches=count
 ```
 (Clang can also emit gcov data with `--coverage`; then use `llvm-cov gcov` in place of `gcov`.)
+MC/DC (clang 18+: `-fcoverage-mcdc`), the index import and the per-condition gap list: `llvm-mcdc.md`.
 
 
 Build or run fails → load `resources/tools/errors/gcov-lcov.md` (error messages and fixes).
+
+Into the code index: `index.sh cov-import "$KB_DIR/index" --gcov-dir <build dir>` (best: drops the exception arcs
+that make a fully tested `if` look partial) or `--lcov file.info`; then `index.sh uncovered "$KB_DIR/index"`.

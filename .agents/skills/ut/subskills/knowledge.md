@@ -1,7 +1,7 @@
 # Phase 3 — Knowledge
 
 Goal: `KB_DIR` holds everything a test writer needs about THIS codebase, in the form a small model uses best:
-one real example to copy, counted facts, and one card per function. No questions in this phase.
+one real example to copy, counted facts, one card per function and diagrams. No questions in this phase.
 
 ## 1. KB folder
 ```sh
@@ -14,14 +14,14 @@ Not writable → use `$TASK/kb/` instead and record it. Fill KB `Identity` and `
 to `resources/kb/INDEX.md`. Record `KB dir` in Config. Never open another codebase's KB folder.
 KB exists with `Conventions approved on <date>` and the code did not change much → do only steps 2 and 5, then finish.
 
-## 2. Code graph (always; local; about a minute)
+## 2. Code index (always; local; seconds to a minute)
 ```sh
-G="$SKILL_DIR/resources/scripts/graphify.sh"; GD="$KB_DIR/graphify"
-"$G" setup                                    # once per machine (Python 3.10+); falls back to the bash map by itself
-"$G" build --cdb <compile DB from KB Commands> "$GD" <code paths> <test paths> <mock paths>   # omit --cdb if none
+I="$SKILL_DIR/resources/scripts/index.sh"; GD="$KB_DIR/index"
+"$I" setup                                     # once per machine (Python 3.10+)
+"$I" build --cdb <compile DB from KB Commands> "$GD" <code paths> <header paths> <test paths> <mock paths>   # omit --cdb if none
 ```
-Check the output for `preprocessed with compile flags` (good) and `not preprocessed` / syntax warnings (record those
-files in KB `Build notes`). How to ask the graph questions: `resources/graph-queries.md` (load it when needed).
+Check the output for `preprocessed with compile flags` (good) and `not preprocessed` / syntax warnings: record those
+files in KB `Build notes`. How to ask the index: `resources/graph-queries.md`.
 
 ## 3. How the existing tests are written
 ```sh
@@ -39,11 +39,16 @@ Write:
   top asserts, mock API, `extern "C"`, statics access). Mark `DRAFT (from N files); approved: no`.
 No tests exist → write `greenfield` in Conventions; the pilot will create the exemplars.
 
-## 4. Module cards (in-scope code only)
-For each in-scope source file `F` (from Config paths and the request):
+Test seams already in use (evidence table at the end of `resources/test-seams.md`; grep is right here: it looks at
+test and build files): for each hit write KB `Test seams` `<need>: <ID> ... (detected in the existing tests, <date>,
+evidence file:line)`. Two techniques for one need → record the first, name the other under it ("also in old tests; do
+not use for new tests") and tell the user in one line.
+
+## 4. Module cards and diagrams (in-scope code only)
+For the in-scope source files `F...` (from Config paths and the request):
 ```sh
-"$G" card "$GD" F  > "$KB_DIR/modules/<basename of F>.cards.md"
-"$G" deps "$GD" F >> "$KB_DIR/modules/<basename of F>.cards.md"
+"$I" kb-cards "$GD" "$KB_DIR" F...          # KB_DIR/modules/<basename>.cards.md = cards + dependencies per file
+"$I" diagrams "$GD" "$KB_DIR/diagrams"       # Mermaid text: flow/, seq/, scenarios/, SCENARIOS.md, INDEX.md
 ```
 Create `KB_DIR/modules/<name>.md` from `resources/templates/module.md` if missing: purpose (1 line, from the header
 comment or file name), files, test file(s) (from testscan / graph `tests`), the cards file name.

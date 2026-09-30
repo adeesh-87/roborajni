@@ -1,0 +1,24 @@
+== libcanard / graphify  (load 0.0s, 0.0 ms/question, no answer {})
+  callees-prod  tp   187 fp     1 fn     0   P 0.995  R 1.000  F1 0.997
+  callees-test  tp  1859 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  callers-prod  tp   187 fp     1 fn     0   P 0.995  R 1.000  F1 0.997
+  callers-test  tp   885 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  ctor/dtor     tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  def           tp   114 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  virtual       tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+== libcanard / clangd  (load 0.3s, 36.9 ms/question, no answer {})
+  callees-prod  tp   160 fp     8 fn    27   P 0.952  R 0.856  F1 0.901
+  callees-test  tp  1844 fp     9 fn    15   P 0.995  R 0.992  F1 0.994
+  callers-prod  tp   161 fp     8 fn    26   P 0.953  R 0.861  F1 0.904
+  callers-test  tp   882 fp     2 fn     3   P 0.998  R 0.997  F1 0.997
+  ctor/dtor     tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  def           tp   112 fp     2 fn     0   P 0.982  R 1.000  F1 0.991
+  virtual       tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+== libcanard / clangd-graph  (load 33.6s, 0.1 ms/question, no answer {})
+  callees-prod  tp   161 fp     7 fn    26   P 0.958  R 0.861  F1 0.907
+  callees-test  tp  1844 fp     9 fn    15   P 0.995  R 0.992  F1 0.994
+  callers-prod  tp   159 fp     7 fn    28   P 0.958  R 0.850  F1 0.901
+  callers-test  tp   882 fp     2 fn     3   P 0.998  R 0.997  F1 0.997
+  ctor/dtor     tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000
+  def           tp   112 fp     2 fn     0   P 0.982  R 1.000  F1 0.991
+  virtual       tp     0 fp     0 fn     0   P 1.000  R 1.000  F1 1.000

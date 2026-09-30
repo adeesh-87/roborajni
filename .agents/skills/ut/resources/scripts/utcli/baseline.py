@@ -43,6 +43,8 @@ def run_baseline(st, root, kb):
         fw = prof.get('framework') or ''
         summ = parse_summary(fw, rout) if fw else None
         res['tests'] = f"{summ['passed']}/{summ['total']} passed, {summ['failed']} failed" if summ else ('exit 0' if rc2 == 0 else f'exit {rc2}')
+        # the run command is verified only when it ran tests (a wrong path exits non-zero or prints no summary)
+        res['run_ok'] = bool(summ and summ['total']) or (rc2 == 0 and not fw)
         res['problems'] += [f'test: {f}' for f in failures(fw, rout)] if fw else []
         if not fw and 'No tests were found' in rout or (summ is None and fw and 'test' not in rout.lower()):
             res['tests'] = 'none (greenfield?)'
@@ -58,14 +60,17 @@ def run_baseline(st, root, kb):
     m = re.search(r'-B\s*(\S+)', c['build'])
     if m:                                                   # binaries of the configured build dir first
         bins = sorted(bins, key=lambda b: 0 if b.startswith(m.group(1).rstrip('/') + '/') else 1)
+    named = [b for b in bins if b in c['run'] or os.path.basename(b) in c['run'].split()]
+    bins = named + [b for b in bins if b not in named]          # the binary the run command uses comes first
     st['baseline'] = res
     st['baseline']['single_test_cmd'] = single_test_template(prof, bins)
     st['baseline']['test_binaries'] = bins
     # record in KB
     kb.setdefault('commands', {})
+    ok = {'env_setup': res['build'] == 'OK', 'build': res['build'] == 'OK', 'run': res.get('run_ok', False), 'clean': None}
     for k in ('env_setup', 'build', 'run', 'clean'):
         if c[k] and c[k] != 'none':
-            kb['commands'][k] = {'cmd': c[k], 'verified': now() if res['build'] == 'OK' else 'FAILED ' + now()}
+            kb['commands'][k] = {'cmd': c[k], 'verified': 'not run by baseline' if ok[k] is None else now() if ok[k] else 'FAILED ' + now()}
     kb['commands']['single_test'] = {'cmd': st['baseline']['single_test_cmd'], 'verified': ''}
     kb['commands']['compile_db'] = {'cmd': cdb, 'verified': now()}
     m = re.search(r'-B\s*(\S+)', c['build'])

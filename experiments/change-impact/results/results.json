@@ -1,0 +1,1865 @@
+{
+ "B1": {
+  "id": "B1",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 2,
+   "branches_taken": 2,
+   "detail": [
+    "src/request_queue.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..1ae5dc2 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -51,7 +51,7 @@ unsigned RequestQueue::size(CoreType core) const {\n \n unsigned RequestQueue::sizeTotal() const {\n     unsigned total = 0;\n-    for (const auto& q : queues_) total += static_cast<unsigned>(q.size());\n+    for (unsigned c = 0; c < kCoreCount; ++c) total += size(static_cast<CoreType>(c));\n     return total;\n }\n \n"
+ },
+ "B2": {
+  "id": "B2",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 3,
+    "summary": "Errors (3 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [
+     "TEST(RequestQueueEnqueue, Enqueue_L18QueueAtMaxSize_ReturnsQueueFull)",
+     "TEST(CvAccelService, Submit_L118StNotOk_ReturnsSt)",
+     "TEST(RequestQueue, Enqueue_QueueSizeAtMax_ReturnsQueueFull)"
+    ],
+    "detail": [
+     "CHECK(st == cvaccel::Status::QUEUE_FULL) failed",
+     "LONGS_EQUAL((int)Status::QUEUE_FULL, (int)st) failed",
+     "LONGS_EQUAL((int)Status::QUEUE_FULL, (int)queue.enqueue(extra)) failed"
+    ],
+    "tail": "................\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1943: error: Failure in TEST(RequestQueueEnqueue, Enqueue_L18QueueAtMaxSize_ReturnsQueueFull)\n\tCHECK(st == cvaccel::Status::QUEUE_FULL) failed\n\n..................................\n\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1404: error: Failure in TEST(CvAccelService, Submit_L118StNotOk_ReturnsSt)\n\tLONGS_EQUAL((int)Status::QUEUE_FULL, (int)st) failed\n\texpected <-5 (0xfffffffffffffffb)>\n\tbut was  < 0 (0x0)>\n\n..................................................\n........................\n/tmp/claude-0/cis/repo/tests/request_queue_test.cpp:64: error: Failure in TEST(RequestQueue, Enqueue_QueueSizeAtMax_ReturnsQueueFull)\n\tLONGS_EQUAL((int)Status::QUEUE_FULL, (int)queue.enqueue(extra)) failed\n\texpected <-5 (0xfffffffffffffffb)>\n\tbut was  < 0 (0x0)>\n\n..........................\n..................................................\n...............\nErrors (3 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 2,
+   "branches_taken": 1,
+   "detail": [
+    "src/request_queue.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..a2a19f7 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -15,7 +15,7 @@ Status RequestQueue::enqueue(const Request& r) {\n     unsigned coreIdx = static_cast<unsigned>(r.core);\n     if (coreIdx >= kCoreCount) return Status::INVALID_ARG;\n     std::deque<Request>& q = queues_[coreIdx];\n-    if (q.size() >= kMaxQueuePerCore) return Status::QUEUE_FULL;\n+    if (q.size() > kMaxQueuePerCore) return Status::QUEUE_FULL;\n \n     // Insert before the first entry with strictly lower priority, keeping FIFO within a priority.\n     auto it = q.begin();\n"
+ },
+ "B3": {
+  "id": "B3",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 4,
+    "summary": "Errors (4 failures, 215 tests, 215 ran, 922 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [
+     "TEST(CvAccelService, MemoryPoolAllocate_GapAtStartFits_PlacesBeforeFirstBlock)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksFits_ReusesGap)",
+     "TEST(MemoryPool, Allocate_GapAtStartFits_PlacesBeforeFirstBlock)",
+     "TEST(MemoryPool, Allocate_GapBetweenBlocksFits_ReusesGap)"
+    ],
+    "detail": [
+     "CHECK(status == cvaccel::Status::OK) failed",
+     "CHECK(status == cvaccel::Status::OK) failed",
+     "CHECK(status == cvaccel::Status::OK) failed",
+     "CHECK(status == cvaccel::Status::OK) failed"
+    ],
+    "tail": ".............................\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1811: error: Failure in TEST(CvAccelService, MemoryPoolAllocate_GapAtStartFits_PlacesBeforeFirstBlock)\n\tCHECK(status == cvaccel::Status::OK) failed\n\n...\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1766: error: Failure in TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksFits_ReusesGap)\n\tCHECK(status == cvaccel::Status::OK) failed\n\n..................\n..................................................\n..................................................\n...............\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:145: error: Failure in TEST(MemoryPool, Allocate_GapAtStartFits_PlacesBeforeFirstBlock)\n\tCHECK(status == cvaccel::Status::OK) failed\n\n...\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:100: error: Failure in TEST(MemoryPool, Allocate_GapBetweenBlocksFits_ReusesGap)\n\tCHECK(status == cvaccel::Status::OK) failed\n\n................................\n...............\nErrors (4 failures, 215 tests, 215 ran, 922 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 2,
+   "branches_taken": 2,
+   "detail": [
+    "src/memory_pool.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..d81d026 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -25,7 +25,7 @@ Status MemoryPool::allocate(SessionId owner, size_t bytes, MemHandle& outHandle,\n         cursor = it->offset + it->reserved;\n     }\n     size_t gapEnd = (it == blocks_.end()) ? poolBytes_ : it->offset;\n-    if (gapEnd - cursor < reserved) return Status::NO_MEMORY;\n+    if (gapEnd - cursor <= reserved) return Status::NO_MEMORY;\n \n     MemBlock blk;\n     blk.handle = nextHandle_++;\n"
+ },
+ "B4": {
+  "id": "B4",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 3,
+    "summary": "Errors (3 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [
+     "TEST(CvAccelService, FreeMem_L80BlkFalse_ReturnsInvalidArg)",
+     "TEST(MemoryPool, Release_HandleNotFound_ReturnsInvalidArg)",
+     "TEST(MemoryPool, Release_EmptyPool_ReturnsInvalidArg)"
+    ],
+    "detail": [
+     "LONGS_EQUAL((int)Status::INVALID_ARG, (int)st) failed",
+     "CHECK(status == cvaccel::Status::INVALID_ARG) failed",
+     "CHECK(status == cvaccel::Status::INVALID_ARG) failed"
+    ],
+    "tail": "..................................................\n......................\n/tmp/claude-0/cis/repo/tests/service_test.cpp:745: error: Failure in TEST(CvAccelService, FreeMem_L80BlkFalse_ReturnsInvalidArg)\n\tLONGS_EQUAL((int)Status::INVALID_ARG, (int)st) failed\n\texpected <-1 (0xffffffffffffffff)>\n\tbut was  <-4 (0xfffffffffffffffc)>\n\n............................\n..................................................\n........\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:216: error: Failure in TEST(MemoryPool, Release_HandleNotFound_ReturnsInvalidArg)\n\tCHECK(status == cvaccel::Status::INVALID_ARG) failed\n\n....\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:175: error: Failure in TEST(MemoryPool, Release_EmptyPool_ReturnsInvalidArg)\n\tCHECK(status == cvaccel::Status::INVALID_ARG) failed\n\n......................................\n...............\nErrors (3 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/memory_pool.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..f99d5da 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -47,7 +47,7 @@ Status MemoryPool::release(MemHandle h, SessionId owner) {\n             return Status::OK;\n         }\n     }\n-    return Status::INVALID_ARG;\n+    return Status::NOT_OWNER;\n }\n \n void MemoryPool::releaseAll(SessionId owner) {\n"
+ },
+ "B5": {
+  "id": "B5",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 2,
+   "branches_taken": 1,
+   "detail": [
+    "src/request_queue.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..4af20c1 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -14,6 +14,7 @@ Status RequestQueue::enqueue(const Request& r) {\n     for (const auto& q : queues_) for (const auto& x : q) if (x.id == r.id) return Status::INVALID_ARG;   // duplicate id\n     unsigned coreIdx = static_cast<unsigned>(r.core);\n     if (coreIdx >= kCoreCount) return Status::INVALID_ARG;\n+    if (r.bytes > kMaxJobBytes) return Status::INVALID_ARG;\n     std::deque<Request>& q = queues_[coreIdx];\n     if (q.size() >= kMaxQueuePerCore) return Status::QUEUE_FULL;\n \n"
+ },
+ "B6": {
+  "id": "B6",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 2,
+    "summary": "Errors (2 failures, 215 tests, 215 ran, 925 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [
+     "TEST(CvAccelService, OnHwCompletion_TypicalCompletion_RecordsAndWakesClient)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionFoundWithOpenRequests_DecrementsOpenRequests)"
+    ],
+    "detail": [
+     "expected <0 (0x0)>",
+     "expected <0 (0x0)>"
+    ],
+    "tail": "............................................\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1586: error: Failure in TEST(CvAccelService, OnHwCompletion_TypicalCompletion_RecordsAndWakesClient)\n\texpected <0 (0x0)>\n\tbut was  <1 (0x1)>\n\n......\n..................................................\n..................................................\n.......................................\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:534: error: Failure in TEST(Dispatcher, OnCompletion_L107_SessionFoundWithOpenRequests_DecrementsOpenRequests)\n\texpected <0 (0x0)>\n\tbut was  <1 (0x1)>\n\n...........\n...............\nErrors (2 failures, 215 tests, 215 ran, 925 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..a9832a2 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -103,9 +103,6 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {\n     rec.status = res.status;\n     perf_.record(rec);\n \n-    SessionInfo* si = sessions_.find(r.session);\n-    if (si && si->openRequests > 0) --si->openRequests;\n-\n     // r.clientFd is set to -1 by cancelSession() for jobs whose session closed while they were\n     // still running (see below), so this also covers \"the session is no longer active\".\n     if (r.clientFd != -1) {\n"
+ },
+ "B7": {
+  "id": "B7",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 1,
+    "summary": "Errors (1 failures, 3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [
+     "TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)"
+    ],
+    "detail": [
+     "Mock Failure: Unexpected additional (2nd) call to function: MemoryPool::physAddr::MemoryPool::physAddr"
+    ],
+    "tail": ".\n/tmp/claude-0/cis/repo/tests/wrap/dispatcher_wrap_test.cpp:42: error: Failure in TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)\n\tMock Failure: Unexpected additional (2nd) call to function: MemoryPool::physAddr::MemoryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\tMemoryPool::physAddr::MemoryPool::physAddr -> unsigned int h: <5 (0x5)> (expected 1 call, called 1 time)\n\n..\nErrors (1 failures, 3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 4,
+   "branches_taken": 4,
+   "detail": [
+    "src/dispatcher.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..45673f3 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -19,7 +19,7 @@ Status Dispatcher::start(Request& r) {\n     hw::JobDesc job{};\n     job.jobId = r.id;\n     job.core = r.core;\n-    job.physAddr = pool_.physAddr(r.mem);\n+    job.physAddr = pool_.physAddr(r.mem) ? pool_.physAddr(r.mem) : 0;\n     job.bytes = r.bytes;\n     for (unsigned i = 0; i < kConfigWords; ++i) job.config[i] = r.config[i];\n \n"
+ },
+ "B8": {
+  "id": "B8",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 2,
+   "executed": 2,
+   "branches": 1,
+   "branches_taken": 1,
+   "detail": [
+    "src/dispatcher.cpp: 2/2"
+   ]
+  },
+  "diff": "diff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..26593a2 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -101,8 +101,6 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {\n     rec.tFinished = dev_.nowNs();\n     rec.hwCycles = res.hwCycles;\n     rec.status = res.status;\n-    perf_.record(rec);\n-\n     SessionInfo* si = sessions_.find(r.session);\n     if (si && si->openRequests > 0) --si->openRequests;\n \n@@ -121,6 +119,7 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {\n         dev_.ioctlToClient(r.clientFd, IoctlCmd::WAKE, &info, sizeof(info));\n     }\n \n+    perf_.record(rec);\n     running_.erase(it);\n     return Status::OK;\n }\n"
+ },
+ "B9": {
+  "id": "B9",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 3,
+   "executed": 3,
+   "branches": 3,
+   "branches_taken": 3,
+   "detail": [
+    "src/dispatcher.cpp: 3/3"
+   ]
+  },
+  "diff": "diff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..9bd0a1c 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -75,7 +75,7 @@ unsigned Dispatcher::pump() {\n             if (r.clientFd != -1) {\n                 // See onCompletion(): this in-process sim's wake handler never calls back into\n                 // the service, so it is safe to hold the service mutex while calling it here.\n-                dev_.ioctlToClient(r.clientFd, IoctlCmd::WAKE, &info, sizeof(info));\n+                dev_.ioctlToClient(r.clientFd, IoctlCmd::WAKE, &info, sizeof(info) - 1);\n             }\n \n             SessionInfo* si = sessions_.find(r.session);\n@@ -118,7 +118,7 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {\n         // Not calling this under mtx_ would let a queued completion race a session close; in this\n         // in-process sim the client's wake handler never calls back into the service, so holding\n         // the service mutex (via the caller) across this ioctl is safe.\n-        dev_.ioctlToClient(r.clientFd, IoctlCmd::WAKE, &info, sizeof(info));\n+        dev_.ioctlToClient(r.clientFd, IoctlCmd::WAKE, &info, sizeof(info) - 1);\n     }\n \n     running_.erase(it);\n@@ -140,7 +140,7 @@ unsigned Dispatcher::cancelSession(SessionId session) {\n             info.status = Status::CANCELLED;\n             info.latencyNs = 0;\n             info.hwCycles = 0;\n-            dev_.ioctlToClient(fd, IoctlCmd::WAKE, &info, sizeof(info));\n+            dev_.ioctlToClient(fd, IoctlCmd::WAKE, &info, sizeof(info) - 1);\n         }\n         if (si && si->openRequests > 0) --si->openRequests;\n     }\n"
+ },
+ "G1": {
+  "id": "G1",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/request_queue.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/request_queue.hpp b/include/cvaccel/request_queue.hpp\nindex c613376..8224744 100644\n--- a/include/cvaccel/request_queue.hpp\n+++ b/include/cvaccel/request_queue.hpp\n@@ -25,7 +25,7 @@ public:\n     Status   enqueue(const Request& r);                 // QUEUE_FULL at kMaxQueuePerCore, INVALID_ARG for a bad core\n     bool     dequeue(CoreType core, Request& out);      // false when empty\n     bool     peek(CoreType core, Request& out) const;\n-    unsigned size(CoreType core) const;\n+    unsigned size(CoreType core, bool includeRunning = false) const;\n     unsigned sizeTotal() const;\n     // removes every queued request of the session; returns how many were removed (their ids appended to removed)\n     unsigned cancelSession(SessionId session, std::vector<RequestId>& removed);\ndiff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..51c2dbf 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -43,7 +43,8 @@ bool RequestQueue::peek(CoreType core, Request& out) const {\n     return true;\n }\n \n-unsigned RequestQueue::size(CoreType core) const {\n+unsigned RequestQueue::size(CoreType core, bool includeRunning) const {\n+    (void)includeRunning;\n     unsigned coreIdx = static_cast<unsigned>(core);\n     if (coreIdx >= kCoreCount) return 0;\n     return static_cast<unsigned>(queues_[coreIdx].size());\n"
+ },
+ "G2": {
+  "id": "G2",
+  "build_ok": false,
+  "errors": [
+   "tests/memory_pool_test.cpp:96: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:111: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:141: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:174: no matching function for call to \u2018cvaccel::MemoryPool::release(int, int)\u2019",
+   "tests/memory_pool_test.cpp:184: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:196: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:205: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:215: no matching function for call to \u2018cvaccel::MemoryPool::release(int, int)\u2019",
+   "tests/memory_pool_test.cpp:224: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/memory_pool_test.cpp:233: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/service_test.cpp:1762: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019",
+   "tests/service_test.cpp:1777: no matching function for call to \u2018cvaccel::MemoryPool::release(cvaccel::MemHandle&, int)\u2019"
+  ],
+  "error_count": 13,
+  "error_files": {
+   "tests/memory_pool_test.cpp": 10,
+   "tests/service_test.cpp": 3
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 2,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/memory_pool.cpp: 0/1",
+    "src/service.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..fba99e0 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -21,7 +21,7 @@ class MemoryPool {\n public:\n     explicit MemoryPool(size_t poolBytes = kPoolBytes, uint64_t physBase = 0, uint8_t* virtBase = nullptr);\n     Status    allocate(SessionId owner, size_t bytes, MemHandle& outHandle, size_t align = kMemAlign);   // NO_MEMORY, INVALID_ARG (0 or > pool)\n-    Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs\n+    Status    release(MemHandle h, SessionId owner, bool force);                          // NOT_OWNER if owner differs\n     void      releaseAll(SessionId owner);\n     const MemBlock* find(MemHandle h) const;\n     uint64_t  physAddr(MemHandle h) const;                                     // 0 if unknown\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..f9d0615 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -39,7 +39,8 @@ Status MemoryPool::allocate(SessionId owner, size_t bytes, MemHandle& outHandle,\n     return Status::OK;\n }\n \n-Status MemoryPool::release(MemHandle h, SessionId owner) {\n+Status MemoryPool::release(MemHandle h, SessionId owner, bool force) {\n+    (void)force;\n     for (auto it = blocks_.begin(); it != blocks_.end(); ++it) {\n         if (it->handle == h) {\n             if (it->owner != owner) return Status::NOT_OWNER;\ndiff --git a/src/service.cpp b/src/service.cpp\nindex d2c8e9d..0f7eb6a 100644\n--- a/src/service.cpp\n+++ b/src/service.cpp\n@@ -78,7 +78,7 @@ Status CvAccelService::freeMem(ClientFd fd, FreeMemArgs& a) {\n     if (!sessions_.owns(a.session, fd)) return Status::NOT_OWNER;\n     const MemBlock* blk = pool_.find(a.handle);\n     uint64_t bytes = blk ? blk->bytes : 0;\n-    Status st = pool_.release(a.handle, a.session);\n+    Status st = pool_.release(a.handle, a.session, false);\n     if (st != Status::OK) return st;\n     if (SessionInfo* si = sessions_.find(a.session)) {\n         si->bytesAllocated = (bytes <= si->bytesAllocated) ? si->bytesAllocated - bytes : 0;\n"
+ },
+ "G3": {
+  "id": "G3",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..dfc293b 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -12,7 +12,7 @@ enum class Status : int8_t {\n     QUEUE_FULL = -5, HW_ERROR = -6, CANCELLED = -7, BUSY = -8, INTEGRITY = -9\n };\n \n-using SessionId = uint16_t;   // 0 = invalid\n+using SessionId = uint32_t;   // 0 = invalid\n using MemHandle = uint32_t;   // 0 = invalid\n using RequestId = uint32_t;   // 0 = invalid\n using ClientFd  = int;        // the client's device file descriptor (identity for the wake-up ioctl)\n"
+ },
+ "G4": {
+  "id": "G4",
+  "build_ok": false,
+  "errors": [
+   "tests/request_queue_test.cpp:131: no match for \u2018operator!\u2019 (operand type is \u2018cvaccel::Status\u2019)",
+   "tests/request_queue_test.cpp:148: no match for \u2018operator!\u2019 (operand type is \u2018cvaccel::Status\u2019)"
+  ],
+  "error_count": 2,
+  "error_files": {
+   "tests/request_queue_test.cpp": 2
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 5,
+   "executed": 5,
+   "branches": 7,
+   "branches_taken": 6,
+   "detail": [
+    "src/dispatcher.cpp: 1/1",
+    "src/request_queue.cpp: 4/4"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/request_queue.hpp b/include/cvaccel/request_queue.hpp\nindex c613376..e9b35c7 100644\n--- a/include/cvaccel/request_queue.hpp\n+++ b/include/cvaccel/request_queue.hpp\n@@ -23,7 +23,7 @@ struct Request {\n class RequestQueue {\n public:\n     Status   enqueue(const Request& r);                 // QUEUE_FULL at kMaxQueuePerCore, INVALID_ARG for a bad core\n-    bool     dequeue(CoreType core, Request& out);      // false when empty\n+    Status   dequeue(CoreType core, Request& out);      // false when empty\n     bool     peek(CoreType core, Request& out) const;\n     unsigned size(CoreType core) const;\n     unsigned sizeTotal() const;\ndiff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..47e20a1 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -37,7 +37,7 @@ unsigned Dispatcher::pump() {\n         CoreType core = static_cast<CoreType>(c);\n         while (!hw_.isBusy(core)) {\n             Request r;\n-            if (!queue_.dequeue(core, r)) break;\n+            if (queue_.dequeue(core, r) != Status::OK) break;\n \n             Status st = start(r);\n             if (st == Status::OK) {\ndiff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..8fbe8db 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -24,14 +24,14 @@ Status RequestQueue::enqueue(const Request& r) {\n     return Status::OK;\n }\n \n-bool RequestQueue::dequeue(CoreType core, Request& out) {\n+Status RequestQueue::dequeue(CoreType core, Request& out) {\n     unsigned coreIdx = static_cast<unsigned>(core);\n-    if (coreIdx >= kCoreCount) return false;\n+    if (coreIdx >= kCoreCount) return Status::INVALID_ARG;\n     std::deque<Request>& q = queues_[coreIdx];\n-    if (q.empty()) return false;\n+    if (q.empty()) return Status::BUSY;\n     out = q.front();\n     q.pop_front();\n-    return true;\n+    return Status::OK;\n }\n \n bool RequestQueue::peek(CoreType core, Request& out) const {\n"
+ },
+ "G5": {
+  "id": "G5",
+  "build_ok": false,
+  "errors": [
+   "tests/request_queue_test.cpp:234: \u2018class cvaccel::RequestQueue\u2019 has no member named \u2018sizeTotal\u2019",
+   "tests/dispatcher_test.cpp:332: \u2018class cvaccel::RequestQueue\u2019 has no member named \u2018sizeTotal\u2019"
+  ],
+  "error_count": 2,
+  "error_files": {
+   "tests/request_queue_test.cpp": 1,
+   "tests/dispatcher_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 2,
+   "executed": 0,
+   "branches": 1,
+   "branches_taken": 0,
+   "detail": [
+    "src/request_queue.cpp: 0/1",
+    "src/service.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/request_queue.hpp b/include/cvaccel/request_queue.hpp\nindex c613376..1188aa6 100644\n--- a/include/cvaccel/request_queue.hpp\n+++ b/include/cvaccel/request_queue.hpp\n@@ -26,7 +26,7 @@ public:\n     bool     dequeue(CoreType core, Request& out);      // false when empty\n     bool     peek(CoreType core, Request& out) const;\n     unsigned size(CoreType core) const;\n-    unsigned sizeTotal() const;\n+    unsigned totalSize() const;\n     // removes every queued request of the session; returns how many were removed (their ids appended to removed)\n     unsigned cancelSession(SessionId session, std::vector<RequestId>& removed);\n private:\ndiff --git a/src/request_queue.cpp b/src/request_queue.cpp\nindex 90062a0..76bb568 100644\n--- a/src/request_queue.cpp\n+++ b/src/request_queue.cpp\n@@ -49,7 +49,7 @@ unsigned RequestQueue::size(CoreType core) const {\n     return static_cast<unsigned>(queues_[coreIdx].size());\n }\n \n-unsigned RequestQueue::sizeTotal() const {\n+unsigned RequestQueue::totalSize() const {\n     unsigned total = 0;\n     for (const auto& q : queues_) total += static_cast<unsigned>(q.size());\n     return total;\ndiff --git a/src/service.cpp b/src/service.cpp\nindex d2c8e9d..26802a8 100644\n--- a/src/service.cpp\n+++ b/src/service.cpp\n@@ -154,7 +154,7 @@ unsigned CvAccelService::pump() {\n \n unsigned CvAccelService::queued() const {\n     std::lock_guard<std::mutex> lock(mtx_);\n-    return queue_.sizeTotal();\n+    return queue_.totalSize();\n }\n \n }  // namespace cvaccel\n"
+ },
+ "G6": {
+  "id": "G6",
+  "build_ok": false,
+  "errors": [
+   "tests/memory_pool_test.cpp:322: \u2018class cvaccel::MemoryPool\u2019 has no member named \u2018largestFree\u2019"
+  ],
+  "error_count": 1,
+  "error_files": {
+   "tests/memory_pool_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [
+   "/tmp/claude-0/cis/repo/src/memory_pool.cpp:87:15: warning: \u2018size_t cvaccel::largestFree_removed(const std::vector<MemBlock>&, size_t)\u2019 defined but not used [-Wunused-function]"
+  ],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/memory_pool.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..0bca7a0 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -28,7 +28,6 @@ public:\n     uint8_t*  map(MemHandle h);                                                // nullptr if unknown or no virt base\n     size_t    bytesInUse() const;\n     size_t    bytesInUse(SessionId owner) const;\n-    size_t    largestFree() const;\n     size_t    capacity() const { return poolBytes_; }\n private:\n     size_t    poolBytes_;\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..1e528b1 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -84,7 +84,7 @@ size_t MemoryPool::bytesInUse(SessionId owner) const {\n     return total;\n }\n \n-size_t MemoryPool::largestFree() const {\n+static size_t largestFree_removed(const std::vector<MemBlock>& blocks_, size_t poolBytes_) {\n     size_t largest = 0;\n     size_t cursor = 0;\n     for (const auto& b : blocks_) {\n"
+ },
+ "G7": {
+  "id": "G7",
+  "build_ok": false,
+  "errors": [
+   "tests/perf_monitor_test.cpp:53: \u2018static bool cvaccel::PerfMonitor::timestampsOk(const cvaccel::PerfRecord&)\u2019 is private within this context",
+   "tests/perf_monitor_test.cpp:59: \u2018static bool cvaccel::PerfMonitor::bytesOk(const cvaccel::PerfRecord&)\u2019 is private within this context",
+   "tests/perf_monitor_test.cpp:67: \u2018static bool cvaccel::PerfMonitor::coreBytesOk(const cvaccel::PerfRecord&)\u2019 is private within this context",
+   "tests/service_test.cpp:1886: \u2018static bool cvaccel::PerfMonitor::coreBytesOk(const cvaccel::PerfRecord&)\u2019 is private within this context"
+  ],
+  "error_count": 4,
+  "error_files": {
+   "tests/perf_monitor_test.cpp": 3,
+   "tests/service_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/perf_monitor.hpp b/include/cvaccel/perf_monitor.hpp\nindex 59bf4e5..0460df3 100644\n--- a/include/cvaccel/perf_monitor.hpp\n+++ b/include/cvaccel/perf_monitor.hpp\n@@ -37,11 +37,10 @@ public:\n     uint64_t totalCount() const;\n     std::string report() const;                       // human-readable, one line per core\n     void     reset();\n-    // integrity rules, exposed for testing\n-    static bool timestampsOk(const PerfRecord& r);    // queued <= started <= finished, finished > 0\n-    static bool bytesOk(const PerfRecord& r);         // 0 < bytes <= allocated\n-    static bool coreBytesOk(const PerfRecord& r);     // bytes <= kMaxJobBytes for that core\n private:\n+    static bool timestampsOk(const PerfRecord& r);\n+    static bool bytesOk(const PerfRecord& r);\n+    static bool coreBytesOk(const PerfRecord& r);\n     std::array<PerfStats, kCoreCount> perCore_{};\n     std::map<SessionId, PerfStats> perSession_;\n     uint64_t integrityErrors_ = 0;\n"
+ },
+ "G8": {
+  "id": "G8",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/memory_pool.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..993c0db 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -28,6 +28,7 @@ public:\n     uint8_t*  map(MemHandle h);                                                // nullptr if unknown or no virt base\n     size_t    bytesInUse() const;\n     size_t    bytesInUse(SessionId owner) const;\n+    size_t    bytesInUse(uint32_t tag) const;\n     size_t    largestFree() const;\n     size_t    capacity() const { return poolBytes_; }\n private:\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..b74955a 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -56,6 +56,8 @@ void MemoryPool::releaseAll(SessionId owner) {\n                   blocks_.end());\n }\n \n+size_t MemoryPool::bytesInUse(uint32_t) const { return 0; }\n+\n const MemBlock* MemoryPool::find(MemHandle h) const {\n     for (const auto& b : blocks_) if (b.handle == h) return &b;\n     return nullptr;\n"
+ },
+ "G9": {
+  "id": "G9",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 1,
+    "summary": "Errors (1 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [
+     "TEST(MemoryPool, Release_OwnerMismatch_ReturnsNotOwner)"
+    ],
+    "detail": [
+     "CHECK(status == cvaccel::Status::NOT_OWNER) failed"
+    ],
+    "tail": "..................................................\n..................................................\n..................................................\n.......\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:225: error: Failure in TEST(MemoryPool, Release_OwnerMismatch_ReturnsNotOwner)\n\tCHECK(status == cvaccel::Status::NOT_OWNER) failed\n\n...........................................\n...............\nErrors (1 failures, 215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 5,
+   "branches_taken": 5,
+   "detail": [
+    "src/memory_pool.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..3170314 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -22,6 +22,7 @@ public:\n     explicit MemoryPool(size_t poolBytes = kPoolBytes, uint64_t physBase = 0, uint8_t* virtBase = nullptr);\n     Status    allocate(SessionId owner, size_t bytes, MemHandle& outHandle, size_t align = kMemAlign);   // NO_MEMORY, INVALID_ARG (0 or > pool)\n     Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs\n+    Status    release(MemHandle h, int legacyOwner);\n     void      releaseAll(SessionId owner);\n     const MemBlock* find(MemHandle h) const;\n     uint64_t  physAddr(MemHandle h) const;                                     // 0 if unknown\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..e7adb4c 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -50,6 +50,8 @@ Status MemoryPool::release(MemHandle h, SessionId owner) {\n     return Status::INVALID_ARG;\n }\n \n+Status MemoryPool::release(MemHandle h, int) { for (auto it = blocks_.begin(); it != blocks_.end(); ++it) if (it->handle == h) { blocks_.erase(it); return Status::OK; } return Status::INVALID_ARG; }\n+\n void MemoryPool::releaseAll(SessionId owner) {\n     blocks_.erase(std::remove_if(blocks_.begin(), blocks_.end(),\n                                   [owner](const MemBlock& b) { return b.owner == owner; }),\n"
+ },
+ "V1": {
+  "id": "V1",
+  "build_ok": false,
+  "errors": [
+   "tests/service_test.cpp:75: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:85: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:98: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:113: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:128: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:149: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:173: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:201: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:232: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:251: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:262: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/service_test.cpp:273: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019"
+  ],
+  "error_count": 99,
+  "error_files": {
+   "tests/service_test.cpp": 62,
+   "tests/dispatcher_test.cpp": 36,
+   "tests/wrap/dispatcher_wrap_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..e6a0f54 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -28,6 +28,7 @@ public:\n     virtual Status   submit(const JobDesc& job) = 0;\n     virtual bool     isBusy(CoreType core) const = 0;\n     virtual void     setCompletionHandler(std::function<void(const JobResult&)> handler) = 0;\n+    virtual void     reset() = 0;\n     virtual unsigned coreCount() const { return kCoreCount; }\n };\n \n"
+ },
+ "V2": {
+  "id": "V2",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..85c95c4 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -28,6 +28,7 @@ public:\n     virtual Status   submit(const JobDesc& job) = 0;\n     virtual bool     isBusy(CoreType core) const = 0;\n     virtual void     setCompletionHandler(std::function<void(const JobResult&)> handler) = 0;\n+    virtual void     reset() {}\n     virtual unsigned coreCount() const { return kCoreCount; }\n };\n \n"
+ },
+ "V3": {
+  "id": "V3",
+  "build_ok": false,
+  "errors": [
+   "tests/service_test.cpp:62: \u2018cvaccel::TimeNs {anonymous}::FakeDevice::nowNs() const\u2019 marked \u2018override\u2019, but does not override",
+   "tests/service_test.cpp:76: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:86: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:99: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:114: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:129: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:150: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:174: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:202: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:233: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:252: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019",
+   "tests/service_test.cpp:263: cannot declare variable \u2018dev\u2019 to be of abstract type \u2018{anonymous}::FakeDevice\u2019"
+  ],
+  "error_count": 102,
+  "error_files": {
+   "tests/service_test.cpp": 63,
+   "tests/wrap/dispatcher_wrap_test.cpp": 2,
+   "tests/dispatcher_test.cpp": 37
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/device.hpp b/include/cvaccel/device.hpp\nindex d709bdc..fffd0da 100644\n--- a/include/cvaccel/device.hpp\n+++ b/include/cvaccel/device.hpp\n@@ -11,7 +11,7 @@ public:\n     virtual ~IDevice() = default;\n     // ioctl in the service->client direction: wakes the client that owns clientFd. Returns OK or INVALID_ARG.\n     virtual Status  ioctlToClient(ClientFd clientFd, IoctlCmd cmd, const void* payload, size_t payloadBytes) = 0;\n-    virtual TimeNs  nowNs() const = 0;\n+    virtual TimeNs  nowNs() = 0;\n     // physical memory backing the pool: the service calls this once at start-up.\n     virtual uint64_t poolPhysBase() const = 0;\n     virtual uint8_t* poolVirtBase() = 0;\n"
+ },
+ "V4": {
+  "id": "V4",
+  "build_ok": false,
+  "errors": [
+   "tests/dispatcher_test.cpp:16: \u2018bool {anonymous}::FakeAccelBlock::isBusy(cvaccel::CoreType) const\u2019 marked \u2018override\u2019, but does not override",
+   "tests/dispatcher_test.cpp:62: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:83: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:101: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:121: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:143: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:166: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:186: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:206: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:221: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:240: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019",
+   "tests/dispatcher_test.cpp:263: cannot declare variable \u2018hw\u2019 to be of abstract type \u2018{anonymous}::FakeAccelBlock\u2019"
+  ],
+  "error_count": 102,
+  "error_files": {
+   "tests/dispatcher_test.cpp": 37,
+   "tests/wrap/dispatcher_wrap_test.cpp": 2,
+   "tests/service_test.cpp": 63
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..aec30b0 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -26,7 +26,7 @@ class IAccelBlock {\n public:\n     virtual ~IAccelBlock() = default;\n     virtual Status   submit(const JobDesc& job) = 0;\n-    virtual bool     isBusy(CoreType core) const = 0;\n+    virtual bool     isBusy(CoreType core, bool strict = false) const = 0;\n     virtual void     setCompletionHandler(std::function<void(const JobResult&)> handler) = 0;\n     virtual unsigned coreCount() const { return kCoreCount; }\n };\n"
+ },
+ "V5": {
+  "id": "V5",
+  "build_ok": false,
+  "errors": [
+   "tests/dispatcher_test.cpp:32: conflicting return type specified for \u2018virtual cvaccel::TimeNs {anonymous}::FakeDevice::nowNs() const\u2019",
+   "tests/service_test.cpp:62: conflicting return type specified for \u2018virtual cvaccel::TimeNs {anonymous}::FakeDevice::nowNs() const\u2019",
+   "tests/wrap/dispatcher_wrap_test.cpp:19: conflicting return type specified for \u2018virtual cvaccel::TimeNs {anonymous}::Dev::nowNs() const\u2019"
+  ],
+  "error_count": 3,
+  "error_files": {
+   "tests/dispatcher_test.cpp": 1,
+   "tests/service_test.cpp": 1,
+   "tests/wrap/dispatcher_wrap_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/device.hpp b/include/cvaccel/device.hpp\nindex d709bdc..3e6aeae 100644\n--- a/include/cvaccel/device.hpp\n+++ b/include/cvaccel/device.hpp\n@@ -11,7 +11,7 @@ public:\n     virtual ~IDevice() = default;\n     // ioctl in the service->client direction: wakes the client that owns clientFd. Returns OK or INVALID_ARG.\n     virtual Status  ioctlToClient(ClientFd clientFd, IoctlCmd cmd, const void* payload, size_t payloadBytes) = 0;\n-    virtual TimeNs  nowNs() const = 0;\n+    virtual int64_t nowNs() const = 0;\n     // physical memory backing the pool: the service calls this once at start-up.\n     virtual uint64_t poolPhysBase() const = 0;\n     virtual uint8_t* poolVirtBase() = 0;\n"
+ },
+ "T1": {
+  "id": "T1",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/request_queue.hpp b/include/cvaccel/request_queue.hpp\nindex c613376..6aeb5a6 100644\n--- a/include/cvaccel/request_queue.hpp\n+++ b/include/cvaccel/request_queue.hpp\n@@ -17,6 +17,7 @@ struct Request {\n     uint32_t  bytes = 0;\n     TimeNs    tQueued = 0;\n     TimeNs    tStarted = 0;\n+    uint32_t  flags = 0;\n };\n \n // One FIFO per core; dequeue returns the highest priority first, FIFO inside a priority.\n"
+ },
+ "T2": {
+  "id": "T2",
+  "build_ok": false,
+  "errors": [
+   "tests/dispatcher_test.cpp:481: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:503: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:531: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:555: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:584: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:605: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:626: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:781: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/dispatcher_test.cpp:806: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization",
+   "tests/wrap/dispatcher_wrap_test.cpp:57: cannot convert \u2018cvaccel::Status\u2019 to \u2018cvaccel::CoreType\u2019 in initialization"
+  ],
+  "error_count": 10,
+  "error_files": {
+   "tests/dispatcher_test.cpp": 9,
+   "tests/wrap/dispatcher_wrap_test.cpp": 1
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..6296b07 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -15,6 +15,7 @@ struct JobDesc {\n \n struct JobResult {\n     uint32_t jobId;\n+    CoreType core;\n     Status   status;                   // OK or HW_ERROR\n     uint32_t hwCycles;\n };\n"
+ },
+ "T3": {
+  "id": "T3",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 5,
+    "summary": "Errors (5 failures, 215 tests, 215 ran, 923 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [
+     "TEST(Dispatcher, CancelSession_L150_RunningJobDifferentSession_ClientFdUnaffected)",
+     "TEST(Dispatcher, OnCompletion_L111_ClientFdSet_WakesClient)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionNotFound_StillErasesRunningAndReturnsOk)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionFoundWithOpenRequests_DecrementsOpenRequests)",
+     "TEST(Dispatcher, OnCompletion_L90_JobIdInRunning_ErasesFromRunningAndReturnsOk)"
+    ],
+    "detail": [
+     "expected <1 (0x1)>",
+     "expected <1 (0x1)>",
+     "LONGS_EQUAL((int)Status::OK, (int)dispatcher.onCompletion(res)) failed",
+     "expected <0 (0x0)>",
+     "LONGS_EQUAL((int)Status::OK, (int)dispatcher.onCompletion(res)) failed"
+    ],
+    "tail": "..................................................\n..................................................\n..................................................\n...........................\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:809: error: Failure in TEST(Dispatcher, CancelSession_L150_RunningJobDifferentSession_ClientFdUnaffected)\n\texpected <1 (0x1)>\n\tbut was  <0 (0x0)>\n\n.........\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:608: error: Failure in TEST(Dispatcher, OnCompletion_L111_ClientFdSet_WakesClient)\n\texpected <1 (0x1)>\n\tbut was  <0 (0x0)>\n\n..\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:557: error: Failure in TEST(Dispatcher, OnCompletion_L107_SessionNotFound_StillErasesRunningAndReturnsOk)\n\tLONGS_EQUAL((int)Status::OK, (int)dispatcher.onCompletion(res)) failed\n\texpected < 0 (0x0)>\n\tbut was  <-1 (0xffffffffffffffff)>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:534: error: Failure in TEST(Dispatcher, OnCompletion_L107_SessionFoundWithOpenRequests_DecrementsOpenRequests)\n\texpected <0 (0x0)>\n\tbut was  <1 (0x1)>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:505: error: Failure in TEST(Dispatcher, OnCompletion_L90_JobIdInRunning_ErasesFromRunningAndReturnsOk)\n\tLONGS_EQUAL((int)Status::OK, (int)dispatcher.onCompletion(res)) failed\n\texpected < 0 (0x0)>\n\tbut was  <-1 (0xffffffffffffffff)>\n\n..........\n...............\nErrors (5 failures, 215 tests, 215 ran, 923 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 1,
+    "summary": "Errors (1 failures, 3 tests, 3 ran, 15 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [
+     "TEST(DispatcherWrap, Completion_RealPath)"
+    ],
+    "detail": [
+     "LONGS_EQUAL(static_cast<int>(Status::OK), static_cast<int>(d.onCompletion(res))) failed"
+    ],
+    "tail": "\n/tmp/claude-0/cis/repo/tests/wrap/dispatcher_wrap_test.cpp:58: error: Failure in TEST(DispatcherWrap, Completion_RealPath)\n\tLONGS_EQUAL(static_cast<int>(Status::OK), static_cast<int>(d.onCompletion(res))) failed\n\texpected < 0 (0x0)>\n\tbut was  <-1 (0xffffffffffffffff)>\n\n...\nErrors (1 failures, 3 tests, 3 ran, 15 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..f3a33c3 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -14,9 +14,9 @@ struct JobDesc {\n };\n \n struct JobResult {\n-    uint32_t jobId;\n-    Status   status;                   // OK or HW_ERROR\n     uint32_t hwCycles;\n+    Status   status;                   // OK or HW_ERROR\n+    uint32_t jobId;\n };\n \n // The accelerator block. One implementation talks to registers; the sim runs a thread per core.\n"
+ },
+ "T4": {
+  "id": "T4",
+  "build_ok": false,
+  "errors": [
+   "tests/session_manager_test.cpp:54: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/service_test.cpp:1470: \u2018const struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/service_test.cpp:1586: \u2018const struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:522: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:534: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:575: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:587: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:729: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:737: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?",
+   "tests/dispatcher_test.cpp:759: \u2018struct cvaccel::SessionInfo\u2019 has no member named \u2018openRequests\u2019; did you mean \u2018pendingRequests\u2019?"
+  ],
+  "error_count": 10,
+  "error_files": {
+   "tests/session_manager_test.cpp": 1,
+   "tests/service_test.cpp": 2,
+   "tests/dispatcher_test.cpp": 7
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 5,
+   "executed": 2,
+   "branches": 15,
+   "branches_taken": 2,
+   "detail": [
+    "src/dispatcher.cpp: 2/3",
+    "src/service.cpp: 0/1",
+    "src/session_manager.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/session_manager.hpp b/include/cvaccel/session_manager.hpp\nindex 0c4fbc9..059dd71 100644\n--- a/include/cvaccel/session_manager.hpp\n+++ b/include/cvaccel/session_manager.hpp\n@@ -8,7 +8,7 @@ struct SessionInfo {\n     SessionId id = 0;\n     ClientFd  clientFd = -1;\n     Priority  priority = Priority::NORMAL;\n-    uint32_t  openRequests = 0;    // queued or running\n+    uint32_t  pendingRequests = 0;    // queued or running\n     uint64_t  bytesAllocated = 0;\n     bool      active = false;\n };\ndiff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..569dbde 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -79,7 +79,7 @@ unsigned Dispatcher::pump() {\n             }\n \n             SessionInfo* si = sessions_.find(r.session);\n-            if (si && si->openRequests > 0) --si->openRequests;\n+            if (si && si->pendingRequests > 0) --si->pendingRequests;\n         }\n     }\n     return started;\n@@ -104,7 +104,7 @@ Status Dispatcher::onCompletion(const hw::JobResult& res) {\n     perf_.record(rec);\n \n     SessionInfo* si = sessions_.find(r.session);\n-    if (si && si->openRequests > 0) --si->openRequests;\n+    if (si && si->pendingRequests > 0) --si->pendingRequests;\n \n     // r.clientFd is set to -1 by cancelSession() for jobs whose session closed while they were\n     // still running (see below), so this also covers \"the session is no longer active\".\n@@ -142,7 +142,7 @@ unsigned Dispatcher::cancelSession(SessionId session) {\n             info.hwCycles = 0;\n             dev_.ioctlToClient(fd, IoctlCmd::WAKE, &info, sizeof(info));\n         }\n-        if (si && si->openRequests > 0) --si->openRequests;\n+        if (si && si->pendingRequests > 0) --si->pendingRequests;\n     }\n \n     // Jobs already handed to the hardware keep running; mark them so their completion is silent.\ndiff --git a/src/service.cpp b/src/service.cpp\nindex d2c8e9d..0f2a7b9 100644\n--- a/src/service.cpp\n+++ b/src/service.cpp\n@@ -118,7 +118,7 @@ Status CvAccelService::submit(ClientFd fd, SubmitArgs& a) {\n     if (st != Status::OK) return st;   // e.g. QUEUE_FULL: leave it posted so the client can retry\n \n     posted_.erase(it);\n-    if (SessionInfo* si = sessions_.find(a.session)) ++si->openRequests;\n+    if (SessionInfo* si = sessions_.find(a.session)) ++si->pendingRequests;\n \n     dispatcher_.pump();\n     return Status::OK;\ndiff --git a/src/session_manager.cpp b/src/session_manager.cpp\nindex 5984272..e653801 100644\n--- a/src/session_manager.cpp\n+++ b/src/session_manager.cpp\n@@ -9,7 +9,7 @@ Status SessionManager::open(ClientFd clientFd, Priority prio, SessionId& outId)\n             s.id = static_cast<SessionId>(i + 1);\n             s.clientFd = clientFd;\n             s.priority = prio;\n-            s.openRequests = 0;\n+            s.pendingRequests = 0;\n             s.bytesAllocated = 0;\n             s.active = true;\n             outId = s.id;\n"
+ },
+ "T5": {
+  "id": "T5",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..8a69e15 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -37,7 +37,7 @@ struct CompletionInfo {\n     RequestId request;\n     SessionId session;\n     Status    status;\n-    TimeNs    latencyNs;     // finished - queued\n+    uint32_t  latencyNs;     // finished - queued\n     uint32_t  hwCycles;      // reported by the block\n };\n \n"
+ },
+ "T6": {
+  "id": "T6",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": -11,
+    "summary": "CRASHED (exit -11): lCoreCount_ReturnsInvalidArg) | \tLONGS_EQUAL((int)Status::INVALID_ARG, (int)queue.enqueue(r)) failed | \texpected <-1 (0xffffffffffffffff)> | \tbut was  < 0 (0x0)> |  | ...",
+    "failed": [
+     "TEST(RequestQueueEnqueue, Enqueue_L16CoreIdxAtOrAboveCoreCount_ReturnsInvalidArg)",
+     "TEST(CvAccelService, PerfMonitorRecord_CoreIndexOutOfRange_SkipsPerCoreAccumulation)",
+     "TEST(RequestQueue, Enqueue_CoreIdxGreaterOrEqualCoreCount_ReturnsInvalidArg)"
+    ],
+    "detail": [
+     "CHECK(st == cvaccel::Status::INVALID_ARG) failed",
+     "expected <0 (0x0)>",
+     "LONGS_EQUAL((int)Status::INVALID_ARG, (int)queue.enqueue(r)) failed"
+    ],
+    "tail": "..................\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1923: error: Failure in TEST(RequestQueueEnqueue, Enqueue_L16CoreIdxAtOrAboveCoreCount_ReturnsInvalidArg)\n\tCHECK(st == cvaccel::Status::INVALID_ARG) failed\n\n......\n/tmp/claude-0/cis/repo/tests/service_test.cpp:1861: error: Failure in TEST(CvAccelService, PerfMonitorRecord_CoreIndexOutOfRange_SkipsPerCoreAccumulation)\n\texpected <0 (0x0)>\n\tbut was  <1 (0x1)>\n\n..........................\n..................................................\n..........................\n/tmp/claude-0/cis/repo/tests/request_queue_test.cpp:46: error: Failure in TEST(RequestQueue, Enqueue_CoreIdxGreaterOrEqualCoreCount_ReturnsInvalidArg)\n\tLONGS_EQUAL((int)Status::INVALID_ARG, (int)queue.enqueue(r)) failed\n\texpected <-1 (0xffffffffffffffff)>\n\tbut was  < 0 (0x0)>\n\n..."
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..11eef83 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -4,8 +4,8 @@\n \n namespace cvaccel {\n \n-enum class CoreType : uint8_t { RESIZE = 0, CONVOLVE = 1, WARP = 2, HISTOGRAM = 3, MATCH = 4 };\n-constexpr unsigned kCoreCount = 5;\n+enum class CoreType : uint8_t { RESIZE = 0, CROP = 1, CONVOLVE = 2, WARP = 3, HISTOGRAM = 4, MATCH = 5 };\n+constexpr unsigned kCoreCount = 6;\n \n enum class Status : int8_t {\n     OK = 0, INVALID_ARG = -1, NO_SESSION = -2, NO_MEMORY = -3, NOT_OWNER = -4,\n"
+ },
+ "T7": {
+  "id": "T7",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..eb58b52 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -25,7 +25,7 @@ constexpr size_t   kMemAlign      = 64;\n constexpr unsigned kConfigWords   = 8;\n constexpr uint32_t kMaxJobBytes   = 8u * 1024u * 1024u;\n \n-enum class Priority : uint8_t { LOW = 0, NORMAL = 1, HIGH = 2, URGENT = 3 };\n+enum class Priority : uint8_t { LOW = 0, NORMAL = 1, HIGH = 2, URGENT = 3, CRITICAL = 4 };\n \n // ioctl command numbers (client -> service and service -> client)\n enum class IoctlCmd : uint32_t {\n"
+ },
+ "T8": {
+  "id": "T8",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 814 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 814 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..e69a331 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -19,7 +19,7 @@ using ClientFd  = int;        // the client's device file descriptor (identity f\n using TimeNs    = uint64_t;\n \n constexpr unsigned kMaxSessions   = 16;\n-constexpr unsigned kMaxQueuePerCore = 32;\n+constexpr unsigned kMaxQueuePerCore = 16;\n constexpr size_t   kPoolBytes     = 64u * 1024u * 1024u;\n constexpr size_t   kMemAlign      = 64;\n constexpr unsigned kConfigWords   = 8;\n"
+ },
+ "T9": {
+  "id": "T9",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 16,
+    "summary": "Errors (16 failures, 215 tests, 215 ran, 923 checks, 0 ignored, 0 filtered out, 5 ms)",
+    "failed": [
+     "TEST(CvAccelService, MemoryPoolAllocate_RemainingSpaceTooSmall_ReturnsNoMemory)",
+     "TEST(CvAccelService, MemoryPoolAllocate_NoFittingGapAmongBlocks_PlacesAfterLast)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksTooSmall_SkipsGap)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksFits_ReusesGap)",
+     "TEST(CvAccelService, MemoryPoolAllocate_ThreeExistingBlocks_PlacesAfterAll)",
+     "TEST(CvAccelService, MemoryPoolAllocate_SingleExistingBlock_PlacesAfterIt)",
+     "TEST(MemoryPool, LargestFree_SingleBlock_ReturnsTailGap)",
+     "TEST(MemoryPool, BytesInUse_TwoBlocks_ReturnsSumOfReservedBytes)",
+     "TEST(MemoryPool, PhysAddr_HandleFound_ReturnsPhysBasePlusOffset)",
+     "TEST(MemoryPool, Allocate_RemainingSpaceTooSmall_ReturnsNoMemory)",
+     "TEST(MemoryPool, Allocate_NoFittingGapAmongBlocks_PlacesAfterLast)",
+     "TEST(MemoryPool, Allocate_GapBetweenBlocksTooSmall_SkipsGap)",
+     "TEST(MemoryPool, Allocate_GapBetweenBlocksFits_ReusesGap)",
+     "TEST(MemoryPool, Allocate_ThreeExistingBlocks_PlacesAfterAll)",
+     "TEST(MemoryPool, Allocate_SingleExistingBlock_PlacesAfterIt)",
+     "TEST(MemoryPool, Allocate_BytesNotExceedingPoolBytes_ReturnsOk)"
+    ],
+    "detail": [
+     "CHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK) failed",
+     "expected <128 (0x80)>",
+     "expected <128 (0x80)>",
+     "expected < 64 (0x40)>",
+     "expected <192 (0xc0)>"
+    ],
+    "tail": "ected <4160 (0x1040)>\n\tbut was  <4224 (0x1080)>\n\n............\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:154: error: Failure in TEST(MemoryPool, Allocate_RemainingSpaceTooSmall_ReturnsNoMemory)\n\tCHECK(pool.allocate(1, 64, a) == cvaccel::Status::OK) failed\n\n..\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:130: error: Failure in TEST(MemoryPool, Allocate_NoFittingGapAmongBlocks_PlacesAfterLast)\n\texpected <128 (0x80)>\n\tbut was  <256 (0x100)>\n\n.\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:116: error: Failure in TEST(MemoryPool, Allocate_GapBetweenBlocksTooSmall_SkipsGap)\n\texpected <128 (0x80)>\n\tbut was  <  0 (0x0)>\n\n.\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:101: error: Failure in TEST(MemoryPool, Allocate_GapBetweenBlocksFits_ReusesGap)\n\texpected < 64 (0x40)>\n\tbut was  <128 (0x80)>\n\n.\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:85: error: Failure in TEST(MemoryPool, Allocate_ThreeExistingBlocks_PlacesAfterAll)\n\texpected <192 (0xc0)>\n\tbut was  <384 (0x180)>\n\n.\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:70: error: Failure in TEST(MemoryPool, Allocate_SingleExistingBlock_PlacesAfterIt)\n\texpected < 64 (0x40)>\n\tbut was  <128 (0x80)>\n\n....\n/tmp/claude-0/cis/repo/tests/memory_pool_test.cpp:31: error: Failure in TEST(MemoryPool, Allocate_BytesNotExceedingPoolBytes_ReturnsOk)\n\tCHECK(status == cvaccel::Status::OK) failed\n\n..........................\n...............\nErrors (16 failures, 215 tests, 215 ran, 923 checks, 0 ignored, 0 filtered out, 5 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/types.hpp b/include/cvaccel/types.hpp\nindex b853d34..8dfaff4 100644\n--- a/include/cvaccel/types.hpp\n+++ b/include/cvaccel/types.hpp\n@@ -21,7 +21,7 @@ using TimeNs    = uint64_t;\n constexpr unsigned kMaxSessions   = 16;\n constexpr unsigned kMaxQueuePerCore = 32;\n constexpr size_t   kPoolBytes     = 64u * 1024u * 1024u;\n-constexpr size_t   kMemAlign      = 64;\n+constexpr size_t   kMemAlign      = 128;\n constexpr unsigned kConfigWords   = 8;\n constexpr uint32_t kMaxJobBytes   = 8u * 1024u * 1024u;\n \n"
+ },
+ "K1": {
+  "id": "K1",
+  "build_ok": false,
+  "errors": [
+   "tests/dispatcher_test.cpp:64: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:85: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:103: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:123: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:145: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:168: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:188: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:208: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:223: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:242: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:265: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019",
+   "tests/dispatcher_test.cpp:285: no matching function for call to \u2018cvaccel::Dispatcher::Dispatcher({anonymous}::FakeAccelBlock&, {anonymous}::FakeDevice&, cvaccel::RequestQueue&, cvaccel::MemoryPool&, cvaccel::SessionManager&, cvaccel::PerfMonitor&)\u2019"
+  ],
+  "error_count": 39,
+  "error_files": {
+   "tests/dispatcher_test.cpp": 36,
+   "tests/wrap/dispatcher_wrap_test.cpp": 3
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/dispatcher.hpp b/include/cvaccel/dispatcher.hpp\nindex 7f3e9a0..0bd282d 100644\n--- a/include/cvaccel/dispatcher.hpp\n+++ b/include/cvaccel/dispatcher.hpp\n@@ -16,7 +16,7 @@ namespace cvaccel {\n // by the service's completion handler, also under the mutex.\n class Dispatcher {\n public:\n-    Dispatcher(hw::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool, SessionManager& sm, PerfMonitor& perf);\n+    Dispatcher(hw::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool, SessionManager& sm, PerfMonitor& perf, unsigned maxInFlight);\n     // submits as many queued requests as the block accepts; returns how many were started\n     unsigned pump();\n     // hardware completion for one job: perf record, session bookkeeping, wake-up ioctl. Returns INVALID_ARG for an unknown job.\ndiff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..c58986a 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -12,8 +12,8 @@ uint32_t blockBytesOf(const MemoryPool& pool, MemHandle h) {\n }  // namespace\n \n Dispatcher::Dispatcher(hw::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool,\n-                        SessionManager& sm, PerfMonitor& perf)\n-    : hw_(hw), dev_(dev), queue_(q), pool_(pool), sessions_(sm), perf_(perf) {}\n+                        SessionManager& sm, PerfMonitor& perf, unsigned maxInFlight)\n+    : hw_(hw), dev_(dev), queue_(q), pool_(pool), sessions_(sm), perf_(perf) { (void)maxInFlight; }\n \n Status Dispatcher::start(Request& r) {\n     hw::JobDesc job{};\ndiff --git a/src/service.cpp b/src/service.cpp\nindex d2c8e9d..0ec05ef 100644\n--- a/src/service.cpp\n+++ b/src/service.cpp\n@@ -7,7 +7,7 @@ CvAccelService::CvAccelService(hw::IAccelBlock& hw, os::IDevice& dev)\n     : hw_(hw),\n       dev_(dev),\n       pool_(kPoolBytes, dev.poolPhysBase(), dev.poolVirtBase()),\n-      dispatcher_(hw_, dev_, queue_, pool_, sessions_, perf_) {\n+      dispatcher_(hw_, dev_, queue_, pool_, sessions_, perf_, 64) {\n     hw_.setCompletionHandler([this](const hw::JobResult& res) { onHwCompletion(res); });\n }\n \n"
+ },
+ "K2": {
+  "id": "K2",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..2193a3b 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -19,7 +19,7 @@ struct MemBlock {\n // within a run (so a stale handle is detected). Free blocks are coalesced.\n class MemoryPool {\n public:\n-    explicit MemoryPool(size_t poolBytes = kPoolBytes, uint64_t physBase = 0, uint8_t* virtBase = nullptr);\n+    explicit MemoryPool(size_t poolBytes = 4096, uint64_t physBase = 0, uint8_t* virtBase = nullptr);\n     Status    allocate(SessionId owner, size_t bytes, MemHandle& outHandle, size_t align = kMemAlign);   // NO_MEMORY, INVALID_ARG (0 or > pool)\n     Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs\n     void      releaseAll(SessionId owner);\n"
+ },
+ "H1": {
+  "id": "H1",
+  "build_ok": false,
+  "errors": [
+   "tests/dispatcher_test.cpp:60: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:61: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:81: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:82: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:99: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:100: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:119: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:120: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:141: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:142: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:164: aggregate \u2018cvaccel::SessionManager sessions\u2019 has incomplete type and cannot be defined",
+   "tests/dispatcher_test.cpp:165: aggregate \u2018cvaccel::PerfMonitor perf\u2019 has incomplete type and cannot be defined"
+  ],
+  "error_count": 78,
+  "error_files": {
+   "tests/dispatcher_test.cpp": 78
+  },
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/dispatcher.hpp b/include/cvaccel/dispatcher.hpp\nindex 7f3e9a0..5f2c06d 100644\n--- a/include/cvaccel/dispatcher.hpp\n+++ b/include/cvaccel/dispatcher.hpp\n@@ -6,10 +6,10 @@\n #include \"cvaccel/device.hpp\"\n #include \"cvaccel/request_queue.hpp\"\n #include \"cvaccel/memory_pool.hpp\"\n-#include \"cvaccel/session_manager.hpp\"\n-#include \"cvaccel/perf_monitor.hpp\"\n \n namespace cvaccel {\n+class SessionManager;\n+class PerfMonitor;\n \n // Moves queued requests to free cores and turns hardware completions into client wake-ups.\n // Not thread-safe by itself: the service holds its mutex around every call; onCompletion() is called\ndiff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..4663fce 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -1,4 +1,6 @@\n #include \"cvaccel/dispatcher.hpp\"\n+#include \"cvaccel/session_manager.hpp\"\n+#include \"cvaccel/perf_monitor.hpp\"\n #include <vector>\n \n namespace cvaccel {\n"
+ },
+ "H2": {
+  "id": "H2",
+  "build_ok": false,
+  "errors": [
+   "tests/wrap/dispatcher_wrap_test.cpp:9: \u2018hw\u2019 has not been declared",
+   "tests/wrap/dispatcher_wrap_test.cpp:9: expected \u2018{\u2019 before \u2018IAccelBlock\u2019",
+   "tests/wrap/dispatcher_wrap_test.cpp:10: expected primary-expression before \u2018public\u2019",
+   "tests/wrap/dispatcher_wrap_test.cpp:10: expected \u2018}\u2019 before \u2018public\u2019",
+   "tests/wrap/dispatcher_wrap_test.cpp:12: virt-specifiers in \u2018isBusy\u2019 not allowed outside a class definition",
+   "tests/wrap/dispatcher_wrap_test.cpp:12: non-member function \u2018bool {anonymous}::isBusy(cvaccel::CoreType)\u2019 cannot have cv-qualifier",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: \u2018hw\u2019 does not name a type; did you mean \u2018Hw\u2019?",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: expected unqualified-id before \u2018&\u2019 token",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: expected \u2018)\u2019 before \u2018&\u2019 token",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: expected template-argument before \u2018)\u2019 token",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: expected \u2018>\u2019 before \u2018)\u2019 token",
+   "tests/wrap/dispatcher_wrap_test.cpp:13: expected initializer before \u2018>\u2019 token"
+  ],
+  "error_count": 177,
+  "error_files": {
+   "tests/wrap/dispatcher_wrap_test.cpp": 17,
+   "tests/service_test.cpp": 85,
+   "tests/dispatcher_test.cpp": 75
+  },
+  "link": [],
+  "warnings_new": [
+   "/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:16:10: warning: \u2018bool {anonymous}::isBusy(cvaccel::CoreType)\u2019 defined but not used [-Wunused-function]",
+   "/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:19:12: warning: \u2018{anonymous}::submitStatus\u2019 defined but not used [-Wunused-variable]",
+   "/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:20:10: warning: \u2018{anonymous}::busy\u2019 defined but not used [-Wunused-variable]",
+   "/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:21:14: warning: \u2018{anonymous}::submitCount\u2019 defined but not used [-Wunused-variable]",
+   "/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:9:35: warning: \u2018{anonymous}::IAccelBlock\u2019 defined but not used [-Wunused-variable]",
+   "/tmp/claude-0/cis/repo/tests/service_test.cpp:39:35: warning: \u2018{anonymous}::IAccelBlock\u2019 defined but not used [-Wunused-variable]"
+  ],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/dispatcher.hpp b/include/cvaccel/dispatcher.hpp\nindex 7f3e9a0..62a865c 100644\n--- a/include/cvaccel/dispatcher.hpp\n+++ b/include/cvaccel/dispatcher.hpp\n@@ -16,18 +16,18 @@ namespace cvaccel {\n // by the service's completion handler, also under the mutex.\n class Dispatcher {\n public:\n-    Dispatcher(hw::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool, SessionManager& sm, PerfMonitor& perf);\n+    Dispatcher(hwif::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool, SessionManager& sm, PerfMonitor& perf);\n     // submits as many queued requests as the block accepts; returns how many were started\n     unsigned pump();\n     // hardware completion for one job: perf record, session bookkeeping, wake-up ioctl. Returns INVALID_ARG for an unknown job.\n-    Status   onCompletion(const hw::JobResult& res);\n+    Status   onCompletion(const hwif::JobResult& res);\n     // a session is closing: its running jobs stay in flight but will not wake anybody; queued ones are cancelled (wake with CANCELLED)\n     unsigned cancelSession(SessionId session);\n     unsigned inFlight() const { return static_cast<unsigned>(running_.size()); }\n     bool     isRunning(RequestId id) const { return running_.count(id) != 0; }\n private:\n     Status   start(Request& r);\n-    hw::IAccelBlock& hw_; os::IDevice& dev_; RequestQueue& queue_; MemoryPool& pool_; SessionManager& sessions_; PerfMonitor& perf_;\n+    hwif::IAccelBlock& hw_; os::IDevice& dev_; RequestQueue& queue_; MemoryPool& pool_; SessionManager& sessions_; PerfMonitor& perf_;\n     std::unordered_map<RequestId, Request> running_;     // jobs handed to the hardware\n };\n \ndiff --git a/include/cvaccel/hw_block.hpp b/include/cvaccel/hw_block.hpp\nindex 23b51d9..b749c4e 100644\n--- a/include/cvaccel/hw_block.hpp\n+++ b/include/cvaccel/hw_block.hpp\n@@ -3,7 +3,7 @@\n #include <functional>\n #include \"cvaccel/types.hpp\"\n \n-namespace cvaccel::hw {\n+namespace cvaccel::hwif {\n \n struct JobDesc {\n     uint32_t jobId;                    // == RequestId\ndiff --git a/include/cvaccel/service.hpp b/include/cvaccel/service.hpp\nindex 84fb2ea..0b349fd 100644\n--- a/include/cvaccel/service.hpp\n+++ b/include/cvaccel/service.hpp\n@@ -24,14 +24,14 @@ struct GetStatsArgs     { SessionId session; uint64_t outCount; uint64_t outAvgL\n // The base app: one instance per SoC. handle() is the ioctl entry point for every client command.\n class CvAccelService {\n public:\n-    CvAccelService(hw::IAccelBlock& hw, os::IDevice& dev);\n+    CvAccelService(hwif::IAccelBlock& hw, os::IDevice& dev);\n     ~CvAccelService();\n     // dispatches on cmd; payload must point to the matching *Args struct of at least payloadBytes\n     Status   handle(ClientFd clientFd, IoctlCmd cmd, void* payload, size_t payloadBytes);\n     // a client's fd was closed: close all its sessions\n     void     clientDisconnected(ClientFd clientFd);\n     // completion path: called by the block's completion handler (any thread)\n-    void     onHwCompletion(const hw::JobResult& res);\n+    void     onHwCompletion(const hwif::JobResult& res);\n     // maintenance: retry submissions the block refused earlier (call periodically or after a completion)\n     unsigned pump();\n     const PerfMonitor& perf() const { return perf_; }\n@@ -47,7 +47,7 @@ private:\n     Status submit(ClientFd fd, SubmitArgs& a);\n     Status getStats(ClientFd fd, GetStatsArgs& a);\n \n-    hw::IAccelBlock& hw_; os::IDevice& dev_;\n+    hwif::IAccelBlock& hw_; os::IDevice& dev_;\n     mutable std::mutex mtx_;\n     SessionManager sessions_; MemoryPool pool_; RequestQueue queue_; PerfMonitor perf_; Dispatcher dispatcher_;\n     std::unordered_map<RequestId, Request> posted_;   // configured, not yet submitted\ndiff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..db7b12c 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -11,12 +11,12 @@ uint32_t blockBytesOf(const MemoryPool& pool, MemHandle h) {\n }\n }  // namespace\n \n-Dispatcher::Dispatcher(hw::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool,\n+Dispatcher::Dispatcher(hwif::IAccelBlock& hw, os::IDevice& dev, RequestQueue& q, MemoryPool& pool,\n                         SessionManager& sm, PerfMonitor& perf)\n     : hw_(hw), dev_(dev), queue_(q), pool_(pool), sessions_(sm), perf_(perf) {}\n \n Status Dispatcher::start(Request& r) {\n-    hw::JobDesc job{};\n+    hwif::JobDesc job{};\n     job.jobId = r.id;\n     job.core = r.core;\n     job.physAddr = pool_.physAddr(r.mem);\n@@ -85,7 +85,7 @@ unsigned Dispatcher::pump() {\n     return started;\n }\n \n-Status Dispatcher::onCompletion(const hw::JobResult& res) {\n+Status Dispatcher::onCompletion(const hwif::JobResult& res) {\n     auto it = running_.find(res.jobId);\n     if (it == running_.end()) return Status::INVALID_ARG;\n     Request r = it->second;\ndiff --git a/src/service.cpp b/src/service.cpp\nindex d2c8e9d..4467ac0 100644\n--- a/src/service.cpp\n+++ b/src/service.cpp\n@@ -3,12 +3,12 @@\n \n namespace cvaccel {\n \n-CvAccelService::CvAccelService(hw::IAccelBlock& hw, os::IDevice& dev)\n+CvAccelService::CvAccelService(hwif::IAccelBlock& hw, os::IDevice& dev)\n     : hw_(hw),\n       dev_(dev),\n       pool_(kPoolBytes, dev.poolPhysBase(), dev.poolVirtBase()),\n       dispatcher_(hw_, dev_, queue_, pool_, sessions_, perf_) {\n-    hw_.setCompletionHandler([this](const hw::JobResult& res) { onHwCompletion(res); });\n+    hw_.setCompletionHandler([this](const hwif::JobResult& res) { onHwCompletion(res); });\n }\n \n CvAccelService::~CvAccelService() {\n@@ -141,7 +141,7 @@ void CvAccelService::clientDisconnected(ClientFd clientFd) {\n     for (SessionId id : ids) closeSession(clientFd, id);\n }\n \n-void CvAccelService::onHwCompletion(const hw::JobResult& res) {\n+void CvAccelService::onHwCompletion(const hwif::JobResult& res) {\n     std::lock_guard<std::mutex> lock(mtx_);\n     dispatcher_.onCompletion(res);\n     dispatcher_.pump();\n"
+ },
+ "H3": {
+  "id": "H3",
+  "build_ok": false,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [
+   "undefined reference to `cvaccel::PerfMonitor::report[abi:cxx11]() const'",
+   "undefined reference to `cvaccel::PerfMonitor::report[abi:cxx11]() const'",
+   "undefined reference to `cvaccel::PerfMonitor::report[abi:cxx11]() const'",
+   "error: ld returned 1 exit status"
+  ],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/perf_monitor.cpp: 0/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/perf_monitor.hpp b/include/cvaccel/perf_monitor.hpp\nindex 59bf4e5..2b531ee 100644\n--- a/include/cvaccel/perf_monitor.hpp\n+++ b/include/cvaccel/perf_monitor.hpp\n@@ -37,6 +37,7 @@ public:\n     uint64_t totalCount() const;\n     std::string report() const;                       // human-readable, one line per core\n     void     reset();\n+    std::string report_moved() const;\n     // integrity rules, exposed for testing\n     static bool timestampsOk(const PerfRecord& r);    // queued <= started <= finished, finished > 0\n     static bool bytesOk(const PerfRecord& r);         // 0 < bytes <= allocated\ndiff --git a/src/perf_monitor.cpp b/src/perf_monitor.cpp\nindex f5a7a1b..566e344 100644\n--- a/src/perf_monitor.cpp\n+++ b/src/perf_monitor.cpp\n@@ -54,7 +54,7 @@ uint64_t PerfMonitor::totalCount() const {\n     return total;\n }\n \n-std::string PerfMonitor::report() const {\n+std::string PerfMonitor::report_moved() const {\n     std::string out;\n     for (unsigned i = 0; i < kCoreCount; ++i) {\n         const PerfStats& s = perCore_[i];\n"
+ },
+ "W1": {
+  "id": "W1",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 74,
+    "summary": "Errors (74 failures, 215 tests, 215 ran, 855 checks, 0 ignored, 0 filtered out, 5 ms)",
+    "failed": [
+     "TEST(CvAccelService, PerfMonitorRecord_IntegrityNotOk_ReturnsIntegrity)",
+     "TEST(CvAccelService, PerfMonitorRecord_IntegrityOk_ReturnsOk)",
+     "TEST(CvAccelService, PerfMonitorRecord_CoreIndexOutOfRange_SkipsPerCoreAccumulation)",
+     "TEST(CvAccelService, PerfMonitorRecord_CoreIndexWithinRange_AccumulatesPerCoreStats)",
+     "TEST(CvAccelService, PerfMonitorRecord_IntegrityOk_IntegrityErrorsStayZero)",
+     "TEST(CvAccelService, PerfMonitorRecord_IntegrityNotOk_IncrementsIntegrityErrors)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapAtStartFits_PlacesBeforeFirstBlock)",
+     "TEST(CvAccelService, MemoryPoolAllocate_NoFittingGapAmongBlocks_PlacesAfterLast)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksTooSmall_SkipsGap)",
+     "TEST(CvAccelService, MemoryPoolAllocate_GapBetweenBlocksFits_ReusesGap)",
+     "TEST(CvAccelService, MemoryPoolAllocate_ThreeExistingBlocks_PlacesAfterAll)",
+     "TEST(CvAccelService, MemoryPoolAllocate_SingleExistingBlock_PlacesAfterIt)",
+     "TEST(CvAccelService, MemoryPoolAllocate_NoExistingBlocks_PlacesAtOffsetZero)",
+     "TEST(CvAccelService, Pump_TypicalQueuedRequest_ReturnsDispatcherPumpCount)",
+     "TEST(CvAccelService, OnHwCompletion_TypicalCompletion_RecordsAndWakesClient)",
+     "TEST(CvAccelService, Submit_L121SiFound_IncrementsOpenRequests)",
+     "TEST(CvAccelService, Submit_L118StOk_ProceedsPastStatusCheck)",
+     "TEST(CvAccelService, Submit_L114BothFalse_ProceedsPastOwnershipCheck)",
+     "TEST(CvAccelService, Submit_L113ItEndFalse_ProceedsPastLookup)",
+     "TEST(CvAccelService, PostConfig_L103ConfigAllWordsSet_CopiesAllWordsToRequest)",
+     "TEST(CvAccelService, PostConfig_L103ConfigOneWordSet_CopiesWordToRequest)",
+     "TEST(CvAccelService, PostConfig_L103ConfigAllZero_CopiesZeroedConfigToRequest)",
+     "TEST(CvAccelService, CloseSession_L60SessionDiffers_KeepsOtherSessionsEntry)",
+     "TEST(CvAccelService, Handle_L21_SubmitCmd_CallsSubmit)",
+     "TEST(PerfMonitor, Reset_TypicalInputs_ClearsAllStats)",
+     "TEST(PerfMonitor, Report_ManyRecordsRecorded_ReflectsAllRecords)",
+     "TEST(PerfMonitor, Report_OneRecordRecorded_ReflectsThatRecord)",
+     "TEST(PerfMonitor, TotalCount_TypicalInputs_ReturnsSumAcrossCores)",
+     "TEST(PerfMonitor, Session_KnownSession_ReturnsAccumulatedStats)",
+     "TEST(PerfMonitor, Session_UnknownSession_ReturnsZeroStats)",
+     "TEST(PerfMonitor, Record_IntegrityNotOk_ReturnsIntegrity)",
+     "TEST(PerfMonitor, Record_IntegrityOk_ReturnsOk)",
+     "TEST(PerfMonitor, Record_CoreIndexOutOfRange_SkipsPerCoreAccumulation)",
+     "TEST(PerfMonitor, Record_CoreIndexWithinRange_AccumulatesPerCoreStats)",
+     "TEST(PerfMonitor, Record_IntegrityOk_IntegrityErrorsStayZero)",
+     "TEST(PerfMonitor, Record_IntegrityNotOk_IncrementsIntegrityErrors)",
+     "TEST(PerfMonitor, Accumulate_StatusOk_FailuresStayZero)",
+     "TEST(PerfMonitor, Accumulate_StatusNotOk_IncrementsFailures)",
+     "TEST(MemoryPool, PhysAddr_HandleNotFound_ReturnsZero)",
+     "TEST(MemoryPool, PhysAddr_HandleFound_ReturnsPhysBasePlusOffset)",
+     "TEST(MemoryPool, Allocate_GapAtStartFits_PlacesBeforeFirstBlock)",
+     "TEST(MemoryPool, Allocate_NoFittingGapAmongBlocks_PlacesAfterLast)",
+     "TEST(MemoryPool, Allocate_GapBetweenBlocksTooSmall_SkipsGap)",
+     "TEST(MemoryPool, Allocate_GapBetweenBlocksFits_ReusesGap)",
+     "TEST(MemoryPool, Allocate_ThreeExistingBlocks_PlacesAfterAll)",
+     "TEST(MemoryPool, Allocate_SingleExistingBlock_PlacesAfterIt)",
+     "TEST(MemoryPool, Allocate_NoExistingBlocks_ReturnsOffsetZero)",
+     "TEST(MemoryPool, Allocate_BytesNotExceedingPoolBytes_ReturnsOk)",
+     "TEST(Dispatcher, CancelSession_L150_RunningJobDifferentSession_ClientFdUnaffected)",
+     "TEST(Dispatcher, CancelSession_L150_RunningJobMatchesSession_CompletionSilenced)",
+     "TEST(Dispatcher, OnCompletion_L111_ClientFdInvalid_DoesNotWakeClient)",
+     "TEST(Dispatcher, OnCompletion_L111_ClientFdSet_WakesClient)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionFoundWithZeroOpenRequests_StaysZero)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionNotFound_StillErasesRunningAndReturnsOk)",
+     "TEST(Dispatcher, OnCompletion_L107_SessionFoundWithOpenRequests_DecrementsOpenRequests)",
+     "TEST(Dispatcher, OnCompletion_L90_JobIdInRunning_ErasesFromRunningAndReturnsOk)",
+     "TEST(Dispatcher, Pump_L75_ClientFdInvalid_DoesNotWakeClient)",
+     "TEST(Dispatcher, Pump_L75_ClientFdSet_WakesClient)",
+     "TEST(Dispatcher, Pump_L47_StatusNotBusy_RecordsFailureInPlace)",
+     "TEST(Dispatcher, Pump_L47_StatusBusy_ReEnqueuesRequestAndBreaks)",
+     "TEST(Dispatcher, Pump_L43_StatusNotOk_DoesNotIncrementStarted)",
+     "TEST(Dispatcher, Pump_L43_StatusOk_IncrementsStartedAndContinuesLoop)",
+     "TEST(Dispatcher, Pump_L40_DequeueSucceeds_CallsStart)",
+     "TEST(Dispatcher, Pump_L38_CoreFreeWithManyRequests_StartsAllQueuedRequests)",
+     "TEST(Dispatcher, Pump_L38_CoreFreeWithOneRequest_StartsOneRequestThenStops)",
+     "TEST(Dispatcher, Pump_L36_MultipleCoresHaveQueuedRequests_StartsEachCoresRequest)",
+     "TEST(Dispatcher, Pump_L36_OneCoreHasQueuedRequest_StartsThatCoresRequest)",
+     "TEST(Dispatcher, Start_SubmitFails_RequestNotMovedToRunning)",
+     "TEST(Dispatcher, Start_SubmitOk_RequestMovesToRunning)",
+     "TEST(Dispatcher, Start_ConfigAllNonZero_JobConfigCopiesEveryWord)",
+     "TEST(Dispatcher, Start_ConfigOneNonZero_JobConfigCopiesThatWord)",
+     "TEST(Dispatcher, Start_ConfigAllZero_JobConfigAllZero)",
+     "TEST(Dispatcher, BlockBytesOf_HandleNotFound_ReturnsZeroSoIntegrityFails)",
+     "TEST(Dispatcher, BlockBytesOf_HandleFound_UsesBlockBytesSoIntegrityOk)"
+    ],
+    "detail": [
+     "Mock Failure: Unexpected call to function: PerfMonitor::record::PerfMonitor::record",
+     "Mock Failure: Unexpected call to function: PerfMonitor::record::PerfMonitor::record",
+     "Mock Failure: Unexpected call to function: PerfMonitor::record::PerfMonitor::record",
+     "Mock Failure: Unexpected call to function: PerfMonitor::record::PerfMonitor::record",
+     "Mock Failure: Unexpected call to function: PerfMonitor::record::PerfMonitor::record"
+    ],
+    "tail": "oryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\t<none>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:116: error: Failure in TEST(Dispatcher, Start_ConfigOneNonZero_JobConfigCopiesThatWord)\n\tMock Failure: Unexpected call to function: MemoryPool::physAddr::MemoryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\t<none>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:96: error: Failure in TEST(Dispatcher, Start_ConfigAllZero_JobConfigAllZero)\n\tMock Failure: Unexpected call to function: MemoryPool::physAddr::MemoryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\t<none>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:78: error: Failure in TEST(Dispatcher, BlockBytesOf_HandleNotFound_ReturnsZeroSoIntegrityFails)\n\tMock Failure: Unexpected call to function: MemoryPool::physAddr::MemoryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\t<none>\n\n.\n/tmp/claude-0/cis/repo/tests/dispatcher_test.cpp:57: error: Failure in TEST(Dispatcher, BlockBytesOf_HandleFound_UsesBlockBytesSoIntegrityOk)\n\tMock Failure: Unexpected call to function: MemoryPool::physAddr::MemoryPool::physAddr\n\tEXPECTED calls that WERE NOT fulfilled:\n\t\t<none>\n\tEXPECTED calls that WERE fulfilled:\n\t\t<none>\n\n...\nErrors (74 failures, 215 tests, 215 ran, 855 checks, 0 ignored, 0 filtered out, 5 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "...\nOK (3 tests, 3 ran, 18 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt\nindex 5a23e75..5cdb1f2 100644\n--- a/tests/CMakeLists.txt\n+++ b/tests/CMakeLists.txt\n@@ -24,7 +24,8 @@ set(UT_CODE_UNDER_TEST\n   ${CMAKE_SOURCE_DIR}/src/service.cpp\n   ${CMAKE_SOURCE_DIR}/src/session_manager.cpp\n )\n-add_executable(unit_tests ${UT_SOURCES} ${UT_CODE_UNDER_TEST})\n+add_executable(unit_tests ${UT_SOURCES} ${UT_CODE_UNDER_TEST} ${CMAKE_CURRENT_SOURCE_DIR}/stubs/cvaccel_wrap_stubs.cpp)\n+target_link_options(unit_tests PRIVATE \"LINKER:--wrap=_ZN7cvaccel11PerfMonitor6recordERKNS_10PerfRecordE\" \"LINKER:--wrap=_ZNK7cvaccel10MemoryPool8physAddrEj\")\n target_include_directories(unit_tests PRIVATE ${CMAKE_SOURCE_DIR}/client/include ${CMAKE_SOURCE_DIR}/include ${CMAKE_CURRENT_SOURCE_DIR}/mocks)\n target_link_libraries(unit_tests PRIVATE ${CPPUTEST_EXT} ${CPPUTEST_LIB} Threads::Threads)\n target_compile_options(unit_tests PRIVATE -Wall -Wextra)\n"
+ },
+ "W2": {
+  "id": "W2",
+  "build_ok": false,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [
+   "undefined reference to `cvaccel::MemoryPool::physAddr(unsigned int) const'",
+   "error: ld returned 1 exit status"
+  ],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": [
+    "src/memory_pool.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..9681348 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -24,7 +24,7 @@ public:\n     Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs\n     void      releaseAll(SessionId owner);\n     const MemBlock* find(MemHandle h) const;\n-    uint64_t  physAddr(MemHandle h) const;                                     // 0 if unknown\n+    uint64_t  physAddr(MemHandle h, bool strict = false) const;                                     // 0 if unknown\n     uint8_t*  map(MemHandle h);                                                // nullptr if unknown or no virt base\n     size_t    bytesInUse() const;\n     size_t    bytesInUse(SessionId owner) const;\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..7ecfea6 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -61,7 +61,8 @@ const MemBlock* MemoryPool::find(MemHandle h) const {\n     return nullptr;\n }\n \n-uint64_t MemoryPool::physAddr(MemHandle h) const {\n+uint64_t MemoryPool::physAddr(MemHandle h, bool strict) const {\n+    (void)strict;\n     const MemBlock* b = find(h);\n     return b ? physBase_ + b->offset : 0;\n }\n"
+ },
+ "W3": {
+  "id": "W3",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 2 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 1,
+    "summary": "Errors (1 failures, 3 tests, 3 ran, 10 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [
+     "TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)"
+    ],
+    "detail": [
+     "expected <11255808 (0xabc000)>"
+    ],
+    "tail": ".\n/tmp/claude-0/cis/repo/tests/wrap/dispatcher_wrap_test.cpp:48: error: Failure in TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)\n\texpected <11255808 (0xabc000)>\n\tbut was  <       0 (0x0)>\n\n..\nErrors (1 failures, 3 tests, 3 ran, 10 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/include/cvaccel/memory_pool.hpp b/include/cvaccel/memory_pool.hpp\nindex 8fa40cd..1bf836e 100644\n--- a/include/cvaccel/memory_pool.hpp\n+++ b/include/cvaccel/memory_pool.hpp\n@@ -24,7 +24,7 @@ public:\n     Status    release(MemHandle h, SessionId owner);                          // NOT_OWNER if owner differs\n     void      releaseAll(SessionId owner);\n     const MemBlock* find(MemHandle h) const;\n-    uint64_t  physAddr(MemHandle h) const;                                     // 0 if unknown\n+    uint64_t  physAddr(MemHandle h) const { const MemBlock* b = find(h); return b ? physBase_ + b->offset : 0; }                                     // 0 if unknown\n     uint8_t*  map(MemHandle h);                                                // nullptr if unknown or no virt base\n     size_t    bytesInUse() const;\n     size_t    bytesInUse(SessionId owner) const;\ndiff --git a/src/memory_pool.cpp b/src/memory_pool.cpp\nindex b3e58f1..55b41d6 100644\n--- a/src/memory_pool.cpp\n+++ b/src/memory_pool.cpp\n@@ -61,10 +61,6 @@ const MemBlock* MemoryPool::find(MemHandle h) const {\n     return nullptr;\n }\n \n-uint64_t MemoryPool::physAddr(MemHandle h) const {\n-    const MemBlock* b = find(h);\n-    return b ? physBase_ + b->offset : 0;\n-}\n \n uint8_t* MemoryPool::map(MemHandle h) {\n     const MemBlock* b = find(h);\n"
+ },
+ "W4": {
+  "id": "W4",
+  "build_ok": false,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [
+   "undefined reference to `__wrap__ZNK7cvaccel10MemoryPool4findEj'",
+   "undefined reference to `__wrap__ZNK7cvaccel10MemoryPool4findEj'",
+   "undefined reference to `__wrap__ZNK7cvaccel10MemoryPool4findEj'",
+   "error: ld returned 1 exit status"
+  ],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 3 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt\nindex 5a23e75..3315280 100644\n--- a/tests/CMakeLists.txt\n+++ b/tests/CMakeLists.txt\n@@ -31,7 +31,7 @@ target_compile_options(unit_tests PRIVATE -Wall -Wextra)\n add_test(NAME unit_tests COMMAND unit_tests -v)\n \n # second binary: the shared --wrap + CppUMock stubs (C++ functions wrapped by mangled name)\n-set(UT_WRAPPED _ZN7cvaccel11PerfMonitor6recordERKNS_10PerfRecordE _ZNK7cvaccel10MemoryPool8physAddrEj)\n+set(UT_WRAPPED _ZNK7cvaccel10MemoryPool4findEj _ZN7cvaccel11PerfMonitor6recordERKNS_10PerfRecordE _ZNK7cvaccel10MemoryPool8physAddrEj)\n add_executable(unit_tests_wrap ${CMAKE_CURRENT_SOURCE_DIR}/wrap/dispatcher_wrap_test.cpp\n   ${CMAKE_CURRENT_SOURCE_DIR}/stubs/cvaccel_wrap_stubs.cpp ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${UT_CODE_UNDER_TEST})\n target_include_directories(unit_tests_wrap PRIVATE ${CMAKE_SOURCE_DIR}/client/include ${CMAKE_SOURCE_DIR}/include)\n"
+ },
+ "W5": {
+  "id": "W5",
+  "build_ok": false,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [
+   "undefined reference to `__real__ZNK7cvaccel10MemoryPool8physAddrEj'",
+   "error: ld returned 1 exit status"
+  ],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": false
+   }
+  },
+  "reach": {
+   "executable": 0,
+   "executed": 0,
+   "branches": 0,
+   "branches_taken": 0,
+   "detail": []
+  },
+  "diff": "diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt\nindex 5a23e75..b56a8a6 100644\n--- a/tests/CMakeLists.txt\n+++ b/tests/CMakeLists.txt\n@@ -31,7 +31,7 @@ target_compile_options(unit_tests PRIVATE -Wall -Wextra)\n add_test(NAME unit_tests COMMAND unit_tests -v)\n \n # second binary: the shared --wrap + CppUMock stubs (C++ functions wrapped by mangled name)\n-set(UT_WRAPPED _ZN7cvaccel11PerfMonitor6recordERKNS_10PerfRecordE _ZNK7cvaccel10MemoryPool8physAddrEj)\n+set(UT_WRAPPED _ZN7cvaccel11PerfMonitor6recordERKNS_10PerfRecordE)\n add_executable(unit_tests_wrap ${CMAKE_CURRENT_SOURCE_DIR}/wrap/dispatcher_wrap_test.cpp\n   ${CMAKE_CURRENT_SOURCE_DIR}/stubs/cvaccel_wrap_stubs.cpp ${CMAKE_CURRENT_SOURCE_DIR}/main.cpp ${UT_CODE_UNDER_TEST})\n target_include_directories(unit_tests_wrap PRIVATE ${CMAKE_SOURCE_DIR}/client/include ${CMAKE_SOURCE_DIR}/include)\n"
+ },
+ "W6": {
+  "id": "W6",
+  "build_ok": true,
+  "errors": [],
+  "error_count": 0,
+  "error_files": {},
+  "link": [],
+  "warnings_new": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "rc": 0,
+    "summary": "OK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)",
+    "failed": [],
+    "detail": [],
+    "tail": "..................................................\n..................................................\n..................................................\n..................................................\n...............\nOK (215 tests, 215 ran, 926 checks, 0 ignored, 0 filtered out, 4 ms)\n\n"
+   },
+   "unit_tests_wrap": {
+    "ran": true,
+    "rc": 1,
+    "summary": "Errors (1 failures, 3 tests, 3 ran, 10 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [
+     "TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)"
+    ],
+    "detail": [
+     "expected <11255808 (0xabc000)>"
+    ],
+    "tail": ".\n/tmp/claude-0/cis/repo/tests/wrap/dispatcher_wrap_test.cpp:48: error: Failure in TEST(DispatcherWrap, Start_UsesPhysAddrOfHandle_Mocked)\n\texpected <11255808 (0xabc000)>\n\tbut was  <       0 (0x0)>\n\n..\nErrors (1 failures, 3 tests, 3 ran, 10 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": {
+   "executable": 1,
+   "executed": 1,
+   "branches": 4,
+   "branches_taken": 4,
+   "detail": [
+    "src/dispatcher.cpp: 1/1"
+   ]
+  },
+  "diff": "diff --git a/src/dispatcher.cpp b/src/dispatcher.cpp\nindex 67dd660..8c8f525 100644\n--- a/src/dispatcher.cpp\n+++ b/src/dispatcher.cpp\n@@ -19,7 +19,7 @@ Status Dispatcher::start(Request& r) {\n     hw::JobDesc job{};\n     job.jobId = r.id;\n     job.core = r.core;\n-    job.physAddr = pool_.physAddr(r.mem);\n+    job.physAddr = pool_.find(r.mem) ? pool_.find(r.mem)->offset : 0;\n     job.bytes = r.bytes;\n     for (unsigned i = 0; i < kConfigWords; ++i) job.config[i] = r.config[i];\n \n"
+ },
+ "X1": {
+  "id": "X1",
+  "build_ok": true,
+  "errors": [],
+  "error_files": {},
+  "link": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "summary": "Errors (2 failures, 3 tests, 3 ran, 13 checks, 0 ignored, 0 filtered out, 0 ms)",
+    "failed": [
+     "TEST(Sensor, Real)",
+     "TEST(Sensor, Spy)"
+    ],
+    "tail": "TEST(Sensor, Real)\ntests/sensor_test.cpp:7: error: Failure in TEST(Sensor, Real)\n\tLONGS_EQUAL(15, sensor_get(3)) failed\n\texpected <       15 (0xf)>\n\tbut was  <959867535 (0x39366a8f)>\n\n - 0 ms\nTEST(Sensor, Spy)\ntests/sensor_test.cpp:6: error: Failure in TEST(Sensor, Spy)\n\tLONGS_EQUAL(15, sensor_get(3)) failed\n\texpected <       15 (0xf)>\n\tbut was  <962523535 (0x395ef18f)>\n\n - 0 ms\nTEST(Sensor, Mocked) - 0 ms\n\nErrors (2 failures, 3 tests, 3 ran, 13 checks, 0 ignored, 0 filtered out, 0 ms)\n\n"
+   }
+  },
+  "reach": null,
+  "warnings_new": [],
+  "diff": "diff --git a/hal.c b/hal.c\nindex f4b816c..a81eb29 100644\n--- a/hal.c\n+++ b/hal.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int hal_read(int reg) { return reg * 10; }\n+int hal_read(int reg, int bank) { return reg * 10 + bank * 1000; }\ndiff --git a/hal.h b/hal.h\nindex 611fa2b..74c0451 100644\n--- a/hal.h\n+++ b/hal.h\n@@ -2,7 +2,7 @@\n #ifdef __cplusplus\n extern \"C\" {\n #endif\n-int hal_read(int reg);\n+int hal_read(int reg, int bank);\n int sensor_get(int reg);\n #ifdef __cplusplus\n }\ndiff --git a/sensor.c b/sensor.c\nindex cbd65ec..609da16 100644\n--- a/sensor.c\n+++ b/sensor.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int sensor_get(int reg) { return hal_read(reg) / 2; }\n+int sensor_get(int reg) { return hal_read(reg, 0) / 2; }\n"
+ },
+ "X2": {
+  "id": "X2",
+  "build_ok": false,
+  "errors": [
+   "stubs/hal_wrap_stubs.cpp:5: conflicting declaration of C function \u2018int __wrap_hal_read(int)\u2019",
+   "stubs/hal_wrap_stubs.cpp:8: too few arguments to function \u2018int __real_hal_read(int, int)\u2019"
+  ],
+  "error_files": {
+   "stubs/hal_wrap_stubs.cpp": 2
+  },
+  "link": [],
+  "tests": {
+   "unit_tests": {
+    "ran": false,
+    "summary": "BUILD FAILED",
+    "failed": [],
+    "tail": ""
+   }
+  },
+  "reach": null,
+  "warnings_new": [],
+  "diff": "diff --git a/hal.c b/hal.c\nindex f4b816c..a81eb29 100644\n--- a/hal.c\n+++ b/hal.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int hal_read(int reg) { return reg * 10; }\n+int hal_read(int reg, int bank) { return reg * 10 + bank * 1000; }\ndiff --git a/hal.h b/hal.h\nindex 611fa2b..74c0451 100644\n--- a/hal.h\n+++ b/hal.h\n@@ -2,7 +2,7 @@\n #ifdef __cplusplus\n extern \"C\" {\n #endif\n-int hal_read(int reg);\n+int hal_read(int reg, int bank);\n int sensor_get(int reg);\n #ifdef __cplusplus\n }\ndiff --git a/sensor.c b/sensor.c\nindex cbd65ec..609da16 100644\n--- a/sensor.c\n+++ b/sensor.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int sensor_get(int reg) { return hal_read(reg) / 2; }\n+int sensor_get(int reg) { return hal_read(reg, 0) / 2; }\ndiff --git a/stubs/hal_wrap_stubs.cpp b/stubs/hal_wrap_stubs.cpp\nindex 0d9daee..cecdd18 100644\n--- a/stubs/hal_wrap_stubs.cpp\n+++ b/stubs/hal_wrap_stubs.cpp\n@@ -1,7 +1,7 @@\n // shared --wrap + CppUMock stub for the C function hal_read (project headers before CppUTest headers)\n #include \"hal.h\"\n #include \"CppUTestExt/MockSupport.h\"\n-extern \"C\" int __real_hal_read(int reg);\n+extern \"C\" __typeof__(hal_read) __real_hal_read, __wrap_hal_read;\n extern \"C\" int __wrap_hal_read(int reg) {\n     mock(\"hal_read\").actualCall(\"hal_read\").withIntParameter(\"reg\", reg);\n     if (mock(\"hal_read\").hasReturnValue()) return mock(\"hal_read\").intReturnValue();\n"
+ },
+ "X3": {
+  "id": "X3",
+  "build_ok": true,
+  "errors": [],
+  "error_files": {},
+  "link": [],
+  "tests": {
+   "unit_tests": {
+    "ran": true,
+    "summary": "Errors (1 failures, 3 tests, 3 ran, 13 checks, 0 ignored, 0 filtered out, 1 ms)",
+    "failed": [
+     "TEST(Sensor, Mocked)"
+    ],
+    "tail": "TEST(Sensor, Real) - 0 ms\nTEST(Sensor, Spy) - 0 ms\nTEST(Sensor, Mocked)\ntests/sensor_test.cpp:5: error: Failure in TEST(Sensor, Mocked)\n\tLONGS_EQUAL(4, sensor_get(3)) failed\n\texpected <          4 (0x4)>\n\tbut was  <-2147483648 (0xffffffff80000000)>\n\n - 0 ms\n\nErrors (1 failures, 3 tests, 3 ran, 13 checks, 0 ignored, 0 filtered out, 1 ms)\n\n"
+   }
+  },
+  "reach": null,
+  "warnings_new": [],
+  "diff": "diff --git a/hal.c b/hal.c\nindex f4b816c..673a6fa 100644\n--- a/hal.c\n+++ b/hal.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int hal_read(int reg) { return reg * 10; }\n+double hal_read(int reg) { return reg * 10.0; }\ndiff --git a/hal.h b/hal.h\nindex 611fa2b..1fc344b 100644\n--- a/hal.h\n+++ b/hal.h\n@@ -2,7 +2,7 @@\n #ifdef __cplusplus\n extern \"C\" {\n #endif\n-int hal_read(int reg);\n+double hal_read(int reg);\n int sensor_get(int reg);\n #ifdef __cplusplus\n }\ndiff --git a/sensor.c b/sensor.c\nindex cbd65ec..70c3c15 100644\n--- a/sensor.c\n+++ b/sensor.c\n@@ -1,2 +1,2 @@\n #include \"hal.h\"\n-int sensor_get(int reg) { return hal_read(reg) / 2; }\n+int sensor_get(int reg) { return (int)(hal_read(reg) / 2); }\n"
+ }
+}

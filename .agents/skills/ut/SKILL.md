@@ -1,6 +1,6 @@
 ---
 name: ut
-description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps a per-codebase knowledge base and a task folder (status.md, context.md) so work can be resumed and split across parallel executor agents.
+description: Plan, write, fix, remove and maintain C/C++ unit tests (CppUTest, GoogleTest/gMock, Unity/CMock/Ceedling, Parasoft C/C++test) and raise code coverage (Testwell CTC++, gcov/lcov/gcovr, clang llvm-cov incl. MC/DC, Parasoft). Use when the user asks for unit tests, test updates after a code change, fixing a broken unit-test build or failing tests, removing obsolete tests, or improving coverage. Keeps a per-codebase knowledge base and a task folder (status.md, context.md) so work can be resumed and split across parallel executor agents.
 ---
 
 # ut — unit test task driver
@@ -21,7 +21,20 @@ continue here. Everything you learn goes into files; your memory is those files.
 4. Never weaken or delete an assertion to make a test pass. A test that shows the code is wrong is
    reported as an open issue (category I), not "fixed".
 5. Read only the file sections a step names. Never paste whole files into the chat.
-6. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+6. Code questions go to the Graphify index FIRST: `index.sh find|defs|list|source|refs|card|deps|tests`
+   (`resources/graph-queries.md`, section "Order of looking at code"). Grepping and reading code files are the LAST
+   resort: only for a line range the index named, or when the index says `not in the index` / cannot answer (macro
+   bodies, strings, build files, generated mocks, one text check before deleting code). Each time you fall back,
+   write one Log line with the question the index could not answer.
+7. Test seams (calling static/private code, mocking in one test but not another, registers, state): ONE technique per
+   need per project, recorded in KB `Test seams (decided)`. Use exactly the recorded one; never add a second one;
+   undecided → ask the user once with `resources/test-seams.md`; a decision changes only when the user explicitly says so.
+8. Before you stop for any reason, update `Next steps` and `Log` in TASK/status.md.
+9. This codebase's KB wins over the generic files where both exist: `KB_DIR/playbooks/<type>.md` is read after
+   `resources/playbooks/<type>.md`; `KB_DIR/change-impact.md` replaces `resources/change-impact.md`;
+   `KB_DIR/learnings.md` holds the project's verdict on each generic learning. On any build, link or run error, search
+   `KB_DIR/workarounds.md` for the error text before `resources/tools/errors/`. `KB_DIR/codebase.md` is the code map
+   (components, hotspots, rules the code relies on).
 
 ## Asking the user (question budget)
 - Look first, then ask. Show what you found in a table and ask the user to correct it; do not ask
@@ -36,11 +49,11 @@ continue here. Everything you learn goes into files; your memory is those files.
 |---|-------|------|------|-----------|
 | 1 | Setup | `subskills/setup.md` | 2 messages | status.md Config confirmed |
 | 2 | Baseline | `subskills/baseline.md` | 0–1 | KB has verified commands; baseline recorded |
-| 3 | Knowledge | `subskills/knowledge.md` | 0 | KB has graph, testscan, exemplar draft, module cards |
+| 3 | Knowledge | `subskills/knowledge.md` | 0–1 | KB has code index, testscan, exemplar draft, module cards, diagrams |
 | 4 | Discovery | one of `subskills/discover-{resume,diff,ask}.md` | 0–1 | context.md work items filled |
 | 5 | Scope | `subskills/scope.md` | 1 | work items approved; pilot need decided |
 | 6 | Pilot | `subskills/pilot.md` — only if scope says `Pilot: yes` | 1–3 reviews | exemplar approved, 2 tests pass |
-| 7 | Coverage | `subskills/coverage.md` — only if a work item has category G | 0–1 | coverage gaps listed |
+| 7 | Coverage | `subskills/coverage.md` — only if a work item has category G or the user wants coverage | 0–1 | coverage gaps listed |
 | 8 | Plan | `subskills/plan.md` | 1 | plan approved, task files written |
 | 9 | Execute | `subskills/executor.md` | only on blockers | every task DONE / PARTIAL / BLOCKED / DROPPED |
 | 10 | Close out | `subskills/closeout.md` | 0 | final summary; KB updated |
@@ -48,7 +61,15 @@ continue here. Everything you learn goes into files; your memory is those files.
 After each phase: tick it in status.md `Phases`, set `Current phase`, add one `Log` line.
 Skipped phases (6, 7): tick and write `skipped`.
 Any time the code or the tests changed (a finished round, a new commit, the user asks): load `subskills/refresh.md`
-so the graph and the cards match the code again. One command, about a minute.
+so the index, the cards and the diagrams match the code again. One command.
+
+## Code index and diagrams
+All code facts come from ONE index (`KB_DIR/index/index.json`): the bundled Graphify graph with the ut fixes
+(preprocessed with the compile DB, TEST blocks, function-pointer targets, access, types and macros), built by
+`resources/scripts/index.sh` in phase 3. Queries: `find`, `defs`, `list`, `source`, `refs`, `card`, `deps`, `tests`,
+`impact` (`resources/graph-queries.md`). Views are Mermaid TEXT for agents:
+`flow` (branches of a function, with coverage counts), `seq` (calls in order, with existing test doubles),
+`scenarios` (one sequence per entry point), `trace` (what a test really called). Reading them: `resources/diagrams.md`.
 
 ### Discovery file (phase 4)
 | The user's answer in setup | Load |

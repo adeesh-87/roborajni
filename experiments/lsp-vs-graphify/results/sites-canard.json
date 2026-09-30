@@ -1,0 +1,3740 @@
+{
+ "codebase": "libcanard",
+ "questions": 114,
+ "scores": {
+  "grep -w": {
+   "tp": 1429,
+   "fp": 352,
+   "fn": 51,
+   "precision": 0.802,
+   "recall": 0.966,
+   "f1": 0.876,
+   "returned_per_q": 15.6,
+   "ms_per_q": 2.6
+  },
+  "grep call": {
+   "tp": 1429,
+   "fp": 214,
+   "fn": 51,
+   "precision": 0.87,
+   "recall": 0.966,
+   "f1": 0.915,
+   "returned_per_q": 14.4,
+   "ms_per_q": 2.8
+  },
+  "graphify": {
+   "tp": 1073,
+   "fp": 1,
+   "fn": 407,
+   "precision": 0.999,
+   "recall": 0.725,
+   "f1": 0.84,
+   "returned_per_q": 9.4,
+   "ms_per_q": 0.0
+  },
+  "clangd": {
+   "tp": 1450,
+   "fp": 11,
+   "fn": 30,
+   "precision": 0.992,
+   "recall": 0.98,
+   "f1": 0.986,
+   "returned_per_q": 12.8,
+   "ms_per_q": 13.1
+  }
+ },
+ "per_function": [
+  {
+   "fn": "cavl2_find",
+   "at": "lib/cavl2/cavl2.h:127",
+   "calls": 2,
+   "grep -w": {
+    "tp": 1,
+    "fp": 5,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:1515"
+    ]
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 4,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:1515"
+    ]
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:1515",
+     "libcanard/canard.c:1573"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_is_inserted",
+   "at": "lib/cavl2/cavl2.h:155",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 6,
+    "missed": [
+     "libcanard/canard.c:1324",
+     "libcanard/canard.c:462",
+     "libcanard/canard.c:507",
+     "libcanard/canard.c:522",
+     "tests/src/test_intrusive_tx.c:193",
+     "tests/src/test_intrusive_tx.c:334"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_remove_if",
+   "at": "lib/cavl2/cavl2.h:167",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:520",
+     "libcanard/canard.c:845"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_extremum",
+   "at": "lib/cavl2/cavl2.h:179",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "cavl2_min",
+   "at": "lib/cavl2/cavl2.h:192",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "libcanard/canard.c:1724",
+     "libcanard/canard.c:1895",
+     "libcanard/canard.c:724",
+     "libcanard/canard.c:820"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_next_greater",
+   "at": "lib/cavl2/cavl2.h:203",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:1726",
+     "libcanard/canard.c:727"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_trivial_factory",
+   "at": "lib/cavl2/cavl2.h:316",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "cavl2_impl_to_owner_helper",
+   "at": "lib/cavl2/cavl2.h:345",
+   "calls": 7,
+   "grep -w": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 7,
+    "missed": [
+     "libcanard/canard.c:1290",
+     "libcanard/canard.c:1515",
+     "libcanard/canard.c:488",
+     "libcanard/canard.c:498",
+     "libcanard/canard.c:724",
+     "libcanard/canard.c:727",
+     "tests/src/test_intrusive_rx_session.c:196"
+    ]
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 7,
+    "missed": [
+     "libcanard/canard.c:1290",
+     "libcanard/canard.c:1515",
+     "libcanard/canard.c:488",
+     "libcanard/canard.c:498",
+     "libcanard/canard.c:724",
+     "libcanard/canard.c:727",
+     "tests/src/test_intrusive_rx_session.c:196"
+    ]
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:727"
+    ]
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 7,
+    "missed": [
+     "libcanard/canard.c:1290",
+     "libcanard/canard.c:1515",
+     "libcanard/canard.c:488",
+     "libcanard/canard.c:498",
+     "libcanard/canard.c:724",
+     "libcanard/canard.c:727",
+     "tests/src/test_intrusive_rx_session.c:196"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_impl_rotate",
+   "at": "lib/cavl2/cavl2.h:351",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "lib/cavl2/cavl2.h:394",
+     "lib/cavl2/cavl2.h:395"
+    ]
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "cavl2_impl_adjust_balance",
+   "at": "lib/cavl2/cavl2.h:370",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "cavl2_impl_retrace_on_growth",
+   "at": "lib/cavl2/cavl2.h:418",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "cavl2_find_or_insert",
+   "at": "lib/cavl2/cavl2.h:436",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "libcanard/canard.c:1515",
+     "libcanard/canard.c:1779",
+     "libcanard/canard.c:508",
+     "libcanard/canard.c:802"
+    ]
+   }
+  },
+  {
+   "fn": "cavl2_remove",
+   "at": "lib/cavl2/cavl2.h:474",
+   "calls": 4,
+   "grep -w": {
+    "tp": 4,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 4,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "libcanard/canard.c:1325",
+     "libcanard/canard.c:1897",
+     "libcanard/canard.c:523"
+    ]
+   }
+  },
+  {
+   "fn": "tx_v0_service",
+   "at": "libcanard/canard.c:1008",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_request",
+   "at": "libcanard/canard.c:1031",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 5,
+    "missed": [
+     "tests/src/test_api_tx.cpp:479",
+     "tests/src/test_intrusive_tx.c:672",
+     "tests/src/test_intrusive_tx.c:674",
+     "tests/src/test_intrusive_tx.c:676",
+     "tests/src/test_intrusive_tx.c:937"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_respond",
+   "at": "libcanard/canard.c:1045",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_api_tx.cpp:482",
+     "tests/src/test_intrusive_tx.c:981"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "popcount",
+   "at": "libcanard/canard.c:107",
+   "calls": 13,
+   "grep -w": {
+    "tp": 13,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 13,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_util.c:497"
+    ]
+   },
+   "clangd": {
+    "tp": 13,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_parse",
+   "at": "libcanard/canard.c:1086",
+   "calls": 81,
+   "grep -w": {
+    "tp": 81,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 81,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 33,
+    "fp": 0,
+    "fn": 48,
+    "missed": [
+     "tests/src/test_intrusive_rx.c:1005",
+     "tests/src/test_intrusive_rx.c:1013",
+     "tests/src/test_intrusive_rx.c:106",
+     "tests/src/test_intrusive_rx.c:115",
+     "tests/src/test_intrusive_rx.c:145",
+     "tests/src/test_intrusive_rx.c:156",
+     "tests/src/test_intrusive_rx.c:187",
+     "tests/src/test_intrusive_rx.c:196"
+    ]
+   },
+   "clangd": {
+    "tp": 81,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "splitmix64",
+   "at": "libcanard/canard.c:121",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_misc.c:532"
+    ]
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_slot_new",
+   "at": "libcanard/canard.c:1211",
+   "calls": 15,
+   "grep -w": {
+    "tp": 15,
+    "fp": 12,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 15,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_intrusive_rx_session.c:2381",
+     "tests/src/test_intrusive_rx_session.c:2490"
+    ]
+   },
+   "clangd": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_slot_destroy",
+   "at": "libcanard/canard.c:1230",
+   "calls": 14,
+   "grep -w": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_intrusive_rx_session.c:2384",
+     "tests/src/test_intrusive_rx_session.c:2496"
+    ]
+   },
+   "clangd": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_slot_advance",
+   "at": "libcanard/canard.c:1237",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_intrusive_rx_session.c:271",
+     "tests/src/test_intrusive_rx_session.c:296"
+    ]
+   },
+   "clangd": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_cavl_compare",
+   "at": "libcanard/canard.c:1288",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "random",
+   "at": "libcanard/canard.c:130",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 17,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_factory",
+   "at": "libcanard/canard.c:1300",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_destroy",
+   "at": "libcanard/canard.c:1318",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_cleanup",
+   "at": "libcanard/canard.c:1331",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_complete_single_frame",
+   "at": "libcanard/canard.c:1351",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "chance",
+   "at": "libcanard/canard.c:136",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 18,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 8,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_intrusive_util.c:575",
+     "tests/src/test_intrusive_util.c:599"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_complete_slot",
+   "at": "libcanard/canard.c:1361",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_accept",
+   "at": "libcanard/canard.c:1387",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "bitmap_set",
+   "at": "libcanard/canard.c:139",
+   "calls": 14,
+   "grep -w": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "libcanard/canard.c:1960",
+     "tests/src/test_intrusive_misc.c:553",
+     "tests/src/test_intrusive_util.c:496"
+    ]
+   },
+   "clangd": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "bitmap_test",
+   "at": "libcanard/canard.c:140",
+   "calls": 26,
+   "grep -w": {
+    "tp": 26,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 26,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 12,
+    "missed": [
+     "libcanard/canard.c:1936",
+     "libcanard/canard.c:1941",
+     "libcanard/canard.c:1949",
+     "tests/src/test_intrusive_misc.c:229",
+     "tests/src/test_intrusive_misc.c:278",
+     "tests/src/test_intrusive_misc.c:387",
+     "tests/src/test_intrusive_misc.c:408",
+     "tests/src/test_intrusive_misc.c:561"
+    ]
+   },
+   "clangd": {
+    "tp": 26,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_record_admission",
+   "at": "libcanard/canard.c:1415",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "mem_alloc",
+   "at": "libcanard/canard.c:142",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_solve_admission",
+   "at": "libcanard/canard.c:1428",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "mem_alloc_zero",
+   "at": "libcanard/canard.c:143",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_session_update",
+   "at": "libcanard/canard.c:1491",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "mem_free",
+   "at": "libcanard/canard.c:152",
+   "calls": 9,
+   "grep -w": {
+    "tp": 9,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 9,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:766",
+     "libcanard/canard.c:776"
+    ]
+   },
+   "clangd": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_subscription_cavl_compare",
+   "at": "libcanard/canard.c:1563",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_find_subscription",
+   "at": "libcanard/canard.c:1568",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_route",
+   "at": "libcanard/canard.c:1578",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_for_subscription",
+   "at": "libcanard/canard.c:1588",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:1743"
+    ]
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "mem_valid",
+   "at": "libcanard/canard.c:159",
+   "calls": 4,
+   "grep -w": {
+    "tp": 4,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 4,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:1976",
+     "libcanard/canard.c:1977"
+    ]
+   },
+   "clangd": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_fuse",
+   "at": "libcanard/canard.c:1634",
+   "calls": 17,
+   "grep -w": {
+    "tp": 17,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 17,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 16,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_rx_filter.c:192"
+    ]
+   },
+   "clangd": {
+    "tp": 17,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_rank",
+   "at": "libcanard/canard.c:1641",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "tests/src/test_intrusive_rx_filter.c:204",
+     "tests/src/test_intrusive_rx_filter.c:206",
+     "tests/src/test_intrusive_rx_filter.c:208",
+     "tests/src/test_intrusive_rx_filter.c:210"
+    ]
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_covered",
+   "at": "libcanard/canard.c:1646",
+   "calls": 8,
+   "grep -w": {
+    "tp": 8,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 8,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_intrusive_rx_filter.c:959",
+     "tests/src/test_intrusive_rx_filter.c:971",
+     "tests/src/test_intrusive_rx_filter.c:983"
+    ]
+   },
+   "clangd": {
+    "tp": 8,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_coalesce_into",
+   "at": "libcanard/canard.c:1659",
+   "calls": 13,
+   "grep -w": {
+    "tp": 13,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 13,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_append",
+   "at": "libcanard/canard.c:1692",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:1745"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_filter_configure",
+   "at": "libcanard/canard.c:1705",
+   "calls": 15,
+   "grep -w": {
+    "tp": 15,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 15,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "rx_subscribe",
+   "at": "libcanard/canard.c:1757",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_subscribe_16b",
+   "at": "libcanard/canard.c:1790",
+   "calls": 71,
+   "grep -w": {
+    "tp": 71,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 71,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 58,
+    "fp": 0,
+    "fn": 13,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:497",
+     "tests/src/test_api_lifecycle.cpp:500",
+     "tests/src/test_api_rx.cpp:136",
+     "tests/src/test_api_rx.cpp:137",
+     "tests/src/test_api_rx.cpp:140",
+     "tests/src/test_api_rx.cpp:216",
+     "tests/src/test_api_rx.cpp:223",
+     "tests/src/test_api_rx.cpp:276"
+    ]
+   },
+   "clangd": {
+    "tp": 71,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_subscribe_13b",
+   "at": "libcanard/canard.c:1801",
+   "calls": 13,
+   "grep -w": {
+    "tp": 13,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 13,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "tests/src/test_api_rx.cpp:148",
+     "tests/src/test_api_rx.cpp:149",
+     "tests/src/test_api_rx.cpp:152",
+     "tests/src/test_api_rx.cpp:182"
+    ]
+   },
+   "clangd": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_subscribe_request",
+   "at": "libcanard/canard.c:1819",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 8,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_api_rx.cpp:160",
+     "tests/src/test_api_rx.cpp:161",
+     "tests/src/test_api_rx.cpp:193"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_subscribe_response",
+   "at": "libcanard/canard.c:1832",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_api_rx.cpp:169",
+     "tests/src/test_api_rx.cpp:170",
+     "tests/src/test_api_rx.cpp:198"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_find_subscription",
+   "at": "libcanard/canard.c:1843",
+   "calls": 13,
+   "grep -w": {
+    "tp": 13,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 13,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 9,
+    "missed": [
+     "tests/src/test_api_rx.cpp:238",
+     "tests/src/test_api_rx.cpp:239",
+     "tests/src/test_api_rx.cpp:240",
+     "tests/src/test_api_rx.cpp:241",
+     "tests/src/test_api_rx.cpp:251",
+     "tests/src/test_api_rx.cpp:252",
+     "tests/src/test_api_rx.cpp:253",
+     "tests/src/test_api_rx.cpp:254"
+    ]
+   },
+   "clangd": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_subscribe",
+   "at": "libcanard/canard.c:1850",
+   "calls": 21,
+   "grep -w": {
+    "tp": 21,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 21,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 7,
+    "missed": [
+     "tests/src/test_api_rx.cpp:565",
+     "tests/src/test_api_rx.cpp:566",
+     "tests/src/test_api_rx.cpp:569",
+     "tests/src/test_api_rx.cpp:629",
+     "tests/src/test_api_rx.cpp:636",
+     "tests/src/test_api_rx.cpp:646",
+     "tests/src/test_api_rx.cpp:667"
+    ]
+   },
+   "clangd": {
+    "tp": 21,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_subscribe_request",
+   "at": "libcanard/canard.c:1862",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_api_rx.cpp:577",
+     "tests/src/test_api_rx.cpp:578"
+    ]
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_subscribe_response",
+   "at": "libcanard/canard.c:1880",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "tests/src/test_api_rx.cpp:586",
+     "tests/src/test_api_rx.cpp:587"
+    ]
+   },
+   "clangd": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_unsubscribe",
+   "at": "libcanard/canard.c:1891",
+   "calls": 104,
+   "grep -w": {
+    "tp": 104,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 104,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 82,
+    "fp": 0,
+    "fn": 22,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:506",
+     "tests/src/test_api_rx.cpp:188",
+     "tests/src/test_api_rx.cpp:194",
+     "tests/src/test_api_rx.cpp:199",
+     "tests/src/test_api_rx.cpp:225",
+     "tests/src/test_api_rx.cpp:226",
+     "tests/src/test_api_rx.cpp:257",
+     "tests/src/test_api_rx.cpp:258"
+    ]
+   },
+   "clangd": {
+    "tp": 104,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "node_id_occupancy_reset",
+   "at": "libcanard/canard.c:1903",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "node_id_occupancy_update",
+   "at": "libcanard/canard.c:1910",
+   "calls": 24,
+   "grep -w": {
+    "tp": 24,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 24,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 23,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_misc.c:591"
+    ]
+   },
+   "clangd": {
+    "tp": 24,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "crc_add_byte",
+   "at": "libcanard/canard.c:193",
+   "calls": 3,
+   "grep -w": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 3,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_new",
+   "at": "libcanard/canard.c:1964",
+   "calls": 38,
+   "grep -w": {
+    "tp": 38,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 38,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 23,
+    "fp": 0,
+    "fn": 15,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:249",
+     "tests/src/test_api_lifecycle.cpp:264",
+     "tests/src/test_api_lifecycle.cpp:268",
+     "tests/src/test_api_lifecycle.cpp:272",
+     "tests/src/test_api_lifecycle.cpp:275",
+     "tests/src/test_api_lifecycle.cpp:279",
+     "tests/src/test_api_lifecycle.cpp:281",
+     "tests/src/test_api_lifecycle.cpp:926"
+    ]
+   },
+   "clangd": {
+    "tp": 38,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "crc_add",
+   "at": "libcanard/canard.c:198",
+   "calls": 41,
+   "grep -w": {
+    "tp": 41,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 41,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 23,
+    "fp": 0,
+    "fn": 18,
+    "missed": [
+     "tests/src/test_intrusive_rx_session.c:1331",
+     "tests/src/test_intrusive_rx_session.c:2040",
+     "tests/src/test_intrusive_rx_session.c:2111",
+     "tests/src/test_intrusive_util.c:100",
+     "tests/src/test_intrusive_util.c:102",
+     "tests/src/test_intrusive_util.c:106",
+     "tests/src/test_intrusive_util.c:110",
+     "tests/src/test_intrusive_util.c:112"
+    ]
+   },
+   "clangd": {
+    "tp": 41,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_destroy",
+   "at": "libcanard/canard.c:1994",
+   "calls": 151,
+   "grep -w": {
+    "tp": 151,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 151,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 130,
+    "fp": 0,
+    "fn": 21,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:252",
+     "tests/src/test_api_lifecycle.cpp:283",
+     "tests/src/test_api_roundtrip.cpp:231",
+     "tests/src/test_api_roundtrip.cpp:281",
+     "tests/src/test_api_roundtrip.cpp:325",
+     "tests/src/test_api_roundtrip.cpp:370",
+     "tests/src/test_api_roundtrip.cpp:415",
+     "tests/src/test_api_roundtrip.cpp:462"
+    ]
+   },
+   "clangd": {
+    "tp": 151,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_set_node_id",
+   "at": "libcanard/canard.c:2010",
+   "calls": 22,
+   "grep -w": {
+    "tp": 22,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 22,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:296",
+     "tests/src/test_api_lifecycle.cpp:299",
+     "tests/src/test_api_lifecycle.cpp:302",
+     "tests/src/test_api_lifecycle.cpp:305"
+    ]
+   },
+   "clangd": {
+    "tp": 22,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_poll",
+   "at": "libcanard/canard.c:2023",
+   "calls": 62,
+   "grep -w": {
+    "tp": 62,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 62,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 47,
+    "fp": 0,
+    "fn": 15,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:420",
+     "tests/src/test_api_lifecycle.cpp:472",
+     "tests/src/test_api_lifecycle.cpp:502",
+     "tests/src/test_api_lifecycle.cpp:815",
+     "tests/src/test_api_tx.cpp:317",
+     "tests/src/test_api_tx.cpp:321",
+     "tests/src/test_api_tx.cpp:349",
+     "tests/src/test_api_tx.cpp:415"
+    ]
+   },
+   "clangd": {
+    "tp": 62,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "ingest_frame",
+   "at": "libcanard/canard.c:2055",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:2091"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_ingest_frame",
+   "at": "libcanard/canard.c:2071",
+   "calls": 88,
+   "grep -w": {
+    "tp": 88,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 88,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 47,
+    "fp": 0,
+    "fn": 41,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:553",
+     "tests/src/test_api_lifecycle.cpp:737",
+     "tests/src/test_api_lifecycle.cpp:788",
+     "tests/src/test_api_lifecycle.cpp:845",
+     "tests/src/test_api_lifecycle.cpp:895",
+     "tests/src/test_api_lifecycle.cpp:899",
+     "tests/src/test_api_lifecycle.cpp:900",
+     "tests/src/test_api_lifecycle.cpp:992"
+    ]
+   },
+   "clangd": {
+    "tp": 88,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_crc_seed_from_data_type_signature",
+   "at": "libcanard/canard.c:2097",
+   "calls": 12,
+   "grep -w": {
+    "tp": 12,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 12,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "crc_add_chain",
+   "at": "libcanard/canard.c:210",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_intrusive_util.c:141",
+     "tests/src/test_intrusive_util.c:150",
+     "tests/src/test_intrusive_util.c:171"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "delist",
+   "at": "libcanard/canard.c:219",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 6,
+    "missed": [
+     "tests/src/test_intrusive_util.c:302",
+     "tests/src/test_intrusive_util.c:310",
+     "tests/src/test_intrusive_util.c:315",
+     "tests/src/test_intrusive_util.c:320",
+     "tests/src/test_intrusive_util.c:387",
+     "tests/src/test_intrusive_util.c:388"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "enlist_before",
+   "at": "libcanard/canard.c:240",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_util.c:428"
+    ]
+   },
+   "clangd": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "enlist_tail",
+   "at": "libcanard/canard.c:268",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 6,
+    "missed": [
+     "tests/src/test_intrusive_util.c:356",
+     "tests/src/test_intrusive_util.c:363",
+     "tests/src/test_intrusive_util.c:371",
+     "tests/src/test_intrusive_util.c:381",
+     "tests/src/test_intrusive_util.c:390",
+     "tests/src/test_intrusive_util.c:410"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "ptr_unbias",
+   "at": "libcanard/canard.c:277",
+   "calls": 45,
+   "grep -w": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 43,
+    "missed": [
+     "libcanard/canard.c:2004",
+     "libcanard/canard.c:2036",
+     "libcanard/canard.c:693",
+     "libcanard/canard.c:860",
+     "libcanard/canard.c:862",
+     "tests/src/test_intrusive_misc.c:155",
+     "tests/src/test_intrusive_misc.c:157",
+     "tests/src/test_intrusive_rx_session.c:1924"
+    ]
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 43,
+    "missed": [
+     "libcanard/canard.c:2004",
+     "libcanard/canard.c:2036",
+     "libcanard/canard.c:693",
+     "libcanard/canard.c:860",
+     "libcanard/canard.c:862",
+     "tests/src/test_intrusive_misc.c:155",
+     "tests/src/test_intrusive_misc.c:157",
+     "tests/src/test_intrusive_rx_session.c:1924"
+    ]
+   },
+   "graphify": {
+    "tp": 26,
+    "fp": 0,
+    "fn": 19,
+    "missed": [
+     "libcanard/canard.c:862",
+     "tests/src/test_intrusive_misc.c:157",
+     "tests/src/test_intrusive_rx_session.c:1934",
+     "tests/src/test_intrusive_rx_session.c:2265",
+     "tests/src/test_intrusive_rx_session.c:2275",
+     "tests/src/test_intrusive_tx.c:127",
+     "tests/src/test_intrusive_tx.c:1837",
+     "tests/src/test_intrusive_tx.c:560"
+    ]
+   },
+   "clangd": {
+    "tp": 45,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "bytes_chain_read",
+   "at": "libcanard/canard.c:295",
+   "calls": 12,
+   "grep -w": {
+    "tp": 12,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 12,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 8,
+    "missed": [
+     "libcanard/canard.c:594",
+     "libcanard/canard.c:676",
+     "tests/src/test_intrusive_util.c:201",
+     "tests/src/test_intrusive_util.c:207",
+     "tests/src/test_intrusive_util.c:208",
+     "tests/src/test_intrusive_util.c:209",
+     "tests/src/test_intrusive_util.c:225",
+     "tests/src/test_intrusive_util.c:236"
+    ]
+   },
+   "clangd": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "bytes_chain_size",
+   "at": "libcanard/canard.c:319",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_intrusive_util.c:196",
+     "tests/src/test_intrusive_util.c:220",
+     "tests/src/test_intrusive_util.c:242"
+    ]
+   },
+   "clangd": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "bytes_chain_valid",
+   "at": "libcanard/canard.c:330",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_util.c:687"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_frame_view",
+   "at": "libcanard/canard.c:354",
+   "calls": 14,
+   "grep -w": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 14,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:841"
+    ]
+   },
+   "clangd": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_frame_from_view",
+   "at": "libcanard/canard.c:359",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_frame_new",
+   "at": "libcanard/canard.c:364",
+   "calls": 5,
+   "grep -w": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 5,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 3,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:573",
+     "libcanard/canard.c:656"
+    ]
+   },
+   "clangd": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_refcount_inc",
+   "at": "libcanard/canard.c:379",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_refcount_dec",
+   "at": "libcanard/canard.c:388",
+   "calls": 15,
+   "grep -w": {
+    "tp": 15,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 15,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_util.c:451"
+    ]
+   },
+   "clangd": {
+    "tp": 15,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_transfer_new",
+   "at": "libcanard/canard.c:430",
+   "calls": 32,
+   "grep -w": {
+    "tp": 32,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 32,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 22,
+    "fp": 0,
+    "fn": 10,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1496",
+     "tests/src/test_intrusive_tx.c:1502",
+     "tests/src/test_intrusive_tx.c:1538",
+     "tests/src/test_intrusive_tx.c:1544",
+     "tests/src/test_intrusive_tx.c:1553",
+     "tests/src/test_intrusive_tx.c:1585",
+     "tests/src/test_intrusive_tx.c:1594",
+     "tests/src/test_intrusive_tx.c:359"
+    ]
+   },
+   "clangd": {
+    "tp": 32,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_is_pending",
+   "at": "libcanard/canard.c:459",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_free_payload",
+   "at": "libcanard/canard.c:470",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_cavl_compare_pending_order",
+   "at": "libcanard/canard.c:485",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_cavl_compare_deadline",
+   "at": "libcanard/canard.c:495",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_make_pending",
+   "at": "libcanard/canard.c:504",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_retire",
+   "at": "libcanard/canard.c:517",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_make_tail_byte",
+   "at": "libcanard/canard.c:529",
+   "calls": 4,
+   "grep -w": {
+    "tp": 4,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 4,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:621",
+     "libcanard/canard.c:680"
+    ]
+   },
+   "clangd": {
+    "tp": 4,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_ceil_frame_payload_size",
+   "at": "libcanard/canard.c:536",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:571"
+    ]
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_spool",
+   "at": "libcanard/canard.c:544",
+   "calls": 14,
+   "grep -w": {
+    "tp": 14,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 14,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1032",
+     "tests/src/test_intrusive_tx.c:1086",
+     "tests/src/test_intrusive_tx.c:1204"
+    ]
+   },
+   "clangd": {
+    "tp": 14,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_spool_v0",
+   "at": "libcanard/canard.c:630",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1392"
+    ]
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_sacrifice",
+   "at": "libcanard/canard.c:691",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 16,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_ensure_queue_space",
+   "at": "libcanard/canard.c:697",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_predict_frame_count",
+   "at": "libcanard/canard.c:713",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_expire",
+   "at": "libcanard/canard.c:722",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_push",
+   "at": "libcanard/canard.c:735",
+   "calls": 32,
+   "grep -w": {
+    "tp": 32,
+    "fp": 6,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 32,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 22,
+    "fp": 0,
+    "fn": 10,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1498",
+     "tests/src/test_intrusive_tx.c:1504",
+     "tests/src/test_intrusive_tx.c:1540",
+     "tests/src/test_intrusive_tx.c:1546",
+     "tests/src/test_intrusive_tx.c:1555",
+     "tests/src/test_intrusive_tx.c:1587",
+     "tests/src/test_intrusive_tx.c:1596",
+     "tests/src/test_intrusive_tx.c:372"
+    ]
+   },
+   "clangd": {
+    "tp": 32,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_pending_node_to_transfer",
+   "at": "libcanard/canard.c:811",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_eject_pending",
+   "at": "libcanard/canard.c:817",
+   "calls": 12,
+   "grep -w": {
+    "tp": 12,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 12,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 9,
+    "fp": 0,
+    "fn": 3,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1660",
+     "tests/src/test_intrusive_tx.c:257",
+     "tests/src/test_intrusive_tx.c:376"
+    ]
+   },
+   "clangd": {
+    "tp": 12,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_purge_continuations",
+   "at": "libcanard/canard.c:858",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_pending_ifaces",
+   "at": "libcanard/canard.c:870",
+   "calls": 21,
+   "grep -w": {
+    "tp": 21,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 21,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 13,
+    "fp": 0,
+    "fn": 8,
+    "missed": [
+     "tests/src/test_api_tx.cpp:123",
+     "tests/src/test_api_tx.cpp:319",
+     "tests/src/test_api_tx.cpp:326",
+     "tests/src/test_api_tx.cpp:351",
+     "tests/src/test_api_tx_queue.cpp:435",
+     "tests/src/test_api_tx_queue.cpp:463",
+     "tests/src/test_api_tx_queue.cpp:473",
+     "tests/src/test_api_tx_queue.cpp:658"
+    ]
+   },
+   "clangd": {
+    "tp": 21,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_publish_16b",
+   "at": "libcanard/canard.c:881",
+   "calls": 70,
+   "grep -w": {
+    "tp": 70,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 70,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 51,
+    "fp": 0,
+    "fn": 19,
+    "missed": [
+     "tests/src/test_api_lifecycle.cpp:572",
+     "tests/src/test_api_lifecycle.cpp:648",
+     "tests/src/test_api_lifecycle.cpp:652",
+     "tests/src/test_api_tx.cpp:122",
+     "tests/src/test_api_tx.cpp:251",
+     "tests/src/test_api_tx_queue.cpp:173",
+     "tests/src/test_api_tx_queue.cpp:174",
+     "tests/src/test_api_tx_queue.cpp:179"
+    ]
+   },
+   "clangd": {
+    "tp": 70,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "smaller",
+   "at": "libcanard/canard.c:90",
+   "calls": 6,
+   "grep -w": {
+    "tp": 6,
+    "fp": 10,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 6,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "libcanard/canard.c:675"
+    ]
+   },
+   "clangd": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "later",
+   "at": "libcanard/canard.c:91",
+   "calls": 1,
+   "grep -w": {
+    "tp": 1,
+    "fp": 11,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 1,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 1,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_publish_13b",
+   "at": "libcanard/canard.c:916",
+   "calls": 11,
+   "grep -w": {
+    "tp": 11,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 11,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 5,
+    "fp": 0,
+    "fn": 6,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1780",
+     "tests/src/test_intrusive_tx.c:1782",
+     "tests/src/test_intrusive_tx.c:1784",
+     "tests/src/test_intrusive_tx.c:1786",
+     "tests/src/test_intrusive_tx.c:746",
+     "tests/src/test_intrusive_tx.c:759"
+    ]
+   },
+   "clangd": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "tx_1v0_service",
+   "at": "libcanard/canard.c:938",
+   "calls": 2,
+   "grep -w": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 2,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 2,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "popcount_emulated",
+   "at": "libcanard/canard.c:95",
+   "calls": 0,
+   "grep -w": {
+    "tp": 0,
+    "fp": 4,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 0,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   },
+   "clangd": {
+    "tp": 0,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_request",
+   "at": "libcanard/canard.c:960",
+   "calls": 18,
+   "grep -w": {
+    "tp": 18,
+    "fp": 3,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 18,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 11,
+    "fp": 0,
+    "fn": 7,
+    "missed": [
+     "tests/src/test_api_tx.cpp:384",
+     "tests/src/test_api_tx.cpp:386",
+     "tests/src/test_api_tx.cpp:389",
+     "tests/src/test_api_tx.cpp:407",
+     "tests/src/test_api_tx.cpp:409",
+     "tests/src/test_intrusive_tx.c:592",
+     "tests/src/test_intrusive_tx.c:801"
+    ]
+   },
+   "clangd": {
+    "tp": 18,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_respond",
+   "at": "libcanard/canard.c:973",
+   "calls": 7,
+   "grep -w": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 7,
+    "fp": 2,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 1,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:843"
+    ]
+   },
+   "clangd": {
+    "tp": 7,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_v0_publish",
+   "at": "libcanard/canard.c:986",
+   "calls": 10,
+   "grep -w": {
+    "tp": 10,
+    "fp": 7,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 10,
+    "fp": 5,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 6,
+    "fp": 0,
+    "fn": 4,
+    "missed": [
+     "tests/src/test_intrusive_tx.c:1803",
+     "tests/src/test_intrusive_tx.c:535",
+     "tests/src/test_intrusive_tx.c:882",
+     "tests/src/test_intrusive_tx.c:896"
+    ]
+   },
+   "clangd": {
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  },
+  {
+   "fn": "canard_kind_version",
+   "at": "libcanard/canard.h:107",
+   "calls": 10,
+   "grep -w": {
+    "tp": 10,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "grep call": {
+    "tp": 10,
+    "fp": 1,
+    "fn": 0,
+    "missed": []
+   },
+   "graphify": {
+    "tp": 8,
+    "fp": 0,
+    "fn": 2,
+    "missed": [
+     "libcanard/canard.c:1224",
+     "libcanard/canard.c:2090"
+    ]
+   },
+   "clangd": {
+    "tp": 10,
+    "fp": 0,
+    "fn": 0,
+    "missed": []
+   }
+  }
+ ]
+}

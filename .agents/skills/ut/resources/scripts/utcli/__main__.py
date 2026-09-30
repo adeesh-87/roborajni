@@ -3,7 +3,7 @@ the agent is called only to write test code.  Run:  python3 -m utcli <command> [
 import argparse, json, os, re, sys, subprocess
 from .state import State, PHASES
 from .util import ask, say, read, write, sh, script, RES, SKILL_DIR, norm, words
-from . import detect, kb as KB, baseline, plan as PLAN, run as RUN, harness as HARNESS
+from . import detect, kb as KB, baseline, plan as PLAN, run as RUN, harness as HARNESS, seams as SEAMS
 from .frameworks import FRAMEWORKS, COVERAGE_TOOLS
 
 
@@ -87,6 +87,11 @@ def cmd_baseline(args):
     if st['safe_run'] != 'yes':
         sys.exit('safe_run is not yes; refusing to build')
     kb = KB.load_kb(st['kb_dir'])
+    for k in ('build', 'run', 'clean', 'env_setup'):          # a corrected command replaces the stored one, then is verified
+        v = getattr(args, 'set_' + k, None)
+        if v:
+            kb.setdefault('commands', {})[k] = {'cmd': v, 'verified': ''}
+            st['profile'][k + '_cmd' if k != 'env_setup' else 'env_setup'] = v
     res = baseline.run_baseline(st, st['repo'], kb)
     say(f"build: {res['build']}  tests: {res.get('tests', '-')}  single-test: {st['baseline'].get('single_test_cmd')}  compile DB: {st['profile'].get('compile_db')}")
     for p in res.get('problems', [])[:8]:
@@ -104,9 +109,15 @@ def cmd_kb(args):
     ident = detect.kb_id(root)
     kb.update({'id': ident.get('id'), 'remote': ident.get('remote'), 'roots': root, 'profile': prof})
     rc, out, gd = KB.build_graph(st['kb_dir'], root, prof, prof.get('compile_db'))
-    say('\n'.join(l for l in out.splitlines() if re.search(r'preprocessed|augmented|MODE|WARNING|FAILED', l)))
+    say('\n'.join(l for l in out.splitlines() if re.search(r'index:|preprocessed|augmented|WARNING|FAILED', l)))
     kb['last_graph_build'] = f"{baseline.now()} ({'compile DB' if prof.get('compile_db', 'none') != 'none' else 'no compile DB'})"
     scan = KB.testscan(st['kb_dir'], root, prof)
+    SEAMS.merge_detected(kb, SEAMS.detect(root, prof))          # techniques the existing tests use = the decision
+    for l in SEAMS.render(kb['seams']):
+        if 'not decided' not in l:
+            say('test seam ' + l[2:])
+    if any(d.get('also_seen') for d in kb['seams'].values()):
+        say('The existing tests mix techniques for one need; new tests use the recorded one. Change it with: ut seams --set need=ID')
     ex = KB.make_exemplars(st['kb_dir'], root, prof, scan)
     conv = kb.get('conventions', {})
     if conv.get('approved', 'no') == 'no':
@@ -116,19 +127,106 @@ def cmd_kb(args):
         files = [f for f in files if any(f.startswith(x) or f == x for x in args.files)]
     kb['modules'] = KB.module_cards(st['kb_dir'], root, prof, gd, files)
     st['kb_modules'] = kb['modules']
+    if prof.get('diagrams', 'auto') != 'off':
+        say(KB.make_diagrams(st['kb_dir'], root))
     kb['updated'] = baseline.now()
     KB.save_kb(st['kb_dir'], kb)
     idx = os.path.join(SKILL_DIR, 'resources', 'kb', 'INDEX.md')
-    if kb['id'] and kb['id'] not in read(idx):
+    if kb['id'] and not kb['id'].startswith('local-') and kb['id'] not in read(idx):     # local KBs are machine-specific, not listed
         with open(idx, 'a', encoding='utf-8') as fh:
             fh.write(f"| {kb['id']} | {kb.get('remote', '')} | {root} | | {kb['updated']} | {kb['updated']} |\n")
     say(f"KB: {st['kb_dir']}  exemplar: {ex or 'none (greenfield)'}  modules: {len(kb['modules'])}  conventions: {len(kb['conventions']['lines'])} lines")
     st.done('knowledge'); st.log('tool', f"knowledge: {len(kb['modules'])} module cards"); st.save()
 
 
+# ------------------------------------------------------------------ coverage (phase 7, scripted)
+def cmd_coverage(args):
+    """run the coverage build+tests, import the report into the index, annotate the flowcharts, add G work items"""
+    st = load(args); root = st['repo']; kb = KB.load_kb(st['kb_dir'])
+    cmds = kb.setdefault('commands', {})
+    cmd = args.cov_cmd or cmds.get('coverage', {}).get('cmd')
+    imp = [x for x in (['--lcov', args.lcov] if args.lcov else ['--gcov-dir', args.gcov_dir] if args.gcov_dir else
+                       ['--ctc', args.ctc] if args.ctc else ['--json', args.json] if args.json else
+                       ['--llvm', args.llvm] if args.llvm else [])]
+    imp = imp or (cmds.get('coverage_import', {}).get('cmd', '').split(' ', 1) if cmds.get('coverage_import') else [])
+    if not imp:
+        sys.exit('give the report to import: --lcov FILE | --gcov-dir BUILD_DIR | --ctc profile.txt | --llvm PROFDATA --object BIN | --json FILE '
+                 '(and --cmd "coverage build+run command" to produce it)')
+    if cmd:
+        say(f'running: {cmd}')
+        rc, out = sh(cmd, cwd=root)
+        write(os.path.join(st.dir, 'logs', 'coverage-run.log'), out)
+        if rc != 0:
+            sys.exit(f'coverage command FAILED (rc {rc}); see logs/coverage-run.log')
+        cmds['coverage'] = {'cmd': cmd, 'verified': baseline.now()}
+    gd = KB.index_dir(st['kb_dir'])
+    absp = lambda p: p if os.path.isabs(p) else os.path.join(root, p)
+    objs = [x for o in (args.object or []) for x in ('--object', absp(o))] if imp[0] == '--llvm' else []
+    if imp[0] == '--llvm' and not objs:
+        prev = cmds.get('coverage_import', {}).get('objects') or []
+        objs = [x for o in prev for x in ('--object', absp(o))]
+    rc, out = sh([script('index.sh'), 'cov-import', gd, imp[0], absp(imp[1])] + objs, cwd=root)
+    say(out.strip())
+    if rc != 0:
+        sys.exit('import FAILED')
+    cmds['coverage_import'] = {'cmd': f'{imp[0]} {imp[1]}', 'verified': baseline.now(),
+                               **({'objects': args.object or cmds.get('coverage_import', {}).get('objects', [])} if imp[0] == '--llvm' else {})}
+    KB.save_kb(st['kb_dir'], kb)
+    say(KB.make_diagrams(st['kb_dir'], root))
+    rc, gaps = sh([script('index.sh'), 'uncovered', gd], cwd=root)
+    write(os.path.join(st.dir, 'coverage-gaps.md'), gaps)
+    ir = KB.index_root(gd)
+    code = tuple(norm(os.path.relpath(os.path.join(root, p), ir)) for p in st['profile']['code_paths'])
+    items, n = [], len(st['work_items'])
+    for m in re.finditer(r'^- (\S+) \((\S+):(\d+)\)(?:: (.*))?$', gaps, re.M):
+        name, file, line, g = m.groups()
+        if not file.startswith(code) or '.lambda@' in name:
+            continue
+        n += 1
+        f_repo = norm(os.path.relpath(os.path.join(ir, file), root))
+        items.append({'id': f'W{n}', 'item': f'{f_repo}:{name} (L{line})', 'kind': 'coverage gap' if g else 'never executed',
+                      'tests': 'see card', 'mocks': '', 'work': ('G drive: ' + g) if g else 'D no test runs it', 'cat': 'G' if g else 'D',
+                      'gaps': [x.strip() for x in (g or '').split(';') if x.strip()], 'in_scope': '', 'priority': ''})
+    known = {w['item'].split(' (')[0] for w in st['work_items']}
+    new = [w for w in items if w['item'].split(' (')[0] not in known]
+    st['work_items'] += new
+    st['coverage']['last'] = out.strip().splitlines()[-1] if out.strip() else ''
+    st['coverage_gaps'] = [l[2:] for l in gaps.splitlines() if l.startswith('- ')][:60]
+    st.done('coverage', st['coverage']['last'][:80])
+    say(f"{len(new)} coverage work items added (G = missing outcomes, D = never executed); full list: {os.path.join(st.dir, 'coverage-gaps.md')}")
+    for w in new[:20]:
+        say(f"  {w['id']:<4} {w['cat']}  {w['item'][:70]}  {w['work'][:90]}")
+    st.log('tool', f'coverage imported: {len(new)} work items'); st.save()
+
+
+# ------------------------------------------------------------------ trace (runtime sequences)
+def cmd_trace(args):
+    st = load(args); root = st['repo']; prof = st['profile']
+    gd = KB.index_dir(st['kb_dir'])
+    run = args.run or (st['baseline'].get('test_binaries') or [''])[0]
+    if not run:
+        sys.exit('give --run "test command" (the test binary built with the trace flags)')
+    cmd = [script('index.sh'), 'trace', gd, '--run', run]
+    if prof.get('build_system') == 'cmake' and not args.no_build:
+        defs = ' '.join(re.findall(r'-D\w+=\S+', prof.get('build_cmd', '')))
+        cmd += ['--cmake', root, '--build-dir', os.path.join(gd, 'trace', 'build'), '--cmake-args', defs]
+        if not args.run:                                # the baseline binary, but from the instrumented build tree
+            m = re.search(r'-B\s*(\S+)', prof.get('build_cmd', ''))
+            bdir = os.path.join(root, m.group(1) if m else 'build')
+            rel = os.path.relpath(run if os.path.isabs(run) else os.path.join(root, run), bdir)
+            if not rel.startswith('..'):
+                cmd[cmd.index('--run') + 1] = '{build}/' + rel
+    rc, out = sh(cmd, cwd=root)
+    say(out.strip()[-1500:])
+    if rc == 0:
+        kb = KB.load_kb(st['kb_dir'])
+        KB.module_cards(st['kb_dir'], root, prof, gd, [m['file'] for m in kb.get('modules', [])])   # cards gain runtime reach
+        st.log('tool', 'trace: runtime sequences + reach'); st.save()
+
+
 # ------------------------------------------------------------------ discovery (phase 4)
 def cmd_discover(args):
-    st = load(args); gd = os.path.join(st['kb_dir'], 'graphify')
+    st = load(args); gd = KB.index_dir(st['kb_dir'])
     if args.base or args.uncommitted or args.range:
         items, summary = PLAN.discover_diff(st, st['repo'], gd, args.base, args.uncommitted, args.range)
         say(summary.strip()[:600])
@@ -165,6 +263,7 @@ def cmd_scope(args):
 def cmd_plan(args):
     st = load(args)
     tasks = PLAN.make_plan(st, st['kb_dir'], st['profile'])
+    decide_access(args, st, tasks)
     reasons = PLAN.complexity(st)
     for t in tasks:
         say(f"  {t['id']} w{t['wave']} {t['type']:<14} {t['file']:<28} {len(t['cases'])} cases  touches {', '.join(t['touches'])}")
@@ -177,11 +276,46 @@ def cmd_plan(args):
     st.done('plan', f'{len(tasks)} tasks'); st.log('tool', f'plan: {len(tasks)} tasks'); st.save()
 
 
+def decide_access(args, st, tasks):
+    """static/private functions in the plan and no access technique decided yet: ask ONCE, record, stick to it"""
+    kb = KB.load_kb(st['kb_dir'])
+    if 'access' in kb.get('seams', {}):
+        return
+    hit = [t['id'] for t in tasks if SEAMS.needs_access(read(os.path.join(st['kb_dir'], 'modules', f"{os.path.basename(t['file'])}.cards.md")),
+                                                     t['functions'], t.get('lines'))]
+    if not hit:
+        return
+    opts = SEAMS.options('access', st['permissions'].get('production_code') == 'yes')
+    say(f"Tasks {', '.join(hit)} test static/private code. How should tests reach it? (asked once; the project keeps the answer)")
+    for sid in opts:
+        say(f"  {sid} {SEAMS.CATALOG[sid][1]}: {SEAMS.CATALOG[sid][3]}")
+    a = ask('Access technique', 'A1', args.yes, answers_of(args), 'seam_access').strip().upper()
+    SEAMS.set_choice(kb, 'access', a if a in opts else 'A1', by='user' if not args.yes else 'default accepted (--yes)')
+    KB.save_kb(st['kb_dir'], kb)
+    st.decide('test seam access', a); say(f"access: {kb['seams']['access']['choice']} recorded in the KB")
+
+
+def cmd_seams(args):
+    """show the decided test seams; --set need=ID changes one (only on the user's explicit request)"""
+    st = load(args); kb = KB.load_kb(st['kb_dir'])
+    for kv in args.set or []:
+        need, _, sid = kv.partition('=')
+        rec = SEAMS.set_choice(kb, need.strip(), sid.strip().upper(), by=args.by or 'user')
+        st.decide(f'test seam {need}', sid); say(f"{need} = {rec['choice']}" + (f" (was {rec['previous']})" if rec.get('previous') else ''))
+    KB.save_kb(st['kb_dir'], kb); st.save()
+    say('Test seams (resources/test-seams.md):'); say('\n'.join(SEAMS.render(kb.get('seams', {}))))
+    if args.options:
+        for sid in SEAMS.options(args.options, st['permissions'].get('production_code') == 'yes'):
+            say(f"  {sid} {SEAMS.CATALOG[sid][1]}: {SEAMS.CATALOG[sid][3]}")
+
+
 # ------------------------------------------------------------------ run (phase 9)
 def cmd_run(args):
     st = load(args)
     if not st['plan']['tasks']:
         sys.exit('no plan: run plan first')
+    if args.diagrams:
+        st['diagrams'] = args.diagrams
     RUN.run_tasks(st, st['kb_dir'], args.agent, executor=args.executor, dry=args.dry_run, max_attempts=args.attempts, only=args.only)
     if all(t['status'] != 'TODO' for t in st['plan']['tasks']):
         st.done('execute')
@@ -202,7 +336,7 @@ def cmd_pilot(args):
         for h in re.finditer(r'^## (\S+)\s+\((\S+):(\d+)-(\d+)\)(.*?)$(.*?)(?=^## |\Z)', cards, re.M | re.S):
             name, file, a, b, flags, body = h.groups()
             nd = len(re.findall(r'^\s+L\d+', body, re.M)); ext = '[function' in body or '[pointer' in body
-            if 'static' in flags or 'Existing tests calling it directly: none' not in body:
+            if re.search(r'static|private|protected', flags) or 'Existing tests calling it directly: none' not in body:
                 continue
             cands.append((name, file, nd, ext))
     simple = sorted([c for c in cands if not c[3]], key=lambda c: c[2])[:1]
@@ -272,6 +406,8 @@ def main(argv=None):
     sub = p.add_subparsers(dest='cmd', required=True)
     s = sub.add_parser('init', help='phase 1: detect, ask, create the task folder'); opt(s); s.add_argument('--repo')
     s = sub.add_parser('baseline', help='phase 2: verified commands, compile DB, build + run'); opt(s)
+    for k in ('build', 'run', 'clean', 'env-setup'):
+        s.add_argument('--' + k, dest='set_' + k.replace('-', '_'), help=f'replace the stored {k} command (then verified by this run)')
     s = sub.add_parser('kb', help='phase 3: graph, testscan, exemplars, conventions, cards'); opt(s); s.add_argument('--files', nargs='*', help='limit cards to these files/dirs')
     s = sub.add_parser('discover', help='phase 4: work items'); opt(s); s.add_argument('--base'); s.add_argument('--uncommitted', action='store_true'); s.add_argument('--range'); s.add_argument('--names', nargs='*')
     s = sub.add_parser('scope', help='phase 5: choose work items, acceptance, pilot decision'); opt(s)
@@ -279,12 +415,24 @@ def main(argv=None):
     s = sub.add_parser('plan', help='phase 8: tasks with Cases from the cards'); opt(s)
     s = sub.add_parser('run', help='phase 9: executor loop'); opt(s); s.add_argument('--agent', default=RUN.DEFAULT_AGENT, help='command; reads the prompt on stdin, or use {prompt} for the file')
     s.add_argument('--executor', default='E1'); s.add_argument('--dry-run', action='store_true'); s.add_argument('--attempts', type=int, default=3); s.add_argument('--only', nargs='*')
+    s.add_argument('--diagrams', choices=['auto', 'on', 'off'], help='Mermaid diagrams in the prompts (default: the profile, auto)')
     s = sub.add_parser('harness', help='greenfield: create tests/CMakeLists.txt + runner + smoke test, hook into the root CMake, build it'); opt(s); s.add_argument('--framework', default='cpputest', choices=['cpputest', 'gtest']); s.add_argument('--dir', default='tests')
     s = sub.add_parser('close', help='phase 10'); opt(s)
+    s = sub.add_parser('seams', help='test seams decided for this project (static/private access, per-test mocking, ...)'); opt(s)
+    s.add_argument('--set', nargs='*', help='need=ID, e.g. access=A2 per-test=C2 (the user explicitly changes a decision)')
+    s.add_argument('--options', choices=list(SEAMS.NEEDS), help='list the techniques for one need')
+    s.add_argument('--by', help='who decided (default "user"); e.g. "default, not confirmed by the user"')
+    s = sub.add_parser('coverage', help='phase 7: run coverage, import it, annotate flowcharts, add work items'); opt(s)
+    s.add_argument('--cmd', dest='cov_cmd', help='coverage build+run command'); s.add_argument('--lcov'); s.add_argument('--gcov-dir'); s.add_argument('--ctc'); s.add_argument('--json')
+    s.add_argument('--llvm', help='merged .profdata of a clang source-based coverage build (MC/DC with -fcoverage-mcdc)')
+    s.add_argument('--object', nargs='*', help='with --llvm: the test binaries that produced the profile')
+    s = sub.add_parser('trace', help='runtime sequence per TEST (-finstrument-functions); cards gain runtime reach'); opt(s)
+    s.add_argument('--run', help='test command; {build} = the trace build dir'); s.add_argument('--no-build', action='store_true')
     s = sub.add_parser('status'); opt(s)
     a = p.parse_args(argv)
     {'init': cmd_init, 'baseline': cmd_baseline, 'kb': cmd_kb, 'discover': cmd_discover, 'scope': cmd_scope, 'pilot': cmd_pilot,
-     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness}[a.cmd](a)
+     'plan': cmd_plan, 'run': cmd_run, 'close': cmd_close, 'status': cmd_status, 'harness': cmd_harness,
+     'coverage': cmd_coverage, 'trace': cmd_trace, 'seams': cmd_seams}[a.cmd](a)
 
 
 if __name__ == '__main__':

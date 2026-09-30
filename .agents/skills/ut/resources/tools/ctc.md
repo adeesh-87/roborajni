@@ -37,6 +37,9 @@ ctcpost MON.sym MON.dat -u untested.txt        # only untested code (smaller, go
 ctc2html -i profile.txt -o CTCHTML             # HTML
 ```
 View options for listings (typical): `-ff` function, `-fd` decision, `-fc` condition, `-fmcdc` MC/DC.
+Into the code index (true/false counts per decision go onto the flowchart edges; gaps become work items):
+`index.sh cov-import "$KB_DIR/index" --ctc profile.txt` then `index.sh uncovered "$KB_DIR/index"`. The listing parser
+follows the documented column layout (hits/true, false, line); compare the first import with ctc2html once.
 
 ## Reading the text listings
 - Totals per function and file: `grep -n '\*\*\*TER' profile.txt` → lines like
@@ -45,6 +48,10 @@ View options for listings (typical): `-ff` function, `-fd` decision, `-fc` condi
 - In the listing, each decision line shows how often it was true and false. A count of `0` / `-`
   in one column marks the missing outcome; untested.txt lists exactly those lines.
 - For each gap write `file:line`, the condition text and which outcome (true/false, which condition) is missing.
+
+## No CTC++ where the agent works
+Measure MC/DC with clang 18+ instead (`llvm-mcdc.md`): the same tests, the same condition vectors. That file lists
+what to confirm once against CTC++ (decision set, pairing rule, decisions with more than 6 conditions).
 
 ## Excluding code (only with user approval)
 ```c
