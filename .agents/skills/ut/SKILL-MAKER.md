@@ -27,8 +27,9 @@ Write real absolute paths in every command; shell variables are not kept between
 2. **Unknown is an answer.** Write `unknown` and put the question in `REPORT` section "Questions". Never invent a path,
    flag, convention or number.
 3. **Do not change the repository.** No edits to production code, tests or build files, and no commits. Build only in
-   new folders (`build-ut*`). If a step needs a scratch test file, create it, build it, then delete it, and write in
-   `REPORT` that you did.
+   new folders (`build-ut*`, `build-mcdc`). If a step needs a scratch test file, create it, build it, then delete it,
+   and write in `REPORT` that you did. **Keep the build folders** when you finish: test-writing agents and
+   `makercheck.py` use the binaries and objects in them. Never `rm -rf` them as a final cleanup.
 4. **Ask little.** Collect every question until step 11 and ask them in ONE message: at most 8, each with a default in
    `[brackets]`. Ask earlier only when a step cannot continue (for example, you cannot build at all).
 5. **Keep it short.** `kb.md` is generated and stays under 120 lines. Details go to `$KB_DIR/notes.md` and
@@ -294,6 +295,8 @@ Then run each check below and record `PASS` / `FAIL: <why>` in REPORT:
 wc -l "$KB_DIR/kb.md"                                     # <= 120
 git -C "$REPO" status --porcelain                         # empty: the repository is unchanged
 ```
+`git status` may list the `build-ut*` / `build-mcdc` folders as untracked: that is expected. Leave them (rule 3); run
+`makercheck.py` last, after any other command, so its `ALL PASS` describes what you hand over.
 Also dry-run one real task to see what a test-writing agent would receive:
 ```sh
 "$S/ut" discover --task "$TASK" --names <one production function> --yes

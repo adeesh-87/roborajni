@@ -67,9 +67,13 @@ def main(a):
     for k in ('build', 'run'):
         v = (cmds.get(k) or {}).get('verified', '')
         check(f'command "{k}" verified', bool(v) and not v.startswith(('FAILED', 'not run')), f'make `{(cmds.get(k) or {}).get("cmd")}` work, rerun `ut baseline`')
+    bdir = (prof.get('compile_db') or 'build-ut/x').split('/')[0]
+    built = os.path.isdir(os.path.join(repo, bdir))
+    check(f'build folder {bdir} kept', built, f'rebuild it with the build command; never delete build-ut* or build-mcdc '
+          '(later tasks and this checker use them)')
     run = (cmds.get('run') or {}).get('cmd', '')
     tok = next((t for t in run.split() if '/' in t and not t.startswith('-')), '')
-    if tok and not tok.startswith(('$', '<')):
+    if tok and not tok.startswith(('$', '<')) and built:
         check(f'run command binary exists ({tok})', os.path.exists(os.path.join(repo, tok)), 'correct the path of the test binary in the run command')
     st = (cmds.get('single_test') or {}).get('cmd', '')
     tok = next((t for t in st.split() if '/' in t), '')
@@ -119,7 +123,8 @@ def main(a):
         want = 'lenient' if lenient else 'strict'
         check(f'notes Stubs states the stub mode ({want}: {"expectedCallsLeft found" if lenient else "no expectedCallsLeft in the stubs"})',
               said == want, f'write "mode: {want}" in notes.md ## Stubs, with the evidence (grep expectedCallsLeft in {", ".join(os.path.relpath(f, repo) for f in wrapdefs[:2])})')
-        wc = subprocess.run([sys.executable, os.path.join(HERE, 'wrapcheck.py'), repo, os.path.join(repo, (prof.get('compile_db') or 'build/x').split('/')[0])]
+    if wrapdefs and built:
+        wc = subprocess.run([sys.executable, os.path.join(HERE, 'wrapcheck.py'), repo, os.path.join(repo, bdir)]
                             + [x for d in tdirs for x in ('--stubs', d)], capture_output=True, text=True).stdout
         first = [l for l in wc.splitlines() if l.startswith(('OK:', 'FLAG', 'STUB', 'STALE', 'INLINE', 'UNGUARDED'))]
         check('notes Stubs has the wrapcheck result', all(l[:40] in (section(notes, 'Stubs') or '') for l in first[:3]),
