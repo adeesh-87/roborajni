@@ -5,6 +5,9 @@ make the skill ready for THAT repository by filling its knowledge base with fact
 repository. Later agents, some of them small models, will write and fix unit tests from what you record, so
 record facts, not guesses.
 
+**You are done only when `python3 "$S/makercheck.py" "$KB_DIR" "$REPO"` prints `ALL PASS`** (step 10). It checks your
+work and says what to fix for each FAIL. If it crashes, write the error into REPORT and do not report the work as done.
+
 ## Names
 | Name | Meaning |
 |---|---|
@@ -33,6 +36,10 @@ Write real absolute paths in every command; shell variables are not kept between
 6. **Look at the code in this order:** the code index (`$S/index.sh ...`, after step 4), then the named lines of a file,
    then grep. Read whole files only for tests, stubs and build files.
 7. After every step, append 1–3 lines to `REPORT`: what you did, what you verified, what is unknown.
+8. **Never edit `kb.json` or `kb.md` by hand**: the tool writes them. Correct a command with
+   `"$S/ut" baseline --task "$TASK" --yes --run "<cmd>"` (also `--build`, `--clean`, `--env-setup`); it replaces the
+   stored command and verifies it. Record a seam with `"$S/ut" seams --task "$TASK" --set need=ID --by "<who>"`. Your
+   own notes go to `notes.md`, `modules/`, `exemplars/` and REPORT.
 
 ## What you produce (definition of done)
 | File | Made by | Must contain |
@@ -115,6 +122,8 @@ Then let the tool verify and store them:
 ```sh
 "$S/ut" baseline --task "$TASK" --yes
 ```
+A wrong stored command (for example, the run command names a binary that does not exist): rerun with the corrected
+one, e.g. `"$S/ut" baseline --task "$TASK" --yes --run "build-ut/tests/unit_tests"`, until it prints `tests: N/N passed`.
 Anything that failed: record the first error and your diagnosis in notes.md `## Build notes`, and put a question in
 REPORT. Do not "fix" build files in the repository.
 
@@ -310,7 +319,8 @@ Only what the files could not answer, at most 8 questions, each with a default. 
 7. Hazards you could not settle (step 8).
 8. Anything that failed to build or run (step 3).
 Record each answer where it belongs:
-- seams: `"$S/ut" seams --task ... --set need=ID`;
+- seams: `"$S/ut" seams --task "$TASK" --set need=ID` (the user's answer). If the user cannot answer now and you were told
+  to go on with defaults: `... --set need=ID --by "default, not confirmed by the user"`;
 - conventions: KB `Conventions (approved on <date>)`;
 - everything else: notes.md.
 Then record the answers in REPORT.

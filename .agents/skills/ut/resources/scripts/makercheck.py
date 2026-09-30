@@ -60,6 +60,10 @@ def main(a):
 
     # 2. commands really verified
     cmds = kj.get('commands', {})
+    bad = [k for k, v in cmds.items() if not isinstance(v, dict)]
+    check('kb.json commands keep the {cmd, verified} format', not bad,
+          f'{", ".join(bad)} edited by hand: never edit kb.json; set a command with `ut baseline --task T --{bad[0] if bad else "run"} "<cmd>"`')
+    cmds = {k: (v if isinstance(v, dict) else {'cmd': v, 'verified': ''}) for k, v in cmds.items()}
     for k in ('build', 'run'):
         v = (cmds.get(k) or {}).get('verified', '')
         check(f'command "{k}" verified', bool(v) and not v.startswith(('FAILED', 'not run')), f'make `{(cmds.get(k) or {}).get("cmd")}` work, rerun `ut baseline`')
@@ -87,7 +91,7 @@ def main(a):
                 for v in re.findall(r'\$\{(\w+)\}', body):
                     mv = re.search(r'set\s*\(\s*' + v + r'\b([^)]*)\)', t)
                     body += mv.group(1) if mv else ''
-                files = re.findall(r'([\w/.-]+_test\.(?:c|cc|cpp)|[\w/.-]+test_\w+\.(?:c|cc|cpp)|[\w/.-]+Test\w*\.(?:c|cc|cpp))', body)
+                files = re.findall(r'([\w/.-]+(?:_test|Test\w*)\.(?:cpp|cxx|cc|c)\b|[\w/.-]*test_\w+\.(?:cpp|cxx|cc|c)\b)', body)
                 targets[m.group(1)] = files
         if targets:
             big = max(targets, key=lambda k: len(targets[k]))
@@ -137,6 +141,10 @@ def main(a):
     seams = kj.get('seams', {})
     for need, dflt in SEAM_DEFAULTS.items():
         if need in seams:
+            d = seams[need]
+            if d.get('by') == 'user' and not d.get('evidence') and re.search(r'not confirmed|not available|defaults? (?:used|accepted)', report, re.I):
+                check(f'seam "{need}" is not recorded as the user\'s decision when the user did not answer', False,
+                      f'record it as a default: `ut seams --task T --set {need}={d.get("choice")} --by "default, not confirmed by the user"`')
             continue
         m = re.search(need + r'[^\n]*\b([A-E][1-7])\b', report)
         check(f'undecided seam "{need}" is asked with a technique ID default (test-seams.md: {dflt})', bool(m),
@@ -155,7 +163,7 @@ def main(a):
         check('notes Coverage has the clang MC/DC line (MC/DC: x/y conditions)', bool(re.search(r'MC/DC:?\s*\d+/\d+', cov)), 'step 7.2')
         check('notes Coverage states the "exceeds max (6)" warning count', bool(re.search(r'exceeds max[^\n]*\d|\d+[^\n]*exceeds max', cov)),
               'count the warnings of the clang MC/DC build: grep -c "exceeds max" <build log>, and write it (0 is an answer)')
-        check('notes Coverage lists >= 3 decisions (file:line) for the CTC++ cross-check', len(re.findall(r'[\w/.-]+\.(?:c|cpp|cc):\d+', cov)) >= 3,
+        check('notes Coverage lists >= 3 decisions (file:line) for the CTC++ cross-check', len(re.findall(r'[\w/.-]+\.(?:cpp|cxx|cc|c):\d+', cov)) >= 3,
               'list 3-5 decisions with 2+ conditions (file:line) under "cross-check pending"')
 
     # 10. repository untouched

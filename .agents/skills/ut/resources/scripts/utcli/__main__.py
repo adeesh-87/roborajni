@@ -87,6 +87,11 @@ def cmd_baseline(args):
     if st['safe_run'] != 'yes':
         sys.exit('safe_run is not yes; refusing to build')
     kb = KB.load_kb(st['kb_dir'])
+    for k in ('build', 'run', 'clean', 'env_setup'):          # a corrected command replaces the stored one, then is verified
+        v = getattr(args, 'set_' + k, None)
+        if v:
+            kb.setdefault('commands', {})[k] = {'cmd': v, 'verified': ''}
+            st['profile'][k + '_cmd' if k != 'env_setup' else 'env_setup'] = v
     res = baseline.run_baseline(st, st['repo'], kb)
     say(f"build: {res['build']}  tests: {res.get('tests', '-')}  single-test: {st['baseline'].get('single_test_cmd')}  compile DB: {st['profile'].get('compile_db')}")
     for p in res.get('problems', [])[:8]:
@@ -295,7 +300,7 @@ def cmd_seams(args):
     st = load(args); kb = KB.load_kb(st['kb_dir'])
     for kv in args.set or []:
         need, _, sid = kv.partition('=')
-        rec = SEAMS.set_choice(kb, need.strip(), sid.strip().upper())
+        rec = SEAMS.set_choice(kb, need.strip(), sid.strip().upper(), by=args.by or 'user')
         st.decide(f'test seam {need}', sid); say(f"{need} = {rec['choice']}" + (f" (was {rec['previous']})" if rec.get('previous') else ''))
     KB.save_kb(st['kb_dir'], kb); st.save()
     say('Test seams (resources/test-seams.md):'); say('\n'.join(SEAMS.render(kb.get('seams', {}))))
@@ -401,6 +406,8 @@ def main(argv=None):
     sub = p.add_subparsers(dest='cmd', required=True)
     s = sub.add_parser('init', help='phase 1: detect, ask, create the task folder'); opt(s); s.add_argument('--repo')
     s = sub.add_parser('baseline', help='phase 2: verified commands, compile DB, build + run'); opt(s)
+    for k in ('build', 'run', 'clean', 'env-setup'):
+        s.add_argument('--' + k, dest='set_' + k.replace('-', '_'), help=f'replace the stored {k} command (then verified by this run)')
     s = sub.add_parser('kb', help='phase 3: graph, testscan, exemplars, conventions, cards'); opt(s); s.add_argument('--files', nargs='*', help='limit cards to these files/dirs')
     s = sub.add_parser('discover', help='phase 4: work items'); opt(s); s.add_argument('--base'); s.add_argument('--uncommitted', action='store_true'); s.add_argument('--range'); s.add_argument('--names', nargs='*')
     s = sub.add_parser('scope', help='phase 5: choose work items, acceptance, pilot decision'); opt(s)
@@ -414,6 +421,7 @@ def main(argv=None):
     s = sub.add_parser('seams', help='test seams decided for this project (static/private access, per-test mocking, ...)'); opt(s)
     s.add_argument('--set', nargs='*', help='need=ID, e.g. access=A2 per-test=C2 (the user explicitly changes a decision)')
     s.add_argument('--options', choices=list(SEAMS.NEEDS), help='list the techniques for one need')
+    s.add_argument('--by', help='who decided (default "user"); e.g. "default, not confirmed by the user"')
     s = sub.add_parser('coverage', help='phase 7: run coverage, import it, annotate flowcharts, add work items'); opt(s)
     s.add_argument('--cmd', dest='cov_cmd', help='coverage build+run command'); s.add_argument('--lcov'); s.add_argument('--gcov-dir'); s.add_argument('--ctc'); s.add_argument('--json')
     s.add_argument('--llvm', help='merged .profdata of a clang source-based coverage build (MC/DC with -fcoverage-mcdc)')
