@@ -41,6 +41,9 @@ F1_DIRS = ("testcases", "testcases_target")
 F2_DIRS = ("testcases",)
 KNOWN_MARKERS = {"INTRF", "CC", "BV", "EQ"}
 NOT_FOUND = "-- not found --"
+# names treated as the same thing, compared lower-case with "_"/"-" removed:
+# stereodisparity, stereo_disparity, StereoDisparity -> dfs
+ALIASES = {"stereodisparity": "dfs"}
 
 COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
 F1_RE = re.compile(r"\bCPPTEST_TEST(_DISABLED)?\s*\(\s*([^,)\s]+)")
@@ -216,13 +219,44 @@ def resolve_root(root, sub, subdirs):
     sys.exit(f"error: none of {', '.join(subdirs)} found in {root} or {root / sub}")
 
 
-def source_files(root, subdirs, prefix):
+def canon(s):
+    """Key for comparing file / module names: lower-case, letters and digits
+    only, aliases applied (so dfs == stereo_disparity == StereoDisparity)."""
+    s = re.sub(r"[^a-z0-9]", "", s.lower())
+    for k, v in ALIASES.items():
+        s = s.replace(k, v)
+    return s
+
+
+def is_ignored(path, root, ignore):
+    """ignore: folder names (match any folder below root) or paths (absolute,
+    or relative to root)."""
+    rel = path.relative_to(root)
+    dirs = {p.lower() for p in rel.parts[:-1]}
+    for item in ignore:
+        p = Path(item)
+        if len(p.parts) == 1 and not p.is_absolute():
+            if p.name.lower() in dirs:
+                return True
+            continue
+        p = p if p.is_absolute() else root / p
+        try:
+            path.resolve().relative_to(p.resolve())
+            return True
+        except ValueError:
+            pass
+    return False
+
+
+def source_files(root, subdirs, prefix, ignore=()):
     """Yield (path, module, file_under_test); module = first folder below subdir."""
     for sub in subdirs:
         base = root / sub
         if not base.is_dir():
             continue
         for path in sorted(base.rglob(f"{prefix}*.cpp")):
+            if ignore and is_ignored(path, root, ignore):
+                continue
             rel = path.relative_to(base).parts
             module = rel[0] if len(rel) > 1 else ""
             fut = path.stem[len(prefix):]
@@ -232,7 +266,19 @@ def source_files(root, subdirs, prefix):
 
 
 def tokens(s):
-    return [t.lower() for t in TOKEN_RE.findall(s)]
+    """Lower-case words of a name, with aliases applied: "Stereo_Disparity",
+    "stereoDisparity" and "stereodisparity" all become "dfs"."""
+    toks = [t.lower() for t in TOKEN_RE.findall(s)]
+    out, i = [], 0
+    while i < len(toks):
+        pair = toks[i] + toks[i + 1] if i + 1 < len(toks) else None
+        if pair in ALIASES:
+            out.append(ALIASES[pair])
+            i += 2
+        else:
+            out.append(ALIASES.get(toks[i], toks[i]))
+            i += 1
+    return out
 
 
 class F1Test:
@@ -265,9 +311,9 @@ class F2Test:
         return t in self.tokset or (not t.isdigit() and len(t) >= 4 and t in self.joined)
 
 
-def collect_f1(root, mock_arg):
+def collect_f1(root, mock_arg, ignore):
     files = []  # (path, module, fut, [F1Test])
-    for path, module, fut in source_files(root, F1_DIRS, "UnitTest_"):
+    for path, module, fut in source_files(root, F1_DIRS, "UnitTest_", ignore):
         text = read(path)
         src = SourceFile(text, f1_mocks, mock_arg)
         tests = []
@@ -296,13 +342,13 @@ def collect_f2(root):
 def pair_files(f1_files, f2_files):
     by_key, by_fut = {}, defaultdict(list)
     for path, (module, fut, _) in f2_files.items():
-        by_key[(module.lower(), fut.lower())] = path
-        by_fut[fut.lower()].append(path)
+        by_key[(canon(module), canon(fut))] = path
+        by_fut[canon(fut)].append(path)
     pairs = {}
     for path, module, fut, _ in f1_files:
-        f2 = by_key.get((module.lower(), fut.lower()))
-        if f2 is None and len(by_fut[fut.lower()]) == 1:
-            f2 = by_fut[fut.lower()][0]
+        f2 = by_key.get((canon(module), canon(fut)))
+        if f2 is None and len(by_fut[canon(fut)]) == 1:
+            f2 = by_fut[canon(fut)][0]
         pairs[path] = f2
     return pairs
 
@@ -397,6 +443,12 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("f1", type=Path, help="<parent>/parasoft (or <parent>)")
     ap.add_argument("f2", type=Path, help="<parent>/cpputest (or <parent>)")
+    ap.add_argument("--ignore", nargs="+", action="extend", default=[], metavar="FOLDER",
+                    help="f1 folders to skip: a folder name (skipped wherever it "
+                         "appears) or a path (absolute, or relative to f1)")
+    ap.add_argument("--alias", action="append", default=[], metavar="NAME=CANONICAL",
+                    help="extra names to treat as the same, e.g. --alias "
+                         "opticalflow=of (built in: stereodisparity=dfs)")
     ap.add_argument("--missing-only", action="store_true",
                     help="only list f1 tests with no f2 match or with missing mocks")
     ap.add_argument("--threshold", type=float, default=0.8,
@@ -410,9 +462,15 @@ def main():
     ap.add_argument("--csv", action="store_true", help="one CSV table instead")
     args = ap.parse_args()
 
+    for a in args.alias:
+        name, sep, target = a.partition("=")
+        if not sep:
+            sys.exit(f"error: --alias needs NAME=CANONICAL, got '{a}'")
+        ALIASES[canon(name)] = canon(target)
+
     f1_root = resolve_root(args.f1, "parasoft", F1_DIRS)
     f2_root = resolve_root(args.f2, "cpputest", F2_DIRS)
-    f1_files = collect_f1(f1_root, args.f1_mock_arg - 1)
+    f1_files = collect_f1(f1_root, args.f1_mock_arg - 1, args.ignore)
     f2_files = collect_f2(f2_root)
     pairs = pair_files(f1_files, f2_files)
     w = make_weight([t for _, _, ts in f2_files.values() for t in ts])
