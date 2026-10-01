@@ -1,34 +1,33 @@
 #!/usr/bin/env python3
-"""Report CPPTEST tests present under f1 but missing from f2's gtest TESTs.
+"""Compare Parasoft (f1) unit tests against CppUTest (f2) unit tests.
 
-f1: <f1>/{testcases,testcases_target}/**/UnitTest_<file>[_cpp].cpp
-    CPPTEST_TEST(<module>_..._<MARKER>_<test_name>)  (also CPPTEST_TEST_DISABLED)
-f2: <f2>/testcases/**/test_<file>.cpp
-    TEST(<module>, <something containing test_name>)
+Usage:  compare_tests.py <parent>/parasoft <parent>/cpputest
+   or:  compare_tests.py <parent> <parent>
 
-Parsing an f1 name:
-  1. split on "_"; first part is the module
-  2. marker = first part in {INTRF, CC, BV, EQ}; if none, the first short
-     ALL-CAPS part (e.g. PP); if none, assume <module>_x_x_x_<test_name>
-  3. parts after the marker = test name, parts before it = context
+f1 files: <f1>/testcases/<module>/.../UnitTest_<file>[_cpp].cpp
+          <f1>/testcases_target/<module>/.../UnitTest_<file>[_cpp].cpp
+          (only these two folders are scanned, any depth below <module>)
+          tests: CPPTEST_TEST(...) / CPPTEST_TEST_DISABLED(...)
+f2 files: <f2>/testcases/<module>/test_<file>.cpp
+          tests: TEST(<group>, <name>)
 
-Matching:
-  * names are split into lower-case tokens (on "_", camelCase, digits);
-    tokens are weighted by how rare they are among f2 names
-  * score = weighted share of the f1 test-name tokens found in the f2 name
-  * numeric names (e.g. EQ_3): the number must be an exact token in the f2
-    name; context tokens and same file-under-test break ties
-  * only f2 tests in the same module are considered (case-insensitive)
-  * one-to-one maximum matching: each f2 test covers at most one f1 test,
-    so EQ_1 / EQ_2 / EQ_3 can't all claim the same f2 test. Identical f1
-    names (e.g. same test in testcases and testcases_target) count once.
-
-Mock check (for matched pairs): functions mocked in f1 but not in f2.
-  f1: CPPTEST_REGISTER_CALLBACK(<func>, ...) in the test body, setUp() and
-      any same-file helper functions they call
-  f2: .expectOneCall("func") / .expectNCalls(n, "func") / .expectNoCall("func")
-      in the TEST body, its TEST_GROUP block (setup()) and same-file helpers
-  Function names are compared by base name ("int ns::foo(int)" -> foo).
+1. File pairing: each f1 file is paired with the f2 file that has the same
+   <module> folder and <file>. If there is none, the single f2 file with
+   that <file> in any module is used (if exactly one exists).
+2. Test matching, only within a file pair:
+   * f1 name: <module>_..._<MARKER>_<test_name>, marker = first of
+     INTRF/CC/BV/EQ, else the first short ALL-CAPS part (e.g. PP), else
+     <module>_x_x_x_<test_name> is assumed
+   * names are split into lower-case words (on "_", camelCase, digits),
+     weighted by how rare they are; score = weighted share of the f1
+     test-name words found in the f2 name; covered if >= --threshold
+   * numeric names (EQ_3): the number must be a separate word in the f2 name
+   * one-to-one: each f2 test covers at most one f1 test
+3. Mocks (matched pairs): functions mocked in f1 but not in f2.
+   f1: CPPTEST_REGISTER_CALLBACK(<func>, ...) in the test, setUp() and
+       same-file helpers they call
+   f2: .expectOneCall("f") / .expectNCalls(n, "f") / .expectNoCall("f") in the
+       TEST, its TEST_GROUP block (setup()) and same-file helpers
 """
 import argparse
 import csv
@@ -41,6 +40,7 @@ from pathlib import Path
 F1_DIRS = ("testcases", "testcases_target")
 F2_DIRS = ("testcases",)
 KNOWN_MARKERS = {"INTRF", "CC", "BV", "EQ"}
+NOT_FOUND = "-- not found --"
 
 COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
 F1_RE = re.compile(r"\bCPPTEST_TEST(_DISABLED)?\s*\(\s*([^,)\s]+)")
@@ -61,6 +61,13 @@ CPPTEST_HDR_RE = re.compile(r"\bCPPTEST_TEST(?:_DISABLED)?\s*\(\s*(\w+)\s*\)\s*$
 FUNC_HDR_RE = re.compile(
     r"(\w+)\s*\((?:[^()]|\([^()]*\))*\)\s*(?:const|override|noexcept|\s)*$")
 TRANSPARENT_HDR_RE = re.compile(r"(?:\bnamespace(?:\s+[\w:]+)?|\bextern\s*\"C\")\s*$")
+
+
+# ---------------------------------------------------------------- C++ parsing
+
+def read(path):
+    text = path.read_text(encoding="utf-8", errors="replace")
+    return COMMENT_RE.sub("", text)
 
 
 def skip_literal(text, i):
@@ -129,9 +136,8 @@ def f1_mocks(body, arg_index):
     out = set()
     for m in F1_MOCK_RE.finditer(body):
         open_i = m.end() - 1
-        args, depth, last = [], 0, open_i + 1
         end = match_close(body, open_i, "(", ")")
-        i = open_i + 1
+        args, depth, last, i = [], 0, open_i + 1, open_i + 1
         while i < end:  # split on top-level commas
             c = body[i]
             if c in "\"'":
@@ -199,95 +205,113 @@ class SourceFile:
         return self.mocks(self.tests[(group, name)]) | self.mocks(self.groups.get(group, ""))
 
 
+# ---------------------------------------------------------------- files
+
+def resolve_root(root, sub, subdirs):
+    """Accept either <parent>/<sub> or <parent> itself."""
+    if any((root / d).is_dir() for d in subdirs):
+        return root
+    if any((root / sub / d).is_dir() for d in subdirs):
+        return root / sub
+    sys.exit(f"error: none of {', '.join(subdirs)} found in {root} or {root / sub}")
+
+
+def source_files(root, subdirs, prefix):
+    """Yield (path, module, file_under_test); module = first folder below subdir."""
+    for sub in subdirs:
+        base = root / sub
+        if not base.is_dir():
+            continue
+        for path in sorted(base.rglob(f"{prefix}*.cpp")):
+            rel = path.relative_to(base).parts
+            module = rel[0] if len(rel) > 1 else ""
+            fut = path.stem[len(prefix):]
+            if fut.lower().endswith("_cpp"):
+                fut = fut[:-4]
+            yield path, module, fut
+
+
 def tokens(s):
     return [t.lower() for t in TOKEN_RE.findall(s)]
 
 
-def read(path):
-    text = path.read_text(encoding="utf-8", errors="replace")
-    return COMMENT_RE.sub("", text)
-
-
-def files(root, subdirs, prefix):
-    for sub in subdirs:
-        base = root / sub
-        if not base.is_dir():
-            print(f"warning: {base} not found", file=sys.stderr)
-            continue
-        yield from sorted(base.rglob(f"{prefix}*.cpp"))
-
-
-def file_under_test(path, prefix):
-    name = path.stem[len(prefix):]
-    return name[:-4] if name.endswith("_cpp") else name
-
-
 class F1Test:
-    def __init__(self, full, fut, disabled, path):
-        self.full, self.fut, self.disabled, self.path = full, fut, disabled, path
+    def __init__(self, full, disabled, path):
+        self.full, self.disabled, self.path = full, disabled, path
         parts = [p for p in full.split("_") if p]
-        self.module, rest = parts[0], parts[1:]
+        rest = parts[1:]  # parts[0] is the module
         idx = next((i for i, p in enumerate(rest) if p.upper() in KNOWN_MARKERS), None)
-        self.how = "marker"
         if idx is None:
             idx = next((i for i, p in enumerate(rest) if GUESS_MARKER_RE.match(p)), None)
-            self.how = "guessed"
         if idx is None:
             idx = 2 if len(rest) >= 4 else -1
-            self.how = "fallback"
-        ctx, name = rest[:idx + 1], rest[idx + 1:]
-        self.marker = rest[idx] if idx >= 0 and self.how != "fallback" else ""
-        self.name = "_".join(name)
-        self.name_tok, self.ctx_tok = tokens(self.name), tokens("_".join(ctx))
+        self.name = "_".join(rest[idx + 1:])
+        self.name_tok, self.ctx_tok = tokens(self.name), tokens("_".join(rest[:idx + 1]))
         if not self.name_tok:  # nothing after the marker: use the context
             self.name_tok, self.ctx_tok = self.ctx_tok, []
         self.numeric = bool(self.name_tok) and all(t.isdigit() for t in self.name_tok)
-
-    @property
-    def parsed(self):
-        return f"{self.marker}:{self.name}" if self.marker else self.name
+        self.mocks = None
 
 
 class F2Test:
-    def __init__(self, module, name, fut, path):
-        self.module, self.name, self.fut, self.path = module, name, fut, path
+    def __init__(self, group, name, path):
+        self.group, self.name, self.path = group, name, path
         tok = tokens(name)
         self.tokset, self.joined = set(tok), "".join(tok)
+        self.mocks = None
 
     def has(self, t):
-        # exact token, or a longer word glued inside another (e.g. "checksvalue")
+        # exact word, or a longer word glued inside another (e.g. "checksvalue")
         return t in self.tokset or (not t.isdigit() and len(t) >= 4 and t in self.joined)
 
 
 def collect_f1(root, mock_arg):
-    out = []
-    for path in files(root, F1_DIRS, "UnitTest_"):
-        fut = file_under_test(path, "UnitTest_")
+    files = []  # (path, module, fut, [F1Test])
+    for path, module, fut in source_files(root, F1_DIRS, "UnitTest_"):
         text = read(path)
         src = SourceFile(text, f1_mocks, mock_arg)
+        tests = []
         for m in F1_RE.finditer(text):
-            t = F1Test(m.group(2), fut, bool(m.group(1)), path)
+            t = F1Test(m.group(2), bool(m.group(1)), path)
             t.mocks = src.f1_test_mocks(t.full)
-            out.append(t)
-    return out
+            tests.append(t)
+        files.append((path, module, fut, tests))
+    return files
 
 
 def collect_f2(root):
-    out = []
-    for path in files(root, F2_DIRS, "test_"):
-        fut = file_under_test(path, "test_")
+    files = {}  # path -> (module, fut, [F2Test])
+    for path, module, fut in source_files(root, F2_DIRS, "test_"):
         text = read(path)
         src = SourceFile(text, f2_mocks)
+        tests = []
         for m in F2_RE.finditer(text):
-            t = F2Test(m.group(1), m.group(2), fut, path)
-            t.mocks = src.f2_test_mocks(t.module, t.name)
-            out.append(t)
-    return out
+            t = F2Test(m.group(1), m.group(2), path)
+            t.mocks = src.f2_test_mocks(t.group, t.name)
+            tests.append(t)
+        files[path] = (module, fut, tests)
+    return files
 
 
-def make_weight(t2):
-    df = Counter(t for f in t2 for t in f.tokset)
-    n = len(t2)
+def pair_files(f1_files, f2_files):
+    by_key, by_fut = {}, defaultdict(list)
+    for path, (module, fut, _) in f2_files.items():
+        by_key[(module.lower(), fut.lower())] = path
+        by_fut[fut.lower()].append(path)
+    pairs = {}
+    for path, module, fut, _ in f1_files:
+        f2 = by_key.get((module.lower(), fut.lower()))
+        if f2 is None and len(by_fut[fut.lower()]) == 1:
+            f2 = by_fut[fut.lower()][0]
+        pairs[path] = f2
+    return pairs
+
+
+# ---------------------------------------------------------------- matching
+
+def make_weight(f2_tests):
+    df = Counter(t for f in f2_tests for t in f.tokset)
+    n = len(f2_tests)
     return lambda t: math.log((n + 1) / (df[t] + 1)) + 1
 
 
@@ -297,12 +321,12 @@ def coverage(toks, f2, w):
 
 
 def score(f1, f2, w):
-    """(main, context, same_file) - compared as a tuple, higher is better."""
+    """(main, context) - compared as a tuple, higher is better."""
     if f1.numeric:
         main = 1.0 if all(t in f2.tokset for t in f1.name_tok) else 0.0
     else:
         main = coverage(f1.name_tok, f2, w)
-    return (main, coverage(f1.ctx_tok, f2, w), f1.fut.lower() == f2.fut.lower())
+    return (main, coverage(f1.ctx_tok, f2, w))
 
 
 def max_matching(nodes, edges):
@@ -333,6 +357,29 @@ def max_matching(nodes, edges):
     return match_l
 
 
+def match_tests(f1_tests, f2_tests, w, threshold, unique):
+    """Return {f1.full: (F2Test, score)} for one f2 file. Identical f1 names
+    (e.g. same test in testcases and testcases_target) share one match."""
+    by_name = {}
+    for t in f1_tests:
+        by_name.setdefault(t.full, t)
+    edges, best = {}, {}
+    for name, f1 in by_name.items():
+        scored = sorted(((score(f1, c, w), i, c) for i, c in enumerate(f2_tests)),
+                        key=lambda x: (x[0], -x[1]), reverse=True)
+        best[name] = scored[0][0] if scored else (0, 0)
+        edges[name] = [c for s, _, c in scored if s[0] >= threshold and s[0] > 0]
+    if unique:
+        # strong text matches first, numeric-only names last
+        order = sorted(edges, key=lambda n: (not by_name[n].numeric, best[n]), reverse=True)
+        match = max_matching(order, edges)
+    else:
+        match = {n: e[0] for n, e in edges.items() if e}
+    return {n: (f2, score(by_name[n], f2, w)[0]) for n, f2 in match.items()}
+
+
+# ---------------------------------------------------------------- output
+
 def print_table(headers, rows):
     widths = [max(len(str(r[i])) for r in [headers] + rows) for i in range(len(headers))]
     line = "+-" + "-+-".join("-" * w for w in widths) + "-+"
@@ -345,131 +392,92 @@ def print_table(headers, rows):
     print(line)
 
 
-def output(headers, rows, as_csv):
-    if as_csv:
-        w = csv.writer(sys.stdout)
-        w.writerow(headers)
-        w.writerows(rows)
-    else:
-        print_table(headers, rows)
-
-
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("f1", type=Path)
-    ap.add_argument("f2", type=Path)
+    ap.add_argument("f1", type=Path, help="<parent>/parasoft (or <parent>)")
+    ap.add_argument("f2", type=Path, help="<parent>/cpputest (or <parent>)")
+    ap.add_argument("--missing-only", action="store_true",
+                    help="only list f1 tests with no f2 match or with missing mocks")
     ap.add_argument("--threshold", type=float, default=0.8,
-                    help="min share (0-1) of f1 test-name tokens found in the f2 name "
+                    help="min share (0-1) of f1 test-name words found in the f2 name "
                          "(default 0.8)")
-    ap.add_argument("--same-file", action="store_true",
-                    help="only match f2 tests from the same <file_under_test>")
-    ap.add_argument("--any-module", action="store_true",
-                    help="ignore the module, compare against all f2 tests")
     ap.add_argument("--no-unique", action="store_true",
                     help="let one f2 test cover several f1 tests")
-    ap.add_argument("--matches", action="store_true",
-                    help="also print the matched pairs, to verify the matching")
     ap.add_argument("--f1-mock-arg", type=int, default=1,
                     help="which CPPTEST_REGISTER_CALLBACK argument (1-based) names "
                          "the mocked function (default 1)")
-    ap.add_argument("--csv", action="store_true", help="CSV output instead of tables")
+    ap.add_argument("--csv", action="store_true", help="one CSV table instead")
     args = ap.parse_args()
 
-    for d in (args.f1, args.f2):
-        if not d.is_dir():
-            sys.exit(f"error: {d} is not a directory")
+    f1_root = resolve_root(args.f1, "parasoft", F1_DIRS)
+    f2_root = resolve_root(args.f2, "cpputest", F2_DIRS)
+    f1_files = collect_f1(f1_root, args.f1_mock_arg - 1)
+    f2_files = collect_f2(f2_root)
+    pairs = pair_files(f1_files, f2_files)
+    w = make_weight([t for _, _, ts in f2_files.values() for t in ts])
 
-    t1, t2 = collect_f1(args.f1, args.f1_mock_arg - 1), collect_f2(args.f2)
-    w = make_weight(t2)
-    group = (lambda m: "") if args.any_module else str.lower
+    # match per f2 file, pooling every f1 file paired with it
+    f1_by_f2 = defaultdict(list)
+    for path, _, _, tests in f1_files:
+        if pairs[path] is not None:
+            f1_by_f2[pairs[path]] += tests
+    matches = {}
+    for f2_path, f1_tests in f1_by_f2.items():
+        matches[f2_path] = match_tests(f1_tests, f2_files[f2_path][2], w,
+                                       args.threshold, not args.no_unique)
 
-    f2_by_group = defaultdict(list)
-    for f in t2:
-        f2_by_group[group(f.module)].append(f)
+    stats = Counter()
+    report = []  # (f1 file, f2 file, rows)
+    for path, _, _, tests in f1_files:
+        f2_path = pairs[path]
+        found = matches.get(f2_path, {})
+        rows = []
+        for t in tests:
+            stats["f1 tests"] += 1
+            label = t.full + ("  [disabled]" if t.disabled else "")
+            if t.full not in found:
+                stats["not found"] += 1
+                rows.append((label, NOT_FOUND, ""))
+                continue
+            f2, s = found[t.full]
+            stats["matched"] += 1
+            f2_label = f2.name + ("" if s >= 1 else f"  (~{s:.0%})")
+            if t.mocks is None or f2.mocks is None:
+                gap = "? (test body not found)"
+            else:
+                gap = ", ".join(sorted(t.mocks - f2.mocks))
+                stats["mock gaps"] += bool(gap)
+            if not args.missing_only or gap:
+                rows.append((label, f2_label, gap))
+        if f2_path is None:
+            stats["f1 files without f2 file"] += 1
+        if rows or not args.missing_only:
+            report.append((path.relative_to(f1_root),
+                           f2_path.relative_to(f2_root) if f2_path else NOT_FOUND, rows))
 
-    # identical f1 names (e.g. testcases vs testcases_target) share one node
-    f1_by_key = defaultdict(list)
-    for f in t1:
-        f1_by_key[(group(f.module), f.full)].append(f)
+    headers = ["f1 test", "f2 match", "mocks missing in f2"]
+    if args.csv:
+        out = csv.writer(sys.stdout)
+        out.writerow(["f1 file", "f2 file"] + headers)
+        for f1_file, f2_file, rows in report:
+            out.writerows([str(f1_file), str(f2_file), *r] for r in rows)
+        return
 
-    edges, closest = {}, {}
-    for key, same in f1_by_key.items():
-        f1 = same[0]
-        cands = f2_by_group.get(key[0], [])
-        if args.same_file:
-            cands = [c for c in cands if c.fut.lower() == f1.fut.lower()]
-        scored = sorted(((score(f1, c, w), i, c) for i, c in enumerate(cands)),
-                        key=lambda x: (x[0], -x[1]), reverse=True)
-        closest[key] = (scored[0][0], scored[0][2]) if scored else None
-        edges[key] = [c for s, _, c in scored if s[0] >= args.threshold and s[0] > 0]
-
-    if args.no_unique:
-        match = {k: e[0] for k, e in edges.items() if e}
-    else:
-        # strong text matches first, numeric-only names last
-        order = sorted(edges, key=lambda k: (not f1_by_key[k][0].numeric,
-                                             closest[k][0] if closest[k] else (0, 0, False)),
-                       reverse=True)
-        match = max_matching(order, edges)
-    owner = {id(v): k for k, v in match.items()}
-
-    missing, matched, mock_gaps = [], [], []
-    no_body = Counter()
-    for key, same in f1_by_key.items():
-        f1 = same[0]
-        if key in match:
-            f2 = match[key]
-            s = score(f1, f2, w)
-            flags = [x for x, on in (("numeric", f1.numeric), ("partial", s[0] < 1),
-                                     ("other file", not s[2])) if on]
-            matched.append((f1.module, f1.full, f1.parsed, f1.how, f2.name,
-                            f"{s[0]:.2f}", ", ".join(flags)))
-            bodies = [f.mocks for f in same if f.mocks is not None]
-            if not bodies:
-                no_body["f1"] += 1
-            elif f2.mocks is None:
-                no_body["f2"] += 1
-            elif gap := set().union(*bodies) - f2.mocks:
-                mock_gaps.append((f1.module, f1.full, f2.name, len(gap),
-                                  ", ".join(sorted(gap)), f2.path.relative_to(args.f2)))
-            continue
-        if closest[key] is None:
-            sc, best = "0.00", "-"
+    for f1_file, f2_file, rows in report:
+        print(f"f1 file: {f1_file}")
+        print(f"f2 file: {f2_file}")
+        if rows:
+            print_table(headers, rows)
         else:
-            s, c = closest[key]
-            sc, best = f"{s[0]:.2f}", c.name
-            if id(c) in owner:
-                best += f"  (used by {owner[id(c)][1]})"
-        for f in same:
-            missing.append((f.module, f.fut, f.full, f.parsed, f.how,
-                            "DISABLED" if f.disabled else "enabled", sc, best,
-                            f.path.relative_to(args.f1)))
-
-    hows = Counter(f.how for f in t1)
-    print(f"f1 tests: {len(t1)} ({len(f1_by_key)} unique)   f2 tests: {len(t2)}   "
-          f"matched: {len(match)}   in f1 but not f2: {len(missing)}")
-    print(f"f1 name parsing: known marker {hows['marker']}, guessed marker "
-          f"{hows['guessed']}, fallback {hows['fallback']}")
-    print(f"mock check: {len(match) - sum(no_body.values())} matched pairs compared, "
-          f"{len(mock_gaps)} with mocks missing in f2, test body not found: "
-          f"f1 {no_body['f1']}, f2 {no_body['f2']}\n")
-
-    if args.matches and matched:
-        print("Matched pairs:")
-        output(["Module", "f1 test", "Parsed", "How", "f2 test", "Score", "Flags"],
-               sorted(matched), args.csv)
+            print("(no tests)")
         print()
-    if missing:
-        print("In f1 but not in f2:")
-        output(["Module", "File under test", "f1 test", "Parsed", "How", "State",
-                "Score", "Closest f2 test", "f1 file"],
-               sorted(missing, key=lambda r: tuple(map(str, r))), args.csv)
-        print()
-    if mock_gaps:
-        print("Mocks in f1 but not in f2 (matched tests):")
-        output(["Module", "f1 test", "f2 test", "#", "Missing mocks", "f2 file"],
-               sorted(mock_gaps, key=lambda r: tuple(map(str, r))), args.csv)
+    print(f"f1: {len(f1_files)} files, {stats['f1 tests']} tests   "
+          f"f2: {len(f2_files)} files, "
+          f"{sum(len(ts) for _, _, ts in f2_files.values())} tests")
+    print(f"f1 files without f2 file: {stats['f1 files without f2 file']}   "
+          f"tests matched: {stats['matched']}   not found: {stats['not found']}   "
+          f"matched with missing mocks: {stats['mock gaps']}")
 
 
 if __name__ == "__main__":
