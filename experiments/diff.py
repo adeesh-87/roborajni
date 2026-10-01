@@ -2,7 +2,8 @@
 """Report CPPTEST tests present under f1 but missing from f2's gtest TESTs.
 
 f1: <f1>/{testcases,testcases_target}/**/UnitTest_<file>[_cpp].cpp
-    CPPTEST_TEST(<module>_<x>_<x>_<x>_<test_name>)  (also CPPTEST_TEST_DISABLED)
+    CPPTEST_TEST(<module>_..._{INTRF|BV|CC}_<test_name>)  (also CPPTEST_TEST_DISABLED)
+    test_name is everything after the first _INTRF_ / _BV_ / _CC_ marker.
 f2: <f2>/testcases/**/test_<file>.cpp
     TEST(<module>, <anything containing test_name>)
 
@@ -19,6 +20,7 @@ F2_DIRS = ("testcases",)
 
 COMMENT_RE = re.compile(r"//[^\n]*|/\*.*?\*/", re.S)
 F1_RE = re.compile(r"\bCPPTEST_TEST(_DISABLED)?\s*\(\s*([^,)\s]+)")
+NAME_RE = re.compile(r"^([^_]+)_(?:.*?_)?(?:INTRF|BV|CC)_(.+)$")
 F2_RE = re.compile(r"(?<![A-Za-z0-9_])TEST\s*\(\s*([^,\s)]+)\s*,\s*([^,)\s]+)")
 
 
@@ -47,12 +49,12 @@ def collect_f1(root):
         fut = file_under_test(path, "UnitTest_")
         for m in F1_RE.finditer(read(path)):
             full = m.group(2)
-            parts = full.split("_", 4)
-            if len(parts) < 5:
+            nm = NAME_RE.match(full)
+            if not nm:
                 print(f"warning: {path}: '{full}' doesn't match "
-                      "<module>_<a>_<b>_<c>_<test_name>", file=sys.stderr)
+                      "<module>_..._{INTRF|BV|CC}_<test_name>", file=sys.stderr)
                 continue
-            out.append((fut, parts[0], parts[4], bool(m.group(1)), full, path))
+            out.append((fut, nm.group(1), nm.group(2), bool(m.group(1)), full, path))
     return out
 
 
