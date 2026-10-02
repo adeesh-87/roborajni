@@ -244,8 +244,10 @@ def analyze_product(p, results, args):
         uncalled = {u for u in owned if funcs[u][3] and u not in referenced and
                     "name:" + simple_name(funcs[u][0]) not in referenced and
                     simple_name(funcs[u][0]) != "main"} - set(root_reasons)
+    if p.tests:
+        mode.append("(tests: only adds uses)")
     return {"owned": owned, "dead": dead, "uncalled": uncalled, "mode": "; ".join(mode),
-            "funcs": funcs, "edges": edges, "vars": gvars}
+            "funcs": funcs, "edges": edges, "vars": gvars, "tests": p.tests}
 
 
 def caller_index(prods):
@@ -392,20 +394,27 @@ def main():
     callers_of = caller_index(prods.values())
     for usr, f in all_funcs.items():
         containing = [n for n, pr in prods.items() if usr in pr["owned"]]
-        dead_in = [n for n in containing if usr in prods[n]["dead"]]
-        uncalled = [n for n in containing if usr in prods[n]["uncalled"]]
+        # products marked "tests" can only add uses; judge by the real products
+        real = [n for n in containing if not prods[n]["tests"]] or containing
+        tests_using = [n for n in containing if prods[n]["tests"] and n not in real and
+                       usr not in prods[n]["dead"]]
+        dead_in = [n for n in real if usr in prods[n]["dead"]]
+        uncalled = [n for n in real if usr in prods[n]["uncalled"]]
         if dead_in:
             callers = callers_of(usr)
             why = ("only referenced from unused code: " + ", ".join(callers)) if callers \
                 else "never referenced"
-            if len(dead_in) == len(containing):
+            if len(dead_in) == len(real) and tests_using:
+                status = "used only by tests"
+                why = f"unused in {', '.join(real)}; reached from {', '.join(tests_using)}"
+            elif len(dead_in) == len(real):
                 status = "dead" + (f" (in all: {', '.join(containing)})" if len(containing) > 1
                                    else "")
             else:
                 status = "unused in " + ", ".join(dead_in)
-                why = "used only by " + ", ".join(n for n in containing if n not in dead_in)
+                why = "used only by " + ", ".join(n for n in real if n not in dead_in)
             func_rows[f[1]].append((f[2], f[0], status, why))
-        elif uncalled and len(uncalled) == len(containing):
+        elif uncalled and len(uncalled) == len(real) and not tests_using:
             func_rows[f[1]].append((f[2], f[0], "no callers (external)",
                                     "not called in analysed code - API or dead?"))
 
