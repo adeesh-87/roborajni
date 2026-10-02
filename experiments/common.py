@@ -343,10 +343,11 @@ def _libclang_has_builtins():
 
 class Product:
     def __init__(self, name, entries, sources=(), public_headers=(), entry_points=(),
-                 extra_roots=()):
+                 extra_roots=(), tests=False):
         self.name, self.entries = name, entries
         self.sources, self.public_headers = list(sources), list(public_headers)
         self.entry_points, self.extra_roots = list(entry_points), list(extra_roots)
+        self.tests = tests  # only adds uses; never the reason code is reported
 
     def owns(self, rel):
         return not self.sources or any(match_path(rel, p) for p in self.sources)
@@ -396,14 +397,17 @@ def load_products(args):
 
         products = []
         for p in cfg["products"]:
-            entries = db(p.get("compile_commands") or cfg["compile_commands"])
+            spec = p.get("compile_commands") or cfg["compile_commands"]
+            entries = [e for path in (spec if isinstance(spec, list) else [spec])
+                       for e in db(path)]
             rx = re.compile(p["command_regex"]) if p.get("command_regex") else None
             sel = [e for e in entries if (rel := pf.rel(e.file)) is not None
                    and (not p.get("sources") or any(match_path(rel, s) for s in p["sources"]))
                    and (rx is None or rx.search(e.command))]
             products.append(Product(p["name"], sel, p.get("sources", []),
                                     p.get("public_headers", []), p.get("entry_points", []),
-                                    cfg.get("extra_roots", []) + p.get("extra_roots", [])))
+                                    cfg.get("extra_roots", []) + p.get("extra_roots", []),
+                                    p.get("tests", False)))
         return pf.root, pf, products
     if not args.compile_db:
         sys.exit("error: give -p <compile_commands.json> or --config <file>")
