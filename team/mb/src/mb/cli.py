@@ -1,6 +1,7 @@
 """mb — minimal message board for agents. Pull-based, email-like.
 
-Storage: single SQLite file (WAL mode) at ~/.mb/board.db (override with MB_DB).
+Storage: single SQLite file (WAL mode). Location: $MB_DB, else `board` in ~/.config/mb/config.json
+(`mb config set board <path>`), else ~/.mb/board.db.
 No daemon: every invocation opens the DB, does one operation, exits.
 Projects and jobs: a manager posts a project, then one job per engineer (any kind, e.g. code or build);
 engineers apply; the manager hires the first applicant of each job.
@@ -23,7 +24,30 @@ import time
 
 from mb import __version__
 
-DB_PATH = pathlib.Path(os.environ.get("MB_DB", pathlib.Path.home() / ".mb" / "board.db"))
+CONFIG_FILE = pathlib.Path(os.environ.get("MB_CONFIG") or pathlib.Path.home() / ".config" / "mb" / "config.json")
+DEFAULT_BOARD = pathlib.Path.home() / ".mb" / "board.db"
+
+
+def _read_config():
+    try:
+        return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+    except FileNotFoundError:
+        return {}
+    except (OSError, ValueError) as e:
+        print(f"mb: error: cannot read config file {CONFIG_FILE}: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+def _resolve_board():
+    if os.environ.get("MB_DB"):
+        return pathlib.Path(os.environ["MB_DB"]).expanduser().absolute(), "MB_DB environment variable"
+    board = _read_config().get("board")
+    if board:
+        return pathlib.Path(board), f"config file {CONFIG_FILE}"
+    return DEFAULT_BOARD, "default"
+
+
+DB_PATH, DB_SOURCE = _resolve_board()
 DEFAULT_LOG = DB_PATH.parent / "mb.log"
 LOBBY = "lobby"
 LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
@@ -149,12 +173,35 @@ def die(msg):
 
 # ---- storage -----------------------------------------------------------------------------------
 
-def connect():
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    con = sqlite3.connect(DB_PATH, timeout=30, isolation_level=None)
+def _open_board(path):
+    """Open (creating if needed) the board at path; raises OSError / sqlite3.Error when that is impossible."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(path, timeout=30, isolation_level=None)
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA busy_timeout=30000")
     con.executescript(SCHEMA)
+    return con
+
+
+def _on_windows_drive(path):
+    try:
+        wsl = "microsoft" in pathlib.Path("/proc/version").read_text().lower()
+    except OSError:
+        wsl = False
+    return wsl and str(path).startswith("/mnt/")
+
+
+def connect():
+    try:
+        con = _open_board(DB_PATH)
+    except (OSError, sqlite3.Error) as e:
+        die(f"cannot open the board {DB_PATH} (set by: {DB_SOURCE}): {e}\n"
+            f"  SQLite must be able to create files in {DB_PATH.parent}. Usual causes:\n"
+            f"  - a sandbox (e.g. Codex workspace-write) blocks writing there: give the session write access to\n"
+            f"    that directory, or have the user pick a writable board with `mb config set board <path>`;\n"
+            f"  - the path is on a Windows drive under WSL (/mnt/c/...), where SQLite is unreliable;\n"
+            f"  - file or directory permissions.\n"
+            f"  Agents: do not pick another board yourself; stop and report this message.")
     cols = {r[1] for r in con.execute("PRAGMA table_info(jobs)")}
     for col, typ in (("hired_at", "INTEGER"), ("closed_at", "INTEGER"), ("project", "TEXT"), ("kind", "TEXT"),
                      ("views", "INTEGER NOT NULL DEFAULT 0")):
@@ -251,7 +298,8 @@ def _scope_of_topic(topic):
 
 
 def _board_line():
-    return f"board: {DB_PATH}   (every agent on this task must use this same board; never set MB_DB yourself)"
+    return (f"board: {DB_PATH}   (from {DB_SOURCE}; every agent on this task must use this same board, "
+            f"never change it yourself)")
 
 
 # ---- messages ----------------------------------------------------------------------------------
@@ -1038,6 +1086,48 @@ def cmd_log(args):
         print("logging: off" + (f" (last file {cfg['log.file']})" if "log.file" in cfg else ""))
 
 
+# ---- board location ----------------------------------------------------------------------------
+
+def _write_config(cfg):
+    CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+    CONFIG_FILE.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
+
+
+def cmd_config(args):
+    cfg = _read_config()
+    if args.action in ("set", "unset") and args.key != "board":
+        die("the only setting is `board`: mb config set board <path> / mb config unset board")
+    if args.action == "set":
+        if not args.value:
+            die("usage: mb config set board <path to a .db file, or a directory>")
+        path = pathlib.Path(args.value).expanduser().absolute()
+        if path.is_dir() or args.value.endswith("/"):
+            path = path / "board.db"
+        try:
+            _open_board(path).close()
+        except (OSError, sqlite3.Error) as e:
+            die(f"cannot create or open a board at {path}: {e}")
+        cfg["board"] = str(path)
+        _write_config(cfg)
+        print(f"board set to {path}  (saved in {CONFIG_FILE})")
+        if _on_windows_drive(path):
+            print("warning: this is a Windows drive under WSL; SQLite's locking is unreliable there. "
+                  "Prefer a Linux path such as ~/...")
+    elif args.action == "unset":
+        cfg.pop("board", None)
+        _write_config(cfg)
+        print(f"board setting removed from {CONFIG_FILE}")
+    board, source = _resolve_board()
+    print(f"board in effect: {board}")
+    print(f"  set by:        {source}")
+    print(f"  config file:   {CONFIG_FILE}" + ("" if CONFIG_FILE.exists() else " (does not exist)"))
+    if os.environ.get("MB_DB") and args.action != "show":
+        print("  note: MB_DB is set in this shell and overrides the config file here")
+    folder = board.parent
+    print(f"  folder:        {folder} (" + ("writable" if os.access(folder, os.W_OK) else
+                                            "exists, NOT writable" if folder.exists() else "missing") + ")")
+
+
 # ---- entry point -------------------------------------------------------------------------------
 
 def main():
@@ -1161,6 +1251,12 @@ def main():
     stp.add_argument("-n", type=int, default=10, help="recent projects/jobs in the board summary")
     stp.add_argument("--json", action="store_true")
     stp.set_defaults(func=cmd_stats)
+
+    cfp = sub.add_parser("config", help="where the board lives: mb config show | set board <path> | unset board")
+    cfp.add_argument("action", choices=["show", "set", "unset"])
+    cfp.add_argument("key", nargs="?")
+    cfp.add_argument("value", nargs="?")
+    cfp.set_defaults(func=cmd_config)
 
     lgp = sub.add_parser("log", help="file logging for every agent on this board")
     lgp.add_argument("action", choices=["on", "off", "status"])

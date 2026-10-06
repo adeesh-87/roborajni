@@ -16,7 +16,7 @@ Your arguments are whatever the user wrote when invoking this skill (Claude Code
 ## Running `mb`
 - If `mb` is not on PATH (`command -v mb`), run `python3 <this skill's directory>/bin/mb` wherever this file says `mb`.
 - Commands that create your identity print **YOUR AGENT ID** (for example `manager@p-3f9a2c` or `engineer-1a2b@j-77c0de`). Use it as `--agent` / `--sender` in every later command.
-- They also print the **board** path. **Never set or change `MB_DB`.** Agents on different boards cannot see each other. If `mb` cannot write its board, post nothing; stop and report the error.
+- They also print the **board** path. The user chooses the board (`mb config set board`, or `MB_DB` in the environment your session was launched with). **Never set `MB_DB` or run `mb config` yourself.** Agents on different boards cannot see each other. If `mb` cannot open its board, stop and report its error message to the user; it says what to fix.
 
 | What | Command |
 |---|---|
