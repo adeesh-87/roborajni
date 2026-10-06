@@ -1,4 +1,4 @@
-# team: a manager + engineer pair over a message board
+# team: a manager with N code engineers and a build engineer, over a message board
 
 This folder is a self-contained skill. Copy the whole `team/` folder into your skills directory next to the task skills it works with, for example `.agents/skills/team/` beside `.agents/skills/ut/` (or under `.claude/skills/` for Claude Code).
 
@@ -13,28 +13,34 @@ team/
 └── README.md
 ```
 
-The task itself is driven by its own skill (for example `ut`). This skill only adds the two roles, the messages and the locks:
+The task itself is driven by its own skill (for example `ut`). This skill only adds the roles, the messages and the locks:
 
-- **Manager:** sets direction and the hard rules, and is slightly conservative. Prepares the work with the task's skill, posts it as a job, hires the first engineer who applies, and at the end evaluates and writes the report.
-- **Engineer:** implements, and is slightly aggressive: wants to do more. Applies to the job with a counter-proposal, then executes with the task's skill under path locks.
+- **Manager:** sets direction and the hard rules, and is slightly conservative. Prepares the work with the task's skill, posts a **project** (the shared context) and **one job per engineer**, hires, routes every build result to the engineer who owns the code, and at the end evaluates and writes the report.
+- **N code engineers:** each owns a disjoint part of the code, is slightly aggressive (wants to do more), and hands every change over as `READY`. They never build.
+- **1 build engineer:** builds and runs when the manager asks (`BUILD`) and posts a `REPORT`. It never edits code.
 
-Both post anything useful they learn (`INFO:`) the moment they learn it.
+Everyone posts anything useful they learn to the whole project (`INFO`) the moment they learn it.
 
 ## Run
 
-Start each agent in its own terminal. The order does not matter.
+Start every agent in its own terminal, in any order. Use one label per run.
 
 ```
-/team manager label=mcdc1 use the ut skill to increase MC/DC coverage of module x
-/team engineer label=mcdc1
+/team manager engineers=2 label=mcdc3 use the ut skill to increase MC/DC coverage of module x
+/team engineer label=mcdc3      # three times: 2 code engineers + 1 build engineer
 ```
 
-1. The manager prepares the work with the task's skill and runs `mb job post`. The posting holds the task, the skill, the paths, the `locks:` dir, the hard rules, a conservative plan, and everything the manager already knows. Then it waits.
-2. The engineer finds the posting (`mb job show --next`), reads it, and replies with `mb job apply`: what it understood, what it would add, and what it already knows.
-3. The manager runs `mb job hire`. That hires the **first** applicant and automatically rejects any others, so several engineers can compete for one job.
-4. They negotiate scope and checkpoints (at most 2 proposals each) and meet in the middle. The manager posts `AGREED` and updates the posting.
-5. The engineer works checkpoint by checkpoint, posting a `SYNC` after each, and doesn't wait for approval. The manager only steps in (`STOP` / `REDIRECT`) when direction or a hard rule is at stake.
-6. The engineer posts `DONE`. The manager evaluates, writes the report, posts `FINAL` and closes the job.
+1. The manager prepares the work, then runs `mb project post`. The posting holds the task, the skill, the paths, the `locks:` dir, the hard rules and what the manager already knows. It then posts N code jobs, each owning disjoint files, and 1 build job holding the exact build, run and coverage commands.
+2. Engineers are launched identically. `mb job show --next` shows each one a different free job; they read it and `mb job apply`. `mb job hire` hires the first applicant of every job, and rejected engineers look for the next free job.
+3. The manager agrees scope and checkpoints with each code engineer (at most 2 proposals each, meeting in the middle) and the commands with the build engineer.
+4. The routing loop:
+   - A code engineer writes a change under lock and posts `READY`. It carries on with its next change.
+   - The manager batches READYs into a `BUILD` for the build engineer.
+   - The build engineer locks the sources and build folder, builds, runs and posts a `REPORT`.
+   - The manager sends each failure as a `FIX` to the engineer who owns the file, and the numbers to everyone as `INFO`.
+5. When every code engineer is `DONE`, the manager asks for a final build, evaluates, writes the report, posts `FINAL` and closes the project.
+
+For a single engineer that builds itself: `engineers=1`, and launch one engineer. The manager posts no build job.
 
 ## Install mb with uv (optional)
 
@@ -48,6 +54,7 @@ uv run --project .agents/skills/team/mb mb --help
 ## Watch
 
 ```bash
+mb project show <id>              # the project, its jobs and who holds them
 mb job list                       # jobs: open / filled / closed / expired
 mb tail --topic lobby             # jobs being posted, filled, closed
 mb tail --topic job/<id> -n 100   # the conversation
@@ -59,7 +66,8 @@ bash .agents/skills/team/bin/lock.sh <locks dir> watch 10   # live lock status
 Every agent action bumps a counter: messages sent (by type, with bytes), inbox calls, empty polls and time spent waiting, lock calls by outcome with time spent waiting, and job actions. Jobs record when they were posted, hired and closed.
 
 ```bash
-mb stats                     # board summary + recent jobs with their phase durations
+mb stats                     # board summary + recent projects
+mb stats --project <id>      # staffing, time to first build and to final, READY/BUILD/REPORT/FIX counts, per-agent costs
 mb stats --job <id>          # timeline, message mix, per-agent costs
 mb stats --agent <id>        # one agent's summary and raw counters
 mb stats --job <id> --json   # the same as JSON, for scripts and comparisons between runs
@@ -90,23 +98,26 @@ Each line has a timestamp, the level, `event=...`, `agent=...` and key=value fie
 
 | Command | Purpose |
 |---|---|
-| `mb job post --title T [--label L] [--ttl MIN] "<posting>"` | Manager: post a job (prints the manager id) |
-| `mb job show [ID] [--next] [--label L] [--wait S]` / `--agent ID` | Read a posting: by id, the oldest open one, or your own |
-| `mb job apply [ID] [--label L] "<reply>"` | Engineer: reply to a posting (prints the engineer id) |
-| `mb job hire --agent ID [APPLICANT]` | Manager: hire the first pending applicant (or a named one) |
-| `mb job update --agent ID "<posting>"` / `mb job close --agent ID [--note N]` | Manager: replace the posting / close the job |
+| `mb project post --title T [--label L] "<posting>"` | Manager: post the project, the shared context (prints the manager id) |
+| `mb project show [ID] [--agent ID]` / `mb project close --agent ID [--note N]` | Show a project and its jobs / close it with all its jobs |
+| `mb job post --agent ID --kind code\|build --title T [--ttl MIN] "<posting>"` | Manager: post one job (one engineer) in the project |
+| `mb job show [ID] [--next] [--label L] [--kind K] [--wait S]` / `--agent ID` | Read a posting: by id, the next free one, or your own |
+| `mb job apply ID "<reply>"` | Engineer: reply to a posting (prints the engineer id) |
+| `mb job hire --agent ID [--job J] [APPLICANT]` | Manager: hire the first applicant of every open job (or of one job, or a named applicant) |
+| `mb job update --agent ID [--job J] "<posting>"` / `mb job close --agent ID [--job J] [--note N]` | Manager: replace a job's posting / close one job |
 | `mb job list` | Recent jobs |
-| `mb say "<text>" --agent ID` | Post to your job's private channel |
+| `mb say "<text>" --agent ID [--job J \| --all]` | Post to your job channel, to one job (manager), or to the whole project |
 | `mb pub <topic> "<text>" --sender ID` | Post to any topic (`agent/<id>` for a direct message) |
 | `mb inbox --agent ID [--wait SECS] [--peek]` | Read unread mail |
 | `mb tail [--topic T] [-n N]` | Recent messages, ignoring cursors |
 | `mb lock --agent ID <acquire\|wait\|release\|release-all\|alive\|check\|status> ...` | Path locks in the job's `locks:` dir; see LOCKING.md |
-| `mb stats [--job ID \| --agent ID] [--json]` | Statistics (see above) |
+| `mb stats [--project ID \| --job ID \| --agent ID] [--json]` | Statistics (see above) |
 | `mb log on\|off\|status [--level L] [--file F]` | File logging (see above) |
 
 `mb` keeps everything in one SQLite file, `~/.mb/board.db` (override with `MB_DB`). An agent never receives its own messages. Open jobs expire after `--ttl` minutes (default 240) if nobody is hired.
 
 ## With the ut skill
-- The manager does ut's phases up to and including the plan, then closeout.
-- The engineer runs ut's executor.
+- The manager does ut's phases up to and including the plan, splits the plan's tasks across the code jobs by what they touch, and does closeout at the end.
+- Code engineers write the tests with ut's executor steps but hand every build and run to the build engineer.
+- The build engineer runs the build, test and coverage commands recorded in ut's KB.
 - ut's parallel executors use this skill's `bin/lock.sh` too, so they and a manager/engineer pair respect each other's locks.
