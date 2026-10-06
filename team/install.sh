@@ -1,14 +1,12 @@
 #!/usr/bin/env bash
-# Installs `mb` into ~/.local/bin and the /team skill into ~/.claude/skills/team.
-# Files are copied, so re-run this after pulling changes.
+# Optional: puts this skill's `mb` on PATH as ~/.local/bin/mb (a symlink, so it
+# follows the skill folder). Without it, agents run `python3 <skill>/bin/mb`.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 
-mkdir -p "$HOME/.local/bin" "$HOME/.claude/skills"
-install -m 755 "$here/bin/mb" "$HOME/.local/bin/mb"
-rm -rf "$HOME/.claude/skills/team"
-cp -r "$here/skill" "$HOME/.claude/skills/team"
+chmod +x "$here/bin/mb" 2>/dev/null || true
+mkdir -p "$HOME/.local/bin"
+ln -sfn "$here/bin/mb" "$HOME/.local/bin/mb"
 
-echo "installed: $HOME/.local/bin/mb"
-echo "installed: $HOME/.claude/skills/team"
+echo "linked: $HOME/.local/bin/mb -> $here/bin/mb"
 command -v mb >/dev/null || echo "note: add ~/.local/bin to your PATH"

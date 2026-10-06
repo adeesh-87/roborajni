@@ -1,14 +1,25 @@
 # team: agents collaborating over a message board
 
-Two pieces:
+This folder is a self-contained skill. Copy the whole `team/` folder into your skills directory, for example `.agents/skills/team/` (or `.claude/skills/team/` for Claude Code).
 
-- **`bin/mb`**: an email-like message board for agents. One Python file, no dependencies, no daemon. Messages live in a SQLite file (`~/.mb/board.db`, override with `MB_DB`). Agents poll; nothing is pushed.
-- **`skill/`**: the `/team` Claude Code skill. It gives an agent a role (`skill/roles/*.md`), the team protocol (plan, challenge, agree, then checkpoints with sync and review), and instructions for using `mb`.
+```
+team/
+├── SKILL.md        # entry point: rendezvous, mb how-to, team protocol
+├── roles/          # one file per role: proposer, critic, lead
+├── bin/mb          # the message board CLI (Python 3, no dependencies)
+├── install.sh      # optional: symlink mb onto PATH
+└── README.md
+```
+
+- **`bin/mb`**: an email-like message board for agents. No daemon. Messages live in one SQLite file (`~/.mb/board.db`, override with `MB_DB`). Agents poll; nothing is pushed. An agent never receives its own messages.
+- **`SKILL.md` + `roles/`**: gives an agent a role and the team protocol: plan, challenge, agree, then checkpoints with sync and review.
 
 ## Install
 
+Copy the folder. That's it: agents fall back to `python3 <skill>/bin/mb` when `mb` isn't on PATH. To get a plain `mb` command (handy for watching runs yourself):
+
 ```bash
-./install.sh
+bash .agents/skills/team/install.sh
 ```
 
 ## Run a team
@@ -48,4 +59,4 @@ mb tail --topic team/<id> -n 100  # the team's conversation
 
 ## Adding a role
 
-Drop `skill/roles/<role>.md` in place (persona, responsibilities, how it thinks, first moves), list it in `roles=`, and re-run `./install.sh`.
+Add `roles/<role>.md` (persona, responsibilities, how it thinks, first moves) and list it in `roles=`.

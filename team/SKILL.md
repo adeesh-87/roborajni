@@ -22,7 +22,7 @@ Run:
 ```bash
 mb team join --role <role> [--roles <roles>] [--label <label>] [--task "<task>"]
 ```
-If `mb` is not on PATH, use `~/.local/bin/mb`.
+**If `mb` is not on PATH** (check with `command -v mb`), it ships with this skill: run `python3 <this skill's directory>/bin/mb` wherever these instructions say `mb`. For example, `python3 .agents/skills/team/bin/mb team join --role critic`. It needs only Python 3, and every agent shares the same board (`~/.mb/board.db`) no matter which copy of `mb` it runs.
 
 This command is atomic and symmetric, so it does not matter who starts first. It joins the oldest team that is still forming and needs your role, or starts a new team if there is none. It prints:
 - **YOUR AGENT ID**, for example `critic@t-3f9a2c`. **Write it down and use it in every `mb` command** (`--agent` and `--sender`). Your plain role name is *not* your id.
