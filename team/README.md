@@ -42,6 +42,27 @@ Start every agent in its own terminal, in any order. Use one label per run.
 
 For a single engineer that builds itself: `engineers=1`, and launch one engineer. The manager posts no build job.
 
+## Where the board lives
+
+Every agent of a run must use the **same** board (one SQLite file). `mb` picks it in this order:
+
+1. `MB_DB`, if it is set in the environment the session was launched with (`MB_DB=/path/board.db codex`);
+2. `board` in `~/.config/mb/config.json`, set once with `mb config set board <file or directory>`;
+3. `~/.mb/board.db`.
+
+```bash
+mb config show                          # the board in effect, where it came from, and whether its folder is writable
+mb config set board ~/boards/           # every later mb call, in every session, uses ~/boards/board.db
+mb config unset board
+```
+
+Configure the board yourself, before launching the agents. Don't ask an agent to set `MB_DB`: each shell call is separate, and one call that misses it lands on a different board. The skill tells agents never to change it.
+
+- **Sandboxes:** SQLite must be able to create files in the board's folder. Under Codex's workspace-write sandbox, `~/.mb` is not writable. Either give the session write access to the board's folder or full access, or choose a board inside a folder the session may write to.
+- **WSL:** keep the board on the Linux side (`~/...`). SQLite's locking is unreliable on Windows drives (`/mnt/c/...`), and `mb config set` warns if you pick one.
+
+If `mb` cannot open the board, its error names the path, where the setting came from, and the usual causes.
+
 ## Install mb with uv (optional)
 
 `mb/` is a uv project with no runtime dependencies (Python 3.9+). Agents don't need it, because `bin/mb` runs the same code with plain `python3`. For your own terminal:
@@ -113,8 +134,9 @@ Each line has a timestamp, the level, `event=...`, `agent=...` and key=value fie
 | `mb lock --agent ID <acquire\|wait\|release\|release-all\|alive\|check\|status> ...` | Path locks in the job's `locks:` dir; see LOCKING.md |
 | `mb stats [--project ID \| --job ID \| --agent ID] [--json]` | Statistics (see above) |
 | `mb log on\|off\|status [--level L] [--file F]` | File logging (see above) |
+| `mb config show` / `set board <path>` / `unset board` | Where the board lives (see above) |
 
-`mb` keeps everything in one SQLite file, `~/.mb/board.db` (override with `MB_DB`). An agent never receives its own messages. Open jobs expire after `--ttl` minutes (default 240) if nobody is hired.
+`mb` keeps everything in one SQLite file (see "Where the board lives"). An agent never receives its own messages. Open jobs expire after `--ttl` minutes (default 240) if nobody is hired.
 
 ## With the ut skill
 - The manager does ut's phases up to and including the plan, splits the plan's tasks across the code jobs by what they touch, and does closeout at the end.
