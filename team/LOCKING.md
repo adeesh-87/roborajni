@@ -10,7 +10,7 @@ A lock protects one **path**: a file, a directory, an executable, or a name that
 
 ## Calling it
 
-**Managers and engineers** use `mb lock`. It reads the lock directory from the `locks:` line of the job posting and fills in your agent id as the owner:
+**Managers and engineers** use `mb lock`. It reads the lock directory from the `locks:` line of the project posting (or the job posting) and fills in your agent id as the owner:
 ```bash
 mb lock --agent <your id> <command> [args...]
 ```
@@ -34,16 +34,16 @@ Always use **absolute paths**.
 ## Rules
 1. **Lock before you write.** Before writing a shared path, or running a command that writes to one (build, test run, coverage, a script that updates task state), acquire it. Take everything one step needs in **one** `acquire`. Taking locks one at a time while holding others is how deadlocks happen.
 2. **Release as soon as the step is done.** Never keep a lock "for later".
-3. **Never wait while holding locks.** Release everything before you wait for a message or for the other agent (`mb inbox --wait`). The only exception is `wait`ing for the next lock of the **same** step, and only on paths the other agent doesn't need to finish its current step.
+3. **Never wait while holding locks.** Release everything before you wait for a message or for another agent (`mb inbox --wait`). The only exception is `wait`ing for the next lock of the **same** step, and only on paths no other agent needs to finish its current step.
 4. **Long work: declare it first.** Before a build or test run longer than a few minutes, run `alive <2x the expected seconds> "<what>"`. Every lock call is a heartbeat. An owner silent for longer than `stale_after` (default 30 minutes, set with `stale_after=SECONDS` in `<lock dir>/config`) and not inside a declared busy window becomes **STALE** to everyone else.
 5. **Check before you read.** Before evaluating files, run `check` on them. Exit 1 means someone is mid-write: don't judge a half-written state. Wait for their next `SYNC`, or `wait` briefly and check again.
 6. **Busy (exit 1):** do something else that doesn't need those paths, or `wait`. Never edit a locked path, and never work around a lock by using a different path for the same resource.
 7. **Stale owner (exit 3, or a `STALE-WARNING` line):** **never `reap`, `break` or `--force` on your own.**
-   - **On a job:** if the stale owner is the other agent on your job, message them (`mb pub agent/<their id> "BLOCKED: you hold <path>, still working?" --sender <you>`) and wait up to 10 waits. If they don't answer and are still STALE, post `BLOCKED:` with the STALE-WARNING line. Only the **manager** may then run `reap <their id>`, and posts `INFO: reaped <id>` with the reason. Never reap an owner that is not on your job; post `BLOCKED` and work on something else, or stop.
+   - **On a project:** if the stale owner is another agent of your project, message them (`mb pub agent/<their id> "BLOCKED: you hold <path>, still working?" --sender <you>`) and wait up to 10 waits. If they don't answer and are still STALE, post `BLOCKED:` with the STALE-WARNING line. Only the **manager** may then run `reap <their id>`, and posts `INFO: reaped <id>` with the reason. Never reap an owner that is not on your project; post `BLOCKED` and work on something else, or stop.
    - **Not on a job** (a human is present): show the STALE-WARNING line to the user and ask "Is <id> still running? May I remove its locks?". Reap only after a yes.
 8. **Finish clean.** When you are done, run `release-all`, then `status` to confirm you hold nothing.
 
 ## Where the lock directory lives
-The manager chooses it and puts it in the job posting as `locks: <absolute path>`. Normally that is `<task dir>/locks`, next to the state it protects, so a resumed run sees the old locks. Without a task directory, use `<repo>/.locks` (add it to `.gitignore`). Everyone working on the same resources must use the **same** lock directory, or the locks protect nothing.
+The manager chooses it and puts it in the project posting as `locks: <absolute path>`. Normally that is `<task dir>/locks`, next to the state it protects, so a resumed run sees the old locks. Without a task directory, use `<repo>/.locks` (add it to `.gitignore`). Everyone working on the same resources must use the **same** lock directory, or the locks protect nothing.
 
 Watch the locks from a human terminal: `bash <team skill dir>/bin/lock.sh <lock dir> watch 10`.

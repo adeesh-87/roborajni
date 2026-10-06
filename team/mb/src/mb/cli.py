@@ -2,9 +2,11 @@
 
 Storage: single SQLite file (WAL mode) at ~/.mb/board.db (override with MB_DB).
 No daemon: every invocation opens the DB, does one operation, exits.
-Jobs: a manager posts a job, engineers apply, the manager hires the first applicant.
-Locks: `mb lock` runs lock.sh (next to this file) on the lock dir named in the job posting.
-Stats: every agent action bumps a counter; `mb stats` reports them with job timelines.
+Projects and jobs: a manager posts a project, then one job per engineer (any kind, e.g. code or build);
+engineers apply; the manager hires the first applicant of each job.
+Channels: job/<id> (manager + that engineer), project/<id> (manager + every engineer), agent/<id> (direct).
+Locks: `mb lock` runs lock.sh (next to this file) on the lock dir named in the project or job posting.
+Stats: every agent action bumps a counter; `mb stats` reports them with timelines.
 Logging: `mb log on|off` writes events to a file at error/warn/info/debug level.
 """
 import argparse
@@ -27,6 +29,7 @@ LOBBY = "lobby"
 LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
 OWNER_CMDS = {"acquire", "wait", "release", "release-all", "alive"}
 LEVELS = {"debug": 10, "info": 20, "warn": 30, "error": 40}
+ACTIVE = ("open", "filled")
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -46,6 +49,17 @@ CREATE TABLE IF NOT EXISTS cursors (
   agent    TEXT PRIMARY KEY,
   last_seq INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS projects (
+  id         TEXT PRIMARY KEY,
+  label      TEXT,
+  title      TEXT NOT NULL,
+  posting    TEXT NOT NULL,
+  manager    TEXT NOT NULL UNIQUE,
+  status     TEXT NOT NULL,
+  start_seq  INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  closed_at  INTEGER
+);
 CREATE TABLE IF NOT EXISTS jobs (
   id         TEXT PRIMARY KEY,
   label      TEXT,
@@ -58,7 +72,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   ttl_min    INTEGER NOT NULL,
   created_at INTEGER NOT NULL,
   hired_at   INTEGER,
-  closed_at  INTEGER
+  closed_at  INTEGER,
+  project    TEXT,
+  kind       TEXT,
+  views      INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS applications (
   seq        INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -68,12 +85,12 @@ CREATE TABLE IF NOT EXISTS applications (
   status     TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
-CREATE TABLE IF NOT EXISTS members (
-  team      TEXT NOT NULL,
+CREATE TABLE IF NOT EXISTS memberships (
+  scope     TEXT NOT NULL,
+  agent     TEXT NOT NULL,
   role      TEXT NOT NULL,
-  agent     TEXT NOT NULL UNIQUE,
   joined_at INTEGER NOT NULL,
-  PRIMARY KEY (team, role)
+  PRIMARY KEY (scope, agent)
 );
 CREATE TABLE IF NOT EXISTS counters (
   agent   TEXT NOT NULL,
@@ -139,9 +156,14 @@ def connect():
     con.execute("PRAGMA busy_timeout=30000")
     con.executescript(SCHEMA)
     cols = {r[1] for r in con.execute("PRAGMA table_info(jobs)")}
-    for col in ("hired_at", "closed_at"):
+    for col, typ in (("hired_at", "INTEGER"), ("closed_at", "INTEGER"), ("project", "TEXT"), ("kind", "TEXT"),
+                     ("views", "INTEGER NOT NULL DEFAULT 0")):
         if col not in cols:
-            con.execute(f"ALTER TABLE jobs ADD COLUMN {col} INTEGER")
+            con.execute(f"ALTER TABLE jobs ADD COLUMN {col} {typ}")
+    legacy = con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='members'").fetchone()
+    if legacy and not con.execute("SELECT 1 FROM memberships LIMIT 1").fetchone():
+        con.execute("INSERT OR IGNORE INTO memberships (scope, agent, role, joined_at) "
+                    "SELECT team, agent, role, joined_at FROM members")
     _load_log(con)
     return con
 
@@ -185,40 +207,100 @@ def _set_cursor(con, agent, seq):
     )
 
 
-def _job_of(con, agent):
+def _join(con, scope, agent, role, topic):
+    con.execute("INSERT OR IGNORE INTO memberships (scope, agent, role, joined_at) VALUES (?, ?, ?, ?)",
+                (scope, agent, role, now_ms()))
+    con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (agent, topic))
+
+
+def _is_member(con, scope, agent):
+    return con.execute("SELECT 1 FROM memberships WHERE scope=? AND agent=?", (scope, agent)).fetchone() is not None
+
+
+def _engineer_job(con, agent):
     row = con.execute(
-        "SELECT m.team FROM members m JOIN jobs j ON j.id = m.team WHERE m.agent=?", (agent,)
+        "SELECT m.scope FROM memberships m JOIN jobs j ON j.id = m.scope WHERE m.agent=? AND m.role='engineer'",
+        (agent,),
     ).fetchone()
     return row[0] if row else None
 
 
-def _is_member(con, job, agent):
-    return con.execute("SELECT 1 FROM members WHERE team=? AND agent=?", (job, agent)).fetchone() is not None
+def _managed_project(con, agent):
+    row = con.execute("SELECT id FROM projects WHERE manager=?", (agent,)).fetchone()
+    return row[0] if row else None
+
+
+def _managed_jobs(con, agent):
+    return [r[0] for r in con.execute(
+        "SELECT id FROM jobs WHERE manager=? AND status IN ('open', 'filled') ORDER BY created_at", (agent,))]
+
+
+def _project_of(con, agent):
+    project = _managed_project(con, agent)
+    if project:
+        return project
+    job = _engineer_job(con, agent)
+    return con.execute("SELECT project FROM jobs WHERE id=?", (job,)).fetchone()[0] if job else None
+
+
+def _scope_of_topic(topic):
+    for prefix in ("job/", "project/"):
+        if topic.startswith(prefix):
+            return topic[len(prefix):]
+    return None
+
+
+def _board_line():
+    return f"board: {DB_PATH}   (every agent on this task must use this same board; never set MB_DB yourself)"
 
 
 # ---- messages ----------------------------------------------------------------------------------
 
 def cmd_pub(args):
     con = connect()
-    if args.topic.startswith("job/") and not _is_member(con, args.topic[4:], args.sender):
-        die(f"'{args.sender}' is not on job {args.topic[4:]}; job channels are private")
+    scope = _scope_of_topic(args.topic)
+    if scope and not _is_member(con, scope, args.sender):
+        die(f"'{args.sender}' is not on {args.topic}; job and project channels are private")
     seq = _post(con, args.topic, args.sender, args.body, args.reply_to)
     print(f"published seq={seq} topic={args.topic}")
 
 
+def _say_topic(con, agent, job, everyone):
+    if everyone:
+        project = _project_of(con, agent)
+        if not project:
+            die(f"'{agent}' is not on a project, so there is no channel for everyone")
+        return f"project/{project}"
+    if job:
+        if not _is_member(con, job, agent):
+            die(f"'{agent}' is not on job {job}")
+        return f"job/{job}"
+    own = _engineer_job(con, agent)
+    if own:
+        return f"job/{own}"
+    managed = _managed_jobs(con, agent)
+    if len(managed) == 1:
+        return f"job/{managed[0]}"
+    if managed:
+        die(f"you manage {len(managed)} jobs ({', '.join(managed)}): add --job <id> for one engineer, "
+            "or --all for everyone")
+    if _managed_project(con, agent):
+        die("your project has no jobs yet; post one with `mb job post`, or use --all")
+    die(f"'{agent}' is not on any job (post a project, or apply and get hired, first)")
+
+
 def cmd_say(args):
     con = connect()
-    job = _job_of(con, args.agent)
-    if not job:
-        die(f"'{args.agent}' is not on any job (post one, or apply and get hired, first)")
-    seq = _post(con, f"job/{job}", args.agent, args.body, args.reply_to)
-    print(f"published seq={seq} topic=job/{job}")
+    topic = _say_topic(con, args.agent, args.job, args.all)
+    seq = _post(con, topic, args.agent, args.body, args.reply_to)
+    print(f"published seq={seq} topic={topic}")
 
 
 def cmd_sub(args):
     con = connect()
-    if args.topic.startswith("job/") and not _is_member(con, args.topic[4:], args.agent):
-        die(f"'{args.agent}' is not on job {args.topic[4:]}")
+    scope = _scope_of_topic(args.topic)
+    if scope and not _is_member(con, scope, args.agent):
+        die(f"'{args.agent}' is not on {args.topic}")
     con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (args.agent, args.topic))
     _log("info", "subscribe", args.agent, topic=args.topic)
     print(f"{args.agent} subscribed to {args.topic}")
@@ -280,6 +362,96 @@ def cmd_tail(args):
         print(f"[{seq}] {topic} <{sender}>: {body}")
 
 
+# ---- projects ----------------------------------------------------------------------------------
+
+def _id_line(agent):
+    return f"YOUR AGENT ID: {agent}   <- use it as --agent / --sender in EVERY mb command"
+
+
+def cmd_project_post(args):
+    posting = args.posting.strip()
+    if not posting:
+        die("the posting is empty")
+    con = connect()
+    con.execute("BEGIN IMMEDIATE")
+    project = f"p-{secrets.token_hex(3)}"
+    manager = f"manager@{project}"
+    start = _max_seq(con)
+    con.execute(
+        "INSERT INTO projects (id, label, title, posting, manager, status, start_seq, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 'active', ?, ?)",
+        (project, args.label, args.title, posting, manager, start, now_ms()),
+    )
+    _join(con, project, manager, "manager", f"project/{project}")
+    _set_cursor(con, manager, start)
+    _post(con, LOBBY, "mb", f"PROJECT {project}" + (f" [label {args.label}]" if args.label else "") + f": {args.title}")
+    _count(con, manager, "project.post")
+    _log("info", "project.posted", manager, project=project, label=args.label, title=args.title)
+    _log("debug", "project.posting", manager, project=project, posting=posting)
+    con.execute("COMMIT")
+    print(_id_line(manager))
+    print(_board_line())
+    print(f"posted project {project}")
+    if not _posting_lock_dir(posting):
+        print("note: the posting has no `locks: <absolute dir>` line, so `mb lock` will not work until you add it.")
+    print(f"\nNext: post one job per engineer, e.g.\n"
+          f"  mb job post --agent {manager} --kind code  --title \"<scope>\" \"<what this engineer owns and does>\"\n"
+          f"  mb job post --agent {manager} --kind build --title \"build and run\" \"<commands, what to report>\"")
+
+
+def _resolve_project(con, args):
+    if args.project:
+        if not con.execute("SELECT 1 FROM projects WHERE id=?", (args.project,)).fetchone():
+            die(f"no project {args.project}")
+        return args.project
+    if args.agent:
+        project = _project_of(con, args.agent)
+        if not project:
+            die(f"'{args.agent}' is not on a project")
+        return project
+    die("give a project id or --agent")
+
+
+def cmd_project_show(args):
+    con = connect()
+    project = _resolve_project(con, args)
+    pid, label, title, posting, manager, status = con.execute(
+        "SELECT id, label, title, posting, manager, status FROM projects WHERE id=?", (project,)).fetchone()
+    print(f"project:   {pid}" + (f" (label: {label})" if label else ""))
+    print(f"title:     {title}")
+    print(f"status:    {status}")
+    print(f"manager:   {manager}")
+    print(f"channel:   project/{pid}   (everyone: mb say --all ...)")
+    print("posting:")
+    print("\n".join("  " + line for line in posting.splitlines()))
+    print("jobs:")
+    rows = con.execute("SELECT id, kind, status, engineer, title FROM jobs WHERE project=? ORDER BY created_at",
+                       (pid,)).fetchall()
+    if not rows:
+        print("  (none yet)")
+    for jid, kind, jstatus, engineer, jtitle in rows:
+        print(f"  {jid} [{kind or '-'}] {jstatus:7} {engineer or '(not hired)':26} {jtitle}")
+
+
+def cmd_project_close(args):
+    con = connect()
+    project = _managed_project(con, args.agent)
+    if not project:
+        die(f"'{args.agent}' does not manage a project")
+    note = f": {args.note}" if args.note else ""
+    con.execute("BEGIN IMMEDIATE")
+    for (job,) in con.execute("SELECT id FROM jobs WHERE project=? AND status IN ('open', 'filled')",
+                              (project,)).fetchall():
+        _close_job(con, args.agent, job, args.note)
+    con.execute("UPDATE projects SET status='closed', closed_at=? WHERE id=?", (now_ms(), project))
+    _post(con, f"project/{project}", "mb", f"CLOSED: project {project}{note}")
+    _post(con, LOBBY, "mb", f"CLOSED: project {project}{note}")
+    _count(con, args.agent, "project.close")
+    _log("info", "project.closed", args.agent, project=project, note=args.note)
+    con.execute("COMMIT")
+    print(f"project {project} closed")
+
+
 # ---- jobs --------------------------------------------------------------------------------------
 
 def _expire(con):
@@ -292,46 +464,54 @@ def _expire(con):
         _log("warn", "job.expired", job=jid)
 
 
-def _oldest_open(con, label):
+def _pick_open(con, label, kind, reserve=False):
+    """The open job with the fewest views + pending applications, then the oldest, so engineers that look
+    at the same moment are shown different jobs. With reserve, the view is recorded (call inside a transaction)."""
     row = con.execute(
-        "SELECT id FROM jobs WHERE status='open' AND label IS ? ORDER BY created_at LIMIT 1", (label,)
+        "SELECT j.id FROM jobs j WHERE j.status='open' AND j.label IS ? AND (? IS NULL OR j.kind=?) "
+        "ORDER BY j.views + (SELECT COUNT(*) FROM applications a WHERE a.job=j.id AND a.status='pending'), "
+        "j.created_at LIMIT 1",
+        (label, kind, kind),
     ).fetchone()
+    if row and reserve:
+        con.execute("UPDATE jobs SET views = views + 1 WHERE id=?", (row[0],))
     return row[0] if row else None
 
 
-def _resolve_job(con, args):
-    if getattr(args, "job", None):
-        if not con.execute("SELECT 1 FROM jobs WHERE id=?", (args.job,)).fetchone():
-            die(f"no job {args.job}; list them with `mb job list`")
-        return args.job
-    if getattr(args, "agent", None):
-        job = _job_of(con, args.agent)
-        if not job:
-            die(f"'{args.agent}' is not on any job")
-        return job
-    return _oldest_open(con, args.label)
-
-
-def _lock_dir(con, job):
-    posting = con.execute("SELECT posting FROM jobs WHERE id=?", (job,)).fetchone()[0]
-    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", posting, re.MULTILINE)
+def _posting_lock_dir(posting):
+    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", posting or "", re.MULTILINE)
     return os.path.expanduser(m.group(1)) if m else None
 
 
-def _show(con, job):
-    jid, label, title, posting, manager, engineer, status = con.execute(
-        "SELECT id, label, title, posting, manager, engineer, status FROM jobs WHERE id=?", (job,)
+def _lock_dir(con, agent):
+    postings = []
+    project = _project_of(con, agent)
+    if project:
+        postings.append(con.execute("SELECT posting FROM projects WHERE id=?", (project,)).fetchone()[0])
+    jobs = [_engineer_job(con, agent)] if _engineer_job(con, agent) else _managed_jobs(con, agent)
+    postings += [con.execute("SELECT posting FROM jobs WHERE id=?", (j,)).fetchone()[0] for j in jobs]
+    return next((d for d in map(_posting_lock_dir, postings) if d), None)
+
+
+def _show_job(con, job):
+    jid, label, title, posting, manager, engineer, status, project, kind = con.execute(
+        "SELECT id, label, title, posting, manager, engineer, status, project, kind FROM jobs WHERE id=?", (job,)
     ).fetchone()
     pending = con.execute(
         "SELECT COUNT(*) FROM applications WHERE job=? AND status='pending'", (jid,)
     ).fetchone()[0]
     print(f"job:       {jid}" + (f" (label: {label})" if label else ""))
+    print(f"kind:      {kind or '-'}")
     print(f"title:     {title}")
     print(f"status:    {status}" + (f" ({pending} application(s) pending)" if status == "open" else ""))
     print(f"manager:   {manager}")
     print(f"engineer:  {engineer or '(not hired yet)'}")
-    print(f"channel:   job/{jid}")
-    print("posting:")
+    print(f"channel:   job/{jid}" + (f"   (everyone on the project: project/{project})" if project else ""))
+    if project:
+        print(f"project {project} posting (shared by every job):")
+        ppost = con.execute("SELECT posting FROM projects WHERE id=?", (project,)).fetchone()[0]
+        print("\n".join("  " + line for line in ppost.splitlines()))
+    print("job posting:")
     print("\n".join("  " + line for line in posting.splitlines()))
 
 
@@ -340,30 +520,27 @@ def cmd_job_post(args):
     if not posting:
         die("the posting is empty")
     con = connect()
+    project = _managed_project(con, args.agent)
+    if not project:
+        die(f"'{args.agent}' does not manage a project; post one first with `mb project post`")
     con.execute("BEGIN IMMEDIATE")
     _expire(con)
+    label = con.execute("SELECT label FROM projects WHERE id=?", (project,)).fetchone()[0]
     job = f"j-{secrets.token_hex(3)}"
-    manager = f"manager@{job}"
-    start = _max_seq(con)
     con.execute(
-        "INSERT INTO jobs (id, label, title, posting, manager, status, start_seq, ttl_min, created_at) "
-        "VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)",
-        (job, args.label, args.title, posting, manager, start, args.ttl, now_ms()),
+        "INSERT INTO jobs (id, label, title, posting, manager, status, start_seq, ttl_min, created_at, project, kind) "
+        "VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, ?)",
+        (job, label, args.title, posting, args.agent, _max_seq(con), args.ttl, now_ms(), project, args.kind),
     )
-    con.execute("INSERT INTO members (team, role, agent, joined_at) VALUES (?, 'manager', ?, ?)", (job, manager, now_ms()))
-    con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (manager, f"job/{job}"))
-    _set_cursor(con, manager, start)
-    _post(con, LOBBY, "mb", f"JOB {job}" + (f" [label {args.label}]" if args.label else "") + f": {args.title}")
-    _count(con, manager, "job.post")
-    _log("info", "job.posted", manager, job=job, label=args.label, title=args.title, ttl_min=args.ttl)
-    _log("debug", "job.posting", manager, job=job, posting=posting)
+    _join(con, job, args.agent, "manager", f"job/{job}")
+    _post(con, LOBBY, "mb", f"JOB {job}" + (f" [label {label}]" if label else "") + f" ({args.kind}) in {project}: {args.title}")
+    _count(con, args.agent, "job.post")
+    _log("info", "job.posted", args.agent, job=job, project=project, kind=args.kind, title=args.title, ttl_min=args.ttl)
+    _log("debug", "job.posting", args.agent, job=job, posting=posting)
     con.execute("COMMIT")
-    print(f"YOUR AGENT ID: {manager}   <- use it as --agent / --sender in EVERY mb command")
-    print(f"posted job {job}; engineers find it with `mb job show --next" + (f" --label {args.label}" if args.label else "") + "`")
-    if not _lock_dir(con, job):
-        print("note: the posting has no `locks: <absolute dir>` line, so `mb lock` will not work until you add it (mb job update).")
-    print(f"\nNext: wait for applications (they arrive in your inbox as APPLY):  mb inbox --agent {manager} --wait 540")
-    print(f"Then hire the first applicant:  mb job hire --agent {manager}")
+    print(f"posted job {job} ({args.kind}) in project {project}")
+    print(f"Wait for applications (they arrive as APPLY):  mb inbox --agent {args.agent} --wait 540")
+    print(f"Hire the first applicant of every job that has one:  mb job hire --agent {args.agent}")
 
 
 def cmd_job_show(args):
@@ -371,21 +548,35 @@ def cmd_job_show(args):
     con.execute("BEGIN IMMEDIATE")
     _expire(con)
     con.execute("COMMIT")
-    deadline = time.time() + args.wait
-    job = _resolve_job(con, args)
-    while not job and time.time() < deadline:
-        time.sleep(3)
-        job = _oldest_open(con, args.label)
-    if args.agent:
+    if args.job:
+        if not con.execute("SELECT 1 FROM jobs WHERE id=?", (args.job,)).fetchone():
+            die(f"no job {args.job}; list them with `mb job list`")
+        job = args.job
+    elif args.agent:
+        job = _engineer_job(con, args.agent)
+        if not job:
+            managed = _managed_jobs(con, args.agent)
+            if len(managed) != 1:
+                die("as a manager, use `mb project show --agent <you>`, or give a job id")
+            job = managed[0]
         _count(con, args.agent, "job.show")
-    if not job:
-        print("(no open job)" + (f" with label {args.label}" if args.label else ""))
-        return
-    _show(con, job)
-    if not args.agent:
-        status = con.execute("SELECT status FROM jobs WHERE id=?", (job,)).fetchone()[0]
-        if status == "open":
-            print(f"\nTo take it, reply to the manager:  mb job apply {job} \"<your reply>\"")
+    else:
+        deadline = time.time() + args.wait
+        while True:
+            con.execute("BEGIN IMMEDIATE")
+            job = _pick_open(con, args.label, args.kind, reserve=True)
+            con.execute("COMMIT")
+            if job or time.time() >= deadline:
+                break
+            time.sleep(3)
+        if not job:
+            print("(no open job)" + (f" with label {args.label}" if args.label else "")
+                  + (f" of kind {args.kind}" if args.kind else ""))
+            return
+    _show_job(con, job)
+    status = con.execute("SELECT status FROM jobs WHERE id=?", (job,)).fetchone()[0]
+    if not args.agent and status == "open":
+        print(f"\nTo take it, reply to the manager:  mb job apply {job} \"<your reply>\"")
 
 
 def cmd_job_list(args):
@@ -393,15 +584,18 @@ def cmd_job_list(args):
     con.execute("BEGIN IMMEDIATE")
     _expire(con)
     con.execute("COMMIT")
+    where, params = ("WHERE project=?", (args.project,)) if args.project else ("", ())
     rows = con.execute(
-        "SELECT id, label, status, title, engineer, created_at FROM jobs ORDER BY created_at DESC LIMIT ?", (args.n,)
+        f"SELECT id, label, status, kind, project, title, engineer, created_at FROM jobs {where} "
+        f"ORDER BY created_at DESC LIMIT ?", (*params, args.n)
     ).fetchall()
     if not rows:
         print("(no jobs)")
-    for jid, label, status, title, engineer, created in rows:
+    for jid, label, status, kind, project, title, engineer, created in rows:
         apps = con.execute("SELECT COUNT(*) FROM applications WHERE job=?", (jid,)).fetchone()[0]
         age = (now_ms() - created) // 60000
-        print(f"{jid} [{status}]" + (f" label={label}" if label else "") + f" apps={apps} age={age}m"
+        print(f"{jid} [{status}] {kind or '-'}" + (f" project={project}" if project else "")
+              + (f" label={label}" if label else "") + f" apps={apps} age={age}m"
               + (f" engineer={engineer}" if engineer else "") + f"  {title}")
 
 
@@ -413,13 +607,13 @@ def cmd_job_apply(args):
     con.execute("BEGIN IMMEDIATE")
     try:
         _expire(con)
-        job = args.job or _oldest_open(con, args.label)
+        job = args.job or _pick_open(con, args.label, args.kind)
         if not job:
             die("there is no open job; wait for one with `mb job show --next --wait 90`")
-        row = con.execute("SELECT status, manager FROM jobs WHERE id=?", (job,)).fetchone()
+        row = con.execute("SELECT status, manager, kind FROM jobs WHERE id=?", (job,)).fetchone()
         if not row:
             die(f"no job {job}")
-        status, manager = row
+        status, manager, kind = row
         if status != "open":
             die(f"job {job} is {status}; look for another with `mb job show --next`")
         while True:
@@ -431,81 +625,106 @@ def cmd_job_apply(args):
             (job, agent, reply, now_ms()),
         )
         _set_cursor(con, agent, _max_seq(con))
-        _post(con, f"agent/{manager}", agent, f"APPLY: {agent} applies for job {job}\n{reply}")
+        _post(con, f"agent/{manager}", agent, f"APPLY: {agent} applies for job {job} ({kind or '-'})\n{reply}")
         _count(con, agent, "job.apply")
-        _log("info", "job.applied", agent, job=job)
+        _log("info", "job.applied", agent, job=job, kind=kind)
         con.execute("COMMIT")
     except BaseException:
         if con.in_transaction:
             con.execute("ROLLBACK")
         raise
-    print(f"YOUR AGENT ID: {agent}   <- use it as --agent / --sender in EVERY mb command")
-    print(f"applied for job {job}. Wait for HIRED or REJECTED:  mb inbox --agent {agent} --wait 90")
+    print(_id_line(agent))
+    print(_board_line())
+    print(f"applied for job {job} ({kind or '-'}). Wait for HIRED or REJECTED:  mb inbox --agent {agent} --wait 90")
+
+
+def _hire(con, manager, job, engineer):
+    project, start_seq = con.execute("SELECT project, start_seq FROM jobs WHERE id=?", (job,)).fetchone()
+    con.execute("UPDATE jobs SET status='filled', engineer=?, hired_at=? WHERE id=?", (engineer, now_ms(), job))
+    con.execute("UPDATE applications SET status='hired' WHERE agent=?", (engineer,))
+    _join(con, job, engineer, "engineer", f"job/{job}")
+    if project:
+        _join(con, project, engineer, "engineer", f"project/{project}")
+        start_seq = con.execute("SELECT start_seq FROM projects WHERE id=?", (project,)).fetchone()[0]
+    _set_cursor(con, engineer, start_seq)
+    rejected = [r[0] for r in con.execute(
+        "SELECT agent FROM applications WHERE job=? AND status='pending'", (job,)).fetchall()]
+    for agent in rejected:
+        con.execute("UPDATE applications SET status='rejected' WHERE agent=?", (agent,))
+        _post(con, f"agent/{agent}", "mb",
+              f"REJECTED: job {job} went to another engineer. Apply for another open job: mb job show --next")
+        _log("warn", "job.rejected", agent, job=job)
+    _post(con, f"agent/{engineer}", "mb",
+          f"HIRED: you are the engineer on job {job}. Read it: mb job show --agent {engineer}. "
+          f"Talk to the manager: mb say \"<TYPE>: ...\" --agent {engineer}"
+          + (f". Tell everyone on the project: mb say \"INFO: ...\" --all --agent {engineer}" if project else ""))
+    _post(con, f"job/{job}", "mb", f"HIRED: {engineer} is the engineer on job {job}")
+    _post(con, LOBBY, "mb", f"FILLED: job {job} by {engineer}")
+    _count(con, manager, "job.hire")
+    _log("info", "job.hired", manager, job=job, engineer=engineer, rejected=len(rejected))
+    return rejected
 
 
 def cmd_job_hire(args):
     con = connect()
     con.execute("BEGIN IMMEDIATE")
     try:
-        job = _job_of(con, args.agent)
-        row = con.execute("SELECT status, manager, start_seq FROM jobs WHERE id=?", (job,)).fetchone() if job else None
-        if not row or row[1] != args.agent:
-            die(f"'{args.agent}' is not the manager of a job")
-        status, manager, start = row
-        if status != "open":
-            die(f"job {job} is {status}")
+        managed = [j for j in _managed_jobs(con, args.agent)
+                   if con.execute("SELECT status FROM jobs WHERE id=?", (j,)).fetchone()[0] == "open"]
         if args.applicant:
-            pick = con.execute(
-                "SELECT agent FROM applications WHERE job=? AND agent=? AND status='pending'", (job, args.applicant)
-            ).fetchone()
-            if not pick:
-                die(f"no pending application from {args.applicant}")
+            row = con.execute("SELECT job FROM applications WHERE agent=? AND status='pending'",
+                              (args.applicant,)).fetchone()
+            if not row or row[0] not in managed:
+                die(f"no pending application from {args.applicant} for an open job of yours")
+            picks = [(row[0], args.applicant)]
         else:
-            pick = con.execute(
-                "SELECT agent FROM applications WHERE job=? AND status='pending' ORDER BY seq LIMIT 1", (job,)
-            ).fetchone()
-            if not pick:
-                die(f"no applications yet; wait for one:  mb inbox --agent {manager} --wait 540")
-        engineer = pick[0]
-        con.execute("UPDATE jobs SET status='filled', engineer=?, hired_at=? WHERE id=?", (engineer, now_ms(), job))
-        con.execute("UPDATE applications SET status='hired' WHERE agent=?", (engineer,))
-        con.execute("INSERT INTO members (team, role, agent, joined_at) VALUES (?, 'engineer', ?, ?)", (job, engineer, now_ms()))
-        con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (engineer, f"job/{job}"))
-        _set_cursor(con, engineer, start)
-        rejected = [r[0] for r in con.execute(
-            "SELECT agent FROM applications WHERE job=? AND status='pending'", (job,)
-        ).fetchall()]
-        for agent in rejected:
-            con.execute("UPDATE applications SET status='rejected' WHERE agent=?", (agent,))
-            _post(con, f"agent/{agent}", "mb", f"REJECTED: job {job} went to another engineer. Look for another job: mb job show --next")
-            _log("warn", "job.rejected", agent, job=job)
-        _post(con, f"agent/{engineer}", "mb",
-              f"HIRED: you are the engineer on job {job}. Read the posting: mb job show --agent {engineer}. "
-              f"Talk on the job channel: mb say \"<TYPE>: ...\" --agent {engineer}")
-        _post(con, f"job/{job}", "mb", f"HIRED: {engineer} is the engineer on job {job}")
-        _post(con, LOBBY, "mb", f"FILLED: job {job} by {engineer}")
-        _count(con, args.agent, "job.hire")
-        _log("info", "job.hired", args.agent, job=job, engineer=engineer, rejected=len(rejected))
+            jobs = managed
+            if args.job:
+                if args.job not in managed:
+                    die(f"job {args.job} is not an open job of yours")
+                jobs = [args.job]
+            picks = []
+            for job in jobs:
+                first = con.execute(
+                    "SELECT agent FROM applications WHERE job=? AND status='pending' ORDER BY seq LIMIT 1", (job,)
+                ).fetchone()
+                if first:
+                    picks.append((job, first[0]))
+            if not picks:
+                if not managed:
+                    die(f"'{args.agent}' has no open jobs")
+                die(f"no applications yet; wait for one:  mb inbox --agent {args.agent} --wait 540")
+        results = [(job, engineer, _hire(con, args.agent, job, engineer)) for job, engineer in picks]
         con.execute("COMMIT")
     except BaseException:
         if con.in_transaction:
             con.execute("ROLLBACK")
         raise
-    print(f"hired {engineer}" + (f"; rejected {len(rejected)} other applicant(s)" if rejected else ""))
-    print(f"Talk on the job channel:  mb say \"<TYPE>: ...\" --agent {args.agent}")
+    for job, engineer, rejected in results:
+        print(f"hired {engineer} for job {job}" + (f"; rejected {len(rejected)} other applicant(s)" if rejected else ""))
+    still_open = [j for j in _managed_jobs(con, args.agent)
+                  if con.execute("SELECT status FROM jobs WHERE id=?", (j,)).fetchone()[0] == "open"]
+    if still_open:
+        print(f"still open: {', '.join(still_open)}")
 
 
-def _manager_job(con, agent):
-    job = _job_of(con, agent)
-    if not job or con.execute("SELECT manager FROM jobs WHERE id=?", (job,)).fetchone()[0] != agent:
-        die(f"'{agent}' is not the manager of a job")
-    return job
+def _resolve_managed_job(con, agent, job):
+    managed = _managed_jobs(con, agent)
+    if job:
+        if con.execute("SELECT manager FROM jobs WHERE id=?", (job,)).fetchone() != (agent,):
+            die(f"'{agent}' does not manage job {job}")
+        return job
+    if len(managed) == 1:
+        return managed[0]
+    if not managed:
+        die(f"'{agent}' manages no open or filled job")
+    die(f"you manage {len(managed)} jobs ({', '.join(managed)}): add --job <id>")
 
 
 def cmd_job_update(args):
     posting = args.posting.strip()
     con = connect()
-    job = _manager_job(con, args.agent)
+    job = _resolve_managed_job(con, args.agent, args.job)
     con.execute("BEGIN IMMEDIATE")
     con.execute("UPDATE jobs SET posting=? WHERE id=?", (posting, job))
     seq = _post(con, f"job/{job}", args.agent, f"POSTING UPDATED:\n{posting}")
@@ -513,22 +732,24 @@ def cmd_job_update(args):
     _log("info", "job.updated", args.agent, job=job, seq=seq)
     con.execute("COMMIT")
     print(f"posting of job {job} updated (seq={seq})")
-    if not _lock_dir(con, job):
-        print("note: the posting has no `locks: <absolute dir>` line, so `mb lock` will not work.")
 
 
-def cmd_job_close(args):
-    con = connect()
-    job = _manager_job(con, args.agent)
-    con.execute("BEGIN IMMEDIATE")
+def _close_job(con, manager, job, note):
     con.execute("UPDATE jobs SET status='closed', closed_at=? WHERE id=?", (now_ms(), job))
     for (agent,) in con.execute("SELECT agent FROM applications WHERE job=? AND status='pending'", (job,)).fetchall():
         con.execute("UPDATE applications SET status='rejected' WHERE agent=?", (agent,))
         _post(con, f"agent/{agent}", "mb", f"REJECTED: job {job} was closed")
-    _post(con, f"job/{job}", "mb", f"CLOSED: job {job}" + (f": {args.note}" if args.note else ""))
-    _post(con, LOBBY, "mb", f"CLOSED: job {job}" + (f": {args.note}" if args.note else ""))
-    _count(con, args.agent, "job.close")
-    _log("info", "job.closed", args.agent, job=job, note=args.note)
+    _post(con, f"job/{job}", "mb", f"CLOSED: job {job}" + (f": {note}" if note else ""))
+    _post(con, LOBBY, "mb", f"CLOSED: job {job}" + (f": {note}" if note else ""))
+    _count(con, manager, "job.close")
+    _log("info", "job.closed", manager, job=job, note=note)
+
+
+def cmd_job_close(args):
+    con = connect()
+    job = _resolve_managed_job(con, args.agent, args.job)
+    con.execute("BEGIN IMMEDIATE")
+    _close_job(con, args.agent, job, args.note)
     con.execute("COMMIT")
     print(f"job {job} closed")
 
@@ -546,12 +767,11 @@ def cmd_lock(args):
     if not args.lock_args:
         die("usage: mb lock --agent ID <acquire|wait|release|release-all|alive|check|list|status|watch|reap|break> [args...]")
     con = connect()
-    job = _job_of(con, args.agent)
-    if not job:
-        die(f"'{args.agent}' is not on any job")
-    lock_dir = _lock_dir(con, job)
+    if not _project_of(con, args.agent) and not _engineer_job(con, args.agent) and not _managed_jobs(con, args.agent):
+        die(f"'{args.agent}' is not on any project or job")
+    lock_dir = _lock_dir(con, args.agent)
     if not lock_dir:
-        die("the job posting has no `locks: <absolute dir>` line; the manager must add it with `mb job update`")
+        die("no `locks: <absolute dir>` line in the project or job posting; the manager must add one")
     if not LOCK_SH.is_file():
         die(f"lock.sh not found at {LOCK_SH}")
     cmd, *rest = args.lock_args
@@ -574,6 +794,9 @@ def cmd_lock(args):
 
 # ---- stats -------------------------------------------------------------------------------------
 
+ROUTING = ("READY", "BUILD", "REPORT", "FIX")
+
+
 def _dur(ms):
     if ms is None:
         return "-"
@@ -583,6 +806,10 @@ def _dur(ms):
     if s < 3600:
         return f"{s // 60}m{s % 60:02d}s"
     return f"{s // 3600}h{(s % 3600) // 60:02d}m"
+
+
+def _span(a, b):
+    return b - a if a is not None and b is not None else None
 
 
 def _counters(con, agent):
@@ -610,67 +837,99 @@ def _agent_summary(con, agent):
     }
 
 
-def _job_stats(con, job):
-    row = con.execute(
-        "SELECT id, label, title, status, manager, engineer, created_at, hired_at, closed_at FROM jobs WHERE id=?",
-        (job,),
-    ).fetchone()
-    if not row:
-        die(f"no job {job}")
-    jid, label, title, status, manager, engineer, posted, hired, closed = row
-    msgs = con.execute(
-        "SELECT seq, topic, sender, body, created_at FROM messages "
-        "WHERE topic=? OR topic LIKE ? OR sender LIKE ? ORDER BY seq",
-        (f"job/{jid}", f"agent/%@{jid}", f"%@{jid}"),
-    ).fetchall()
-
-    def first(kind):
-        return next((t for _, topic, _, body, t in msgs if topic == f"job/{jid}" and _msg_type(body) == kind), None)
-
-    agreed, first_sync, done, final = first("AGREED"), first("SYNC"), first("DONE"), first("FINAL")
-    end = closed or now_ms()
-
-    def span(a, b):
-        return b - a if a is not None and b is not None else None
-
+def _tally(msgs):
     by_type, by_sender, size = {}, {}, 0
     for _, _, sender, body, _ in msgs:
         kind = _msg_type(body)
         by_type[kind] = by_type.get(kind, 0) + 1
         by_sender[sender] = by_sender.get(sender, 0) + 1
         size += len(body.encode())
+    return {"total": len(msgs), "bytes": size, "by_type": by_type, "by_sender": by_sender}
+
+
+def _job_stats(con, job, with_agents=True):
+    row = con.execute(
+        "SELECT id, label, title, status, manager, engineer, created_at, hired_at, closed_at, project, kind "
+        "FROM jobs WHERE id=?", (job,)).fetchone()
+    if not row:
+        die(f"no job {job}")
+    jid, label, title, status, manager, engineer, posted, hired, closed, project, kind = row
+    msgs = con.execute(
+        "SELECT seq, topic, sender, body, created_at FROM messages "
+        "WHERE topic=? OR topic LIKE ? OR sender LIKE ? ORDER BY seq",
+        (f"job/{jid}", f"agent/%@{jid}", f"%@{jid}"),
+    ).fetchall()
+
+    def first(kind_):
+        return next((t for _, topic, _, body, t in msgs if topic == f"job/{jid}" and _msg_type(body) == kind_), None)
+
+    agreed, first_sync, done, final = first("AGREED"), first("SYNC"), first("DONE"), first("FINAL")
+    tally = _tally(msgs)
+    tally["syncs"] = tally["by_type"].get("SYNC", 0)
+    tally["interventions"] = tally["by_type"].get("STOP", 0) + tally["by_type"].get("REDIRECT", 0)
     applicants = [r[0] for r in con.execute("SELECT agent FROM applications WHERE job=? ORDER BY seq", (jid,))]
-    agents = [manager] + [a for a in applicants if a != manager]
-    return {
-        "job": jid, "label": label, "title": title, "status": status,
+    result = {
+        "job": jid, "project": project, "kind": kind, "label": label, "title": title, "status": status,
         "manager": manager, "engineer": engineer, "applicants": len(applicants),
-        "timeline": {
-            "posted": posted, "hired": hired, "agreed": agreed, "first_sync": first_sync,
-            "done": done, "final": final, "closed": closed,
-        },
+        "timeline": {"posted": posted, "hired": hired, "agreed": agreed, "first_sync": first_sync,
+                     "done": done, "final": final, "closed": closed},
         "durations_ms": {
-            "waiting_for_engineer": span(posted, hired),
-            "negotiation": span(hired, agreed),
-            "work": span(agreed, done),
-            "evaluation": span(done, final or closed),
-            "total": span(posted, end),
+            "waiting_for_engineer": _span(posted, hired),
+            "negotiation": _span(hired, agreed),
+            "work": _span(agreed, done),
+            "evaluation": _span(done, final or closed),
+            "total": _span(posted, closed or now_ms()),
         },
-        "messages": {"total": len(msgs), "bytes": size, "by_type": by_type, "by_sender": by_sender,
-                     "syncs": by_type.get("SYNC", 0),
-                     "interventions": by_type.get("STOP", 0) + by_type.get("REDIRECT", 0)},
-        "agents": {a: _agent_summary(con, a) for a in agents},
+        "messages": tally,
+    }
+    if with_agents:
+        result["agents"] = {a: _agent_summary(con, a) for a in [manager] + [a for a in applicants if a != manager]}
+    return result
+
+
+def _project_stats(con, project):
+    row = con.execute("SELECT id, label, title, status, manager, created_at, closed_at FROM projects WHERE id=?",
+                      (project,)).fetchone()
+    if not row:
+        die(f"no project {project}")
+    pid, label, title, status, manager, created, closed = row
+    jobs = [j for (j,) in con.execute("SELECT id FROM jobs WHERE project=? ORDER BY created_at", (pid,))]
+    topics = [f"project/{pid}"] + [f"job/{j}" for j in jobs]
+    placeholders = ",".join("?" * len(topics))
+    msgs = con.execute(f"SELECT seq, topic, sender, body, created_at FROM messages WHERE topic IN ({placeholders}) "
+                       f"ORDER BY seq", topics).fetchall()
+    tally = _tally(msgs)
+    hired = [h for (h,) in con.execute("SELECT hired_at FROM jobs WHERE project=? AND hired_at IS NOT NULL", (pid,))]
+    first_build = next((t for _, _, _, body, t in msgs if _msg_type(body) == "BUILD"), None)
+    final = next((t for _, _, _, body, t in msgs if _msg_type(body) == "FINAL"), None)
+    engineers = [e for (e,) in con.execute(
+        "SELECT agent FROM memberships WHERE scope=? AND role='engineer' ORDER BY joined_at", (pid,))]
+    return {
+        "project": pid, "label": label, "title": title, "status": status, "manager": manager,
+        "jobs": [_job_stats(con, j, with_agents=False) for j in jobs],
+        "durations_ms": {
+            "staffing": _span(created, max(hired)) if len(hired) == len(jobs) and jobs else None,
+            "to_first_build": _span(created, first_build),
+            "to_final": _span(created, final),
+            "total": _span(created, closed or now_ms()),
+        },
+        "messages": tally,
+        "routing": {k: tally["by_type"].get(k, 0) for k in ROUTING},
+        "agents": {a: _agent_summary(con, a) for a in [manager] + engineers},
     }
 
 
 def _board_stats(con, n):
-    jobs = {s: c for s, c in con.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status")}
     return {
         "db": str(DB_PATH),
         "messages": con.execute("SELECT COUNT(*) FROM messages").fetchone()[0],
         "agents": con.execute("SELECT COUNT(DISTINCT agent) FROM counters WHERE agent != 'mb'").fetchone()[0],
-        "jobs": jobs,
-        "recent_jobs": [_job_stats(con, j) for (j,) in con.execute(
-            "SELECT id FROM jobs ORDER BY created_at DESC LIMIT ?", (n,))],
+        "projects": {s: c for s, c in con.execute("SELECT status, COUNT(*) FROM projects GROUP BY status")},
+        "jobs": {s: c for s, c in con.execute("SELECT status, COUNT(*) FROM jobs GROUP BY status")},
+        "recent_projects": [_project_stats(con, p) for (p,) in con.execute(
+            "SELECT id FROM projects ORDER BY created_at DESC LIMIT ?", (n,))],
+        "recent_jobs_without_project": [_job_stats(con, j, with_agents=False) for (j,) in con.execute(
+            "SELECT id FROM jobs WHERE project IS NULL ORDER BY created_at DESC LIMIT ?", (n,))],
     }
 
 
@@ -678,7 +937,7 @@ def _print_agent(name, a, indent="  "):
     acq = a["lock_acquire"]
     print(f"{indent}{name}")
     print(f"{indent}  sent {a['messages_sent']} msgs ({a['bytes_sent']} B)"
-          + (f"  by type: " + ", ".join(f"{k} {v}" for k, v in sorted(a['sent_by_type'].items())) if a['sent_by_type'] else ""))
+          + ("  by type: " + ", ".join(f"{k} {v}" for k, v in sorted(a['sent_by_type'].items())) if a['sent_by_type'] else ""))
     print(f"{indent}  inbox: {a['inbox_calls']} calls, {a['inbox_empty']} empty ({a['inbox_empty_pct']}%), "
           f"{_dur(a['inbox_wait_s'] * 1000)} waiting, {a['messages_read']} msgs read")
     if acq or a["lock_wait"]:
@@ -686,19 +945,37 @@ def _print_agent(name, a, indent="  "):
               + f"; wait {sum(a['lock_wait'].values())} calls, {_dur(a['lock_wait_s'] * 1000)}")
 
 
-def _print_job(j, detail=True):
-    d = j["durations_ms"]
-    print(f"{j['job']} [{j['status']}]" + (f" label={j['label']}" if j["label"] else "") + f"  {j['title']}")
-    print(f"  total {_dur(d['total'])} | waiting for engineer {_dur(d['waiting_for_engineer'])} | "
+def _print_job(j, indent="", detail=True):
+    d, m = j["durations_ms"], j["messages"]
+    print(f"{indent}{j['job']} [{j['status']}] {j['kind'] or '-'}" + (f" label={j['label']}" if j["label"] else "")
+          + f" engineer={j['engineer'] or '-'}  {j['title']}")
+    print(f"{indent}  total {_dur(d['total'])} | waiting for engineer {_dur(d['waiting_for_engineer'])} | "
           f"negotiation {_dur(d['negotiation'])} | work {_dur(d['work'])} | evaluation {_dur(d['evaluation'])}")
-    m = j["messages"]
-    print(f"  messages {m['total']} ({m['bytes']} B), SYNCs {m['syncs']}, STOP/REDIRECT {m['interventions']}, "
+    print(f"{indent}  messages {m['total']} ({m['bytes']} B), SYNCs {m['syncs']}, STOP/REDIRECT {m['interventions']}, "
           f"applicants {j['applicants']}")
+    if detail:
+        print(f"{indent}  by type: " + ", ".join(f"{k} {v}" for k, v in sorted(m["by_type"].items(), key=lambda kv: -kv[1])))
+        if "agents" in j:
+            print(f"{indent}  agents:")
+            for name, a in j["agents"].items():
+                _print_agent(name, a, indent + "    ")
+
+
+def _print_project(p, detail=True):
+    d, m, r = p["durations_ms"], p["messages"], p["routing"]
+    print(f"{p['project']} [{p['status']}]" + (f" label={p['label']}" if p["label"] else "") + f"  {p['title']}")
+    print(f"  total {_dur(d['total'])} | staffing {_dur(d['staffing'])} | to first build {_dur(d['to_first_build'])} "
+          f"| to final {_dur(d['to_final'])}")
+    print(f"  messages {m['total']} ({m['bytes']} B) | " + " ".join(f"{k} {v}" for k, v in r.items())
+          + f" | jobs {len(p['jobs'])}")
     if not detail:
         return
     print("  by type: " + ", ".join(f"{k} {v}" for k, v in sorted(m["by_type"].items(), key=lambda kv: -kv[1])))
+    print("  jobs:")
+    for j in p["jobs"]:
+        _print_job(j, "    ", detail=False)
     print("  agents:")
-    for name, a in j["agents"].items():
+    for name, a in p["agents"].items():
         _print_agent(name, a, "    ")
 
 
@@ -708,6 +985,8 @@ def cmd_stats(args):
         result = {"agent": args.agent, **_agent_summary(con, args.agent)}
     elif args.job:
         result = _job_stats(con, args.job)
+    elif args.project:
+        result = _project_stats(con, args.project)
     else:
         result = _board_stats(con, args.n)
     if args.json:
@@ -719,10 +998,15 @@ def cmd_stats(args):
             print(f"  {name:28} count={v['count']:<6} total={v['total']}")
     elif args.job:
         _print_job(result)
+    elif args.project:
+        _print_project(result)
     else:
-        print(f"board {result['db']}: {result['messages']} messages, {result['agents']} agents, jobs "
-              + (", ".join(f"{k} {v}" for k, v in result["jobs"].items()) or "none"))
-        for j in result["recent_jobs"]:
+        fmt = lambda d: ", ".join(f"{k} {v}" for k, v in d.items()) or "none"  # noqa: E731
+        print(f"board {result['db']}: {result['messages']} messages, {result['agents']} agents, "
+              f"projects {fmt(result['projects'])}, jobs {fmt(result['jobs'])}")
+        for p in result["recent_projects"]:
+            _print_project(p, detail=False)
+        for j in result["recent_jobs_without_project"]:
             _print_job(j, detail=False)
 
 
@@ -757,7 +1041,7 @@ def cmd_log(args):
 # ---- entry point -------------------------------------------------------------------------------
 
 def main():
-    p = argparse.ArgumentParser(prog="mb", description="Message board, jobs and locks for agents.")
+    p = argparse.ArgumentParser(prog="mb", description="Message board, projects, jobs and locks for agents.")
     p.add_argument("--version", action="version", version=f"mb {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
@@ -768,9 +1052,12 @@ def main():
     pp.add_argument("--reply-to", type=int, default=None, dest="reply_to")
     pp.set_defaults(func=cmd_pub)
 
-    yp = sub.add_parser("say", help="post to your job's channel")
+    yp = sub.add_parser("say", help="post to your job channel, a given job (--job) or the whole project (--all)")
     yp.add_argument("body")
     yp.add_argument("--agent", required=True)
+    target = yp.add_mutually_exclusive_group()
+    target.add_argument("--job", default=None, help="manager: the job (engineer) to talk to")
+    target.add_argument("--all", action="store_true", help="everyone on the project")
     yp.add_argument("--reply-to", type=int, default=None, dest="reply_to")
     yp.set_defaults(func=cmd_say)
 
@@ -795,59 +1082,83 @@ def main():
     tp.add_argument("-n", type=int, default=20)
     tp.set_defaults(func=cmd_tail)
 
+    project = sub.add_parser("project", help="manager: the shared context all jobs belong to").add_subparsers(
+        dest="project_cmd", required=True)
+    prp = project.add_parser("post", help="manager: post a project (prints your manager id)")
+    prp.add_argument("posting", help="shared context for every job; include a `locks: <absolute dir>` line")
+    prp.add_argument("--title", required=True)
+    prp.add_argument("--label", default=None)
+    prp.set_defaults(func=cmd_project_post)
+    prs = project.add_parser("show", help="a project's posting and jobs")
+    prs.add_argument("project", nargs="?")
+    prs.add_argument("--agent", default=None)
+    prs.set_defaults(func=cmd_project_show)
+    prc = project.add_parser("close", help="manager: close the project and all its jobs")
+    prc.add_argument("--agent", required=True)
+    prc.add_argument("--note", default=None)
+    prc.set_defaults(func=cmd_project_close)
+
     job = sub.add_parser("job", help="job postings: manager posts, engineers apply, manager hires").add_subparsers(
         dest="job_cmd", required=True)
 
-    jp = job.add_parser("post", help="manager: post a job (prints your manager id)")
-    jp.add_argument("posting", help="the posting text; include a `locks: <absolute dir>` line")
+    jp = job.add_parser("post", help="manager: post one job (one engineer) in your project")
+    jp.add_argument("posting", help="what this engineer owns and does")
+    jp.add_argument("--agent", required=True)
     jp.add_argument("--title", required=True)
-    jp.add_argument("--label", default=None)
+    jp.add_argument("--kind", default="code", help="e.g. code or build (default code)")
     jp.add_argument("--ttl", type=int, default=240, metavar="MINUTES", help="expire if nobody is hired by then")
     jp.set_defaults(func=cmd_job_post)
 
-    shp = job.add_parser("show", help="show a job: by id, your own (--agent), or the oldest open one")
+    shp = job.add_parser("show", help="show a job: by id, your own (--agent), or the next free one")
     shp.add_argument("job", nargs="?")
     shp.add_argument("--agent", default=None)
-    shp.add_argument("--next", action="store_true", help="the oldest open job (default when no id/agent)")
+    shp.add_argument("--next", action="store_true", help="the next free open job (default when no id/agent)")
     shp.add_argument("--label", default=None)
+    shp.add_argument("--kind", default=None)
     shp.add_argument("--wait", type=int, default=0, metavar="SECONDS", help="wait up to SECONDS for an open job")
     shp.set_defaults(func=cmd_job_show)
 
     lp = job.add_parser("list", help="recent jobs")
+    lp.add_argument("--project", default=None)
     lp.add_argument("-n", type=int, default=20)
     lp.set_defaults(func=cmd_job_list)
 
     app = job.add_parser("apply", help="engineer: reply to a job posting (prints your engineer id)")
-    app.add_argument("job", nargs="?", help="job id (default: the oldest open job)")
+    app.add_argument("job", nargs="?", help="job id (default: the next free open job)")
     app.add_argument("reply")
     app.add_argument("--label", default=None)
+    app.add_argument("--kind", default=None)
     app.set_defaults(func=cmd_job_apply)
 
-    hp = job.add_parser("hire", help="manager: hire the first pending applicant (or a named one)")
+    hp = job.add_parser("hire", help="manager: hire the first applicant of every open job (or --job / an applicant)")
     hp.add_argument("applicant", nargs="?")
     hp.add_argument("--agent", required=True)
+    hp.add_argument("--job", default=None)
     hp.set_defaults(func=cmd_job_hire)
 
-    up = job.add_parser("update", help="manager: replace the posting (e.g. with the agreed scope)")
+    up = job.add_parser("update", help="manager: replace a job's posting (e.g. with the agreed scope)")
     up.add_argument("posting")
     up.add_argument("--agent", required=True)
+    up.add_argument("--job", default=None)
     up.set_defaults(func=cmd_job_update)
 
-    cp = job.add_parser("close", help="manager: close the job")
+    cp = job.add_parser("close", help="manager: close one job")
     cp.add_argument("--agent", required=True)
+    cp.add_argument("--job", default=None)
     cp.add_argument("--note", default=None)
     cp.set_defaults(func=cmd_job_close)
 
-    kp = sub.add_parser("lock", help="path locks for your job: mb lock --agent ID <command> [args...]")
+    kp = sub.add_parser("lock", help="path locks for your project: mb lock --agent ID <command> [args...]")
     kp.add_argument("--agent", required=True)
     kp.add_argument("lock_args", nargs=argparse.REMAINDER)
     kp.set_defaults(func=cmd_lock)
 
-    stp = sub.add_parser("stats", help="board, job or agent statistics (add --json for machine use)")
+    stp = sub.add_parser("stats", help="board, project, job or agent statistics (add --json for machine use)")
     group = stp.add_mutually_exclusive_group()
+    group.add_argument("--project", default=None)
     group.add_argument("--job", default=None)
     group.add_argument("--agent", default=None)
-    stp.add_argument("-n", type=int, default=10, help="recent jobs in the board summary")
+    stp.add_argument("-n", type=int, default=10, help="recent projects/jobs in the board summary")
     stp.add_argument("--json", action="store_true")
     stp.set_defaults(func=cmd_stats)
 
