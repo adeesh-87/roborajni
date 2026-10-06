@@ -38,7 +38,10 @@ Start every agent in its own terminal, in any order. Use one label per run.
    - The manager batches READYs into a `BUILD` for the build engineer.
    - The build engineer locks the sources and build folder, builds, runs and posts a `REPORT`.
    - The manager sends each failure as a `FIX` to the engineer who owns the file, and the numbers to everyone as `INFO`.
-5. When every code engineer is `DONE`, the manager asks for a final build, evaluates, writes the report, posts `FINAL` and closes the project.
+5. The manager keeps each job active until its goals are met, and closes it **on its own** right then (`mb job close --job <id>`), so that engineer can stop early. `mb project close` refuses while any job is still active.
+6. When every code job is closed, the manager asks for a final build, closes the build job, evaluates, writes the report, posts `FINAL` and closes the project.
+
+Whenever an agent has nothing else to do, it polls with `mb inbox --wait 300`. The manager polls while any of its jobs is active. An engineer polls until its own job is closed: `mb inbox` then prints `JOB CLOSED`, and it releases its locks and stops.
 
 For a single engineer that builds itself: `engineers=1`, and launch one engineer. The manager posts no build job.
 

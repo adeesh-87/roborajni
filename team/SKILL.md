@@ -35,7 +35,19 @@ Your arguments are whatever the user wrote when invoking this skill (Claude Code
   EOF
   )" --agent <you>
   ```
-- **Waiting:** each `--wait` is one tool call. Set your shell tool's timeout above the wait (`--wait 540` needs at least 600 s; if you can't raise it, use `--wait 90`).
+- **Waiting:** each `--wait` is one tool call. Set your shell tool's timeout above the wait (`--wait 300` needs at least 330 s; if you can't raise it, use a shorter wait and poll more often).
+
+## Polling: who keeps going, and until when
+Whenever you have nothing else to do, **poll**: `mb inbox --agent <you> --wait 300`. Then act on what arrived, and poll again.
+- **Manager:**
+  - A job stays active until **its** goals are met: its agreed checkpoints and `done when`.
+  - While any of your jobs is active, never end your session: work, or poll.
+  - **Close each job on its own** as soon as its goals are met, so its engineer can stop: `mb job close --agent <you> --job <id> --note "<result>"`.
+  - Never use the project to end jobs. `mb project close` only works once every job is closed.
+- **Engineer:**
+  - Work while you have work; when you don't, poll. Keep going until **your** job is closed. Then `mb inbox` prints `JOB CLOSED`: run `mb lock --agent <you> release-all` and stop.
+  - Never stop on your own before that. Even after `DONE`, a `FIX` may still come.
+  - Only if nothing at all has arrived for 2 hours (the manager is gone): post `BLOCKED`, release your locks and stop.
 
 ## Roles
 
@@ -43,6 +55,7 @@ Your arguments are whatever the user wrote when invoking this skill (Claude Code
 - You own *what* gets done and the rules it must follow, not *how* it is coded.
 - You split the work so code engineers never own the same file.
 - You route every build result to the engineer who owns the code.
+- You keep each job active until its goals are met, then close it individually.
 - At the end, **you** evaluate and do the skill's evaluation and report steps (for the ut skill: closeout).
 
 **Code engineer: implementation, slightly aggressive.**
@@ -84,18 +97,18 @@ Then post one job per engineer:
 If the user asked for a single engineer, post one code job and **no** build job; that engineer then builds and runs itself.
 
 **2. Hire (manager).**
-- Wait for applications: `mb inbox --agent <you> --wait 540`, repeated.
+- Wait for applications by polling: `mb inbox --agent <you> --wait 300`, repeated.
 - Each time `APPLY`s arrive, run `mb job hire --agent <you>`. It hires the first applicant of every open job and rejects the rest.
 - Continue until every job is filled. After 2 hours (or what the user said):
-  - if the build job or every code job is still unfilled, close the project and report;
+  - if the build job or every code job is still unfilled, close every job (one by one), then the project, and report;
   - otherwise, close the unfilled code jobs (`mb job close --agent <you> --job <id>`) and give their scope to a hired code engineer.
 
 **3. Apply (engineer).**
-- Find a job: `mb job show --next [--label <label>] --wait 90`, up to 10 times. It shows each engineer a different free job.
+- Find a job: `mb job show --next [--label <label>] --wait 300`, repeated for up to 2 hours. It shows each engineer a different free job.
 - Read the job, the project posting, and the skill and files they name. Then reply with `mb job apply <job id> "<reply>"`, saying:
   - **code job:** what you understood, what you would add and why, and what you already know;
   - **build job:** that the commands are clear, or what is missing, and what you already know.
-- Note your agent id, and wait for `HIRED` or `REJECTED` (`mb inbox --agent <you> --wait 90`, up to 10 times).
+- Note your agent id, and poll for `HIRED` or `REJECTED` (`mb inbox --agent <you> --wait 300`, for up to 2 hours).
 - If you are `REJECTED`, run `mb job show --next` again. Stop after 3 rejections, or if no job is left.
 
 **4. Agree (manager with each engineer, on that engineer's job channel).**
@@ -109,22 +122,22 @@ If the user asked for a single engineer, post one code job and **no** build job;
   2. Post `READY:` with the files changed, what changed, and what the build should show.
   3. Go straight on to your next change. Do not wait for the build.
   4. Read your inbox after every change. A `FIX` comes before new work; a `STOP` halts you; a `REDIRECT` changes course.
-- **Manager (event loop):** `mb inbox --agent <you> --wait 540`, then act on what arrived.
+- **Manager (event loop):** whenever you are idle, poll (`mb inbox --agent <you> --wait 300`), then act on what arrived.
   - **`READY`:** when the build engineer is idle, send it `BUILD:` with every READY item still waiting (job id, files). Batch them: one build serves many changes.
   - **`REPORT`:** send each failure as a `FIX:` to the job that owns the failing file (`--job <id>`), with the exact excerpt and file:line. Post the numbers (coverage, pass counts) to everyone as `INFO`.
   - **Hard rule broken, or work drifting:** `STOP` or `REDIRECT` on that engineer's job channel, with the reason. Never discuss implementation details.
 - **Build engineer, on `BUILD`:**
   1. `alive <2x expected seconds> "build"`, then `acquire` the source roots, build folder and coverage data in **one** call. Code engineers cannot write while you hold them, so the build sees whole changes only.
   2. Build, run, collect coverage, then `release` everything.
-  3. Post `REPORT:` with, for each READY item: pass or fail, the failing test or compiler error excerpt, and the file:line; then the coverage numbers. Then wait for the next `BUILD`.
+  3. Post `REPORT:` with, for each READY item: pass or fail, the failing test or compiler error excerpt, and the file:line; then the coverage numbers. Then poll for the next `BUILD`, until your job is closed.
 
 **6. Finish.**
-- **Code engineer:** when your agreed checkpoints are done and the last REPORT covering your changes passed, `release-all` and post `DONE:` with what changed and where. Then keep reading your inbox until `FINAL` arrives, and handle any `FIX`.
+- **Code engineer:** when your agreed checkpoints are done and the last REPORT covering your changes passed, `release-all` and post `DONE:` with what changed and where. Then keep polling, handling any `FIX`, until your job is closed.
 - **Manager:**
-  1. When every code engineer has posted `DONE`, send the build engineer `BUILD: final` (clean build, all tests, coverage), and wait for its `REPORT`.
-  2. Evaluate with the task's skill and do its report steps.
-  3. Post `FINAL:` to everyone (`--all`) with the result against the agreed scope.
-  4. `mb project close --agent <you> --note "<one-line result>"`.
+  1. **Each code job, as soon as its goals are met:** close it at once. That means it posted `DONE` and the latest REPORT covering its changes passed. Run `mb job close --agent <you> --job <id> --note "<result>"`, and its engineer stops. If the goals are not met, keep the job active and send `FIX` or `REDIRECT`.
+  2. **When every code job is closed:** send the build engineer `BUILD: final` (clean build, all tests, coverage) and wait for its `REPORT`. Then close the build job. If the final build fails in a closed job's files, don't reopen it; record the failure in your report.
+  3. Evaluate with the task's skill and do its report steps.
+  4. Post `FINAL:` to everyone (`--all`) with the result against the agreed scope, then `mb project close --agent <you> --note "<one-line result>"`.
 
 ## Locks
 Read `LOCKING.md` in this skill's directory once, before you write anything. In short:
@@ -148,7 +161,7 @@ Read `LOCKING.md` in this skill's directory once, before you write anything. In 
 
 | Type | Meaning |
 |---|---|
-| `APPLY` / `HIRED` / `REJECTED` | Sent by `mb job apply` / `mb job hire`. |
+| `APPLY` / `HIRED` / `REJECTED` / `CLOSED` | Sent by `mb job apply` / `mb job hire` / `mb job close`. An engineer whose job is `CLOSED` stops. |
 | `PROPOSAL` / `AGREED` | Negotiating a job's scope and checkpoints; the agreed result. |
 | `INFO` | Something you learned that others can use. Post it to everyone immediately. |
 | `QUESTION` / `ANSWER` | Quick questions; answer with `--reply-to <seq>`. |

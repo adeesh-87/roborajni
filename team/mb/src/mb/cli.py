@@ -367,6 +367,22 @@ def _unread(con, agent):
     ).fetchall()
 
 
+def _job_note(con, agent, empty):
+    """What the agent must know about its job(s) on every poll: closed means stop, active means keep polling."""
+    job = _engineer_job(con, agent)
+    if job:
+        status = con.execute("SELECT status FROM jobs WHERE id=?", (job,)).fetchone()[0]
+        if status in ("closed", "expired"):
+            return (f"JOB CLOSED: your job {job} is {status}. Release your locks "
+                    f"(mb lock --agent {agent} release-all) and stop.")
+        return f"(your job {job} is still active: when you have nothing else to do, poll again)" if empty else None
+    managed = _managed_jobs(con, agent)
+    if managed and empty:
+        return (f"({len(managed)} job(s) still active: {', '.join(managed)}. Keep polling until each one's goals "
+                f"are met and you close it with `mb job close --job <id>`)")
+    return None
+
+
 def cmd_inbox(args):
     con = connect()
     started = time.time()
@@ -384,13 +400,15 @@ def cmd_inbox(args):
     _log("debug", "inbox", args.agent, delivered=len(rows), waited_s=round(waited, 1), peek=args.peek or None)
     if not rows:
         print("(no new messages)")
-        return
     for seq, topic, sender, body, reply_to in rows:
         _log("debug", "msg.read", args.agent, seq=seq, topic=topic, sender=sender, type=_msg_type(body))
         reply = f" (reply_to={reply_to})" if reply_to else ""
         print(f"[{seq}] {topic} <{sender}>{reply}: {body}")
-    if not args.peek:
+    if rows and not args.peek:
         _set_cursor(con, args.agent, rows[-1][0])
+    note = _job_note(con, args.agent, empty=not rows)
+    if note:
+        print(note)
 
 
 def cmd_ack(args):
@@ -486,11 +504,13 @@ def cmd_project_close(args):
     project = _managed_project(con, args.agent)
     if not project:
         die(f"'{args.agent}' does not manage a project")
+    active = [j for (j,) in con.execute(
+        "SELECT id FROM jobs WHERE project=? AND status IN ('open', 'filled')", (project,))]
+    if active:
+        die(f"{len(active)} job(s) still active ({', '.join(active)}). Close each one when its goals are met "
+            f"(`mb job close --agent {args.agent} --job <id>`), so its engineer can stop; then close the project.")
     note = f": {args.note}" if args.note else ""
     con.execute("BEGIN IMMEDIATE")
-    for (job,) in con.execute("SELECT id FROM jobs WHERE project=? AND status IN ('open', 'filled')",
-                              (project,)).fetchall():
-        _close_job(con, args.agent, job, args.note)
     con.execute("UPDATE projects SET status='closed', closed_at=? WHERE id=?", (now_ms(), project))
     _post(con, f"project/{project}", "mb", f"CLOSED: project {project}{note}")
     _post(con, LOBBY, "mb", f"CLOSED: project {project}{note}")
@@ -1183,7 +1203,7 @@ def main():
     prs.add_argument("project", nargs="?")
     prs.add_argument("--agent", default=None)
     prs.set_defaults(func=cmd_project_show)
-    prc = project.add_parser("close", help="manager: close the project and all its jobs")
+    prc = project.add_parser("close", help="manager: close the project, once every job is closed")
     prc.add_argument("--agent", required=True)
     prc.add_argument("--note", default=None)
     prc.set_defaults(func=cmd_project_close)
@@ -1232,7 +1252,7 @@ def main():
     up.add_argument("--job", default=None)
     up.set_defaults(func=cmd_job_update)
 
-    cp = job.add_parser("close", help="manager: close one job")
+    cp = job.add_parser("close", help="manager: close one job when its goals are met (its engineer then stops)")
     cp.add_argument("--agent", required=True)
     cp.add_argument("--job", default=None)
     cp.add_argument("--note", default=None)
