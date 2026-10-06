@@ -7,6 +7,7 @@ team/
 ├── SKILL.md        # roles, the flow, mb and lock usage
 ├── LOCKING.md      # path locks for shared resources: commands and rules
 ├── bin/mb          # launcher: runs mb from this folder with plain python3 (no uv needed)
+├── bin/crew        # launcher: start and drive N agent sessions in tmux
 ├── bin/lock.sh     # launcher: path locks with heartbeats and stale detection (bash)
 ├── mb/             # the mb uv project: pyproject.toml, uv.lock, src/mb/{cli.py,lock.sh}
 ├── install.sh      # optional: symlink mb onto PATH
@@ -44,6 +45,40 @@ Start every agent in its own terminal, in any order. Use one label per run.
 Whenever an agent has nothing else to do, it polls with `mb inbox --wait 300`. The manager polls while any of its jobs is active. An engineer polls until its own job is closed: `mb inbox` then prints `JOB CLOSED`, and it releases its locks and stops.
 
 For a single engineer that builds itself: `engineers=1`, and launch one engineer. The manager posts no build job.
+
+## Launching the agents: `crew`
+
+`crew` starts any number of agent sessions (Codex, Claude Code or any other harness) in tmux. You can see which are running, read any of them, and step in only when something is wrong. It needs `tmux`.
+
+```bash
+# save harness commands once; change them whenever you like
+crew harness add codex  "codex --dangerously-bypass-approvals-and-sandbox"
+crew harness add claude "claude --permission-mode acceptEdits"
+crew harness default codex
+crew harness                                    # list them
+
+# one run = one tmux session; every instance gets the prompt
+crew launch --session mcdc7 --name manager '$team manager engineers=2 label=mcdc7 use $ut to increase MC/DC coverage of module x'
+crew launch --session mcdc7 --name eng -n 3 '$team engineer label=mcdc7'
+crew launch --session mcdc7 --name eng -n 1 --harness claude '$team engineer label=mcdc7'   # another harness, same run
+
+crew ls                     # how many are running or exited; flags agents with no output for 15 min (--stale)
+crew peek eng-2 -n 80       # read an agent's screen without entering
+crew attach eng-2           # enter it and type; Ctrl-b d to leave (the agent keeps running)
+crew send eng-2 "continue"  # type one line into it without entering
+crew kill --exited          # tidy up; also: crew kill eng-2, crew kill --all [--session mcdc7]
+```
+
+- **The prompt** is required, and is passed to the harness as its initial-prompt argument. It is quoted, so `$team` reaches the agent unchanged. `{i}`, `{name}` and `{session}` in the prompt are filled in per instance.
+- **Harness placement:** if a harness takes the prompt somewhere other than the end, put `{prompt}` in its command. `--harness` also accepts a literal command instead of a saved name.
+- **Naming:** agents are named `<name>-1`, `<name>-2` and so on, and later launches continue the numbering. Targets are a name, `<session>:<name>`, or the `#` from `crew ls`.
+- **Exited agents** keep their screen until you kill them.
+- **Recording:** `--log` also records each screen to `~/.local/state/crew/<session>/<agent>.log`.
+- **Other options:**
+  - `--cwd` sets the working directory.
+  - `--env KEY=VALUE` passes extra environment.
+  - Each agent also gets `CREW_NAME` and `CREW_SESSION`.
+- **Where harnesses are saved:** in the same config file as the board setting (`~/.config/mb/config.json`).
 
 ## Where the board lives
 

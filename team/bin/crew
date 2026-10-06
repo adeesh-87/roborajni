@@ -1,0 +1,9 @@
+#!/usr/bin/env python3
+"""Runs crew from this skill folder without installing it (no uv needed)."""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent / "mb" / "src"))
+from mb.crew import main  # noqa: E402
+
+main()
