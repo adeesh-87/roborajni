@@ -6,8 +6,9 @@ This folder is a self-contained skill. Copy the whole `team/` folder into your s
 team/
 ├── SKILL.md        # roles, the flow, mb and lock usage
 ├── LOCKING.md      # path locks for shared resources: commands and rules
-├── bin/mb          # the message board CLI (Python 3, no dependencies)
-├── bin/lock.sh     # path locks with heartbeats and stale detection (bash)
+├── bin/mb          # launcher: runs mb from this folder with plain python3 (no uv needed)
+├── bin/lock.sh     # launcher: path locks with heartbeats and stale detection (bash)
+├── mb/             # the mb uv project: pyproject.toml, uv.lock, src/mb/{cli.py,lock.sh}
 ├── install.sh      # optional: symlink mb onto PATH
 └── README.md
 ```
@@ -35,6 +36,15 @@ Start each agent in its own terminal. The order does not matter.
 5. The engineer works checkpoint by checkpoint, posting a `SYNC` after each, and doesn't wait for approval. The manager only steps in (`STOP` / `REDIRECT`) when direction or a hard rule is at stake.
 6. The engineer posts `DONE`. The manager evaluates, writes the report, posts `FINAL` and closes the job.
 
+## Install mb with uv (optional)
+
+`mb/` is a uv project with no runtime dependencies (Python 3.9+). Agents don't need it, because `bin/mb` runs the same code with plain `python3`. For your own terminal:
+
+```bash
+uv tool install .agents/skills/team/mb          # `mb` on PATH
+uv run --project .agents/skills/team/mb mb --help
+```
+
 ## Watch
 
 ```bash
@@ -43,6 +53,38 @@ mb tail --topic lobby             # jobs being posted, filled, closed
 mb tail --topic job/<id> -n 100   # the conversation
 bash .agents/skills/team/bin/lock.sh <locks dir> watch 10   # live lock status
 ```
+
+## Stats
+
+Every agent action bumps a counter: messages sent (by type, with bytes), inbox calls, empty polls and time spent waiting, lock calls by outcome with time spent waiting, and job actions. Jobs record when they were posted, hired and closed.
+
+```bash
+mb stats                     # board summary + recent jobs with their phase durations
+mb stats --job <id>          # timeline, message mix, per-agent costs
+mb stats --agent <id>        # one agent's summary and raw counters
+mb stats --job <id> --json   # the same as JSON, for scripts and comparisons between runs
+```
+
+`mb stats --job` splits the run into phases: **waiting for engineer** (posted → hired), **negotiation** (hired → first `AGREED`), **work** (`AGREED` → `DONE`) and **evaluation** (`DONE` → `FINAL`/closed). It also counts SYNCs and STOP/REDIRECTs, and for each agent shows how much of its inbox polling came back empty.
+
+## Logging
+
+Off by default. The setting lives in the board's database, so it switches on or off for every agent at once:
+
+```bash
+mb log on [--level error|warn|info|debug] [--file PATH]   # default: info, ~/.mb/mb.log
+mb log off
+mb log status
+```
+
+| Level | Logs |
+|---|---|
+| `error` | failed `mb` commands (with their arguments) |
+| `warn` | + busy or stale locks, expired jobs, rejected applicants |
+| `info` | + every message sent (seq, topic, type, size), job events, lock actions |
+| `debug` | + full message bodies and postings, every inbox poll, every message read, lock checks |
+
+Each line has a timestamp, the level, `event=...`, `agent=...` and key=value fields. A logging failure never breaks an `mb` command.
 
 ## `mb` commands
 
@@ -59,6 +101,8 @@ bash .agents/skills/team/bin/lock.sh <locks dir> watch 10   # live lock status
 | `mb inbox --agent ID [--wait SECS] [--peek]` | Read unread mail |
 | `mb tail [--topic T] [-n N]` | Recent messages, ignoring cursors |
 | `mb lock --agent ID <acquire\|wait\|release\|release-all\|alive\|check\|status> ...` | Path locks in the job's `locks:` dir; see LOCKING.md |
+| `mb stats [--job ID \| --agent ID] [--json]` | Statistics (see above) |
+| `mb log on\|off\|status [--level L] [--file F]` | File logging (see above) |
 
 `mb` keeps everything in one SQLite file, `~/.mb/board.db` (override with `MB_DB`). An agent never receives its own messages. Open jobs expire after `--ttl` minutes (default 240) if nobody is hired.
 
