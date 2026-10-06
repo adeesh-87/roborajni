@@ -7,8 +7,10 @@ No daemon: every invocation opens the DB, does one operation, exits.
 import argparse
 import os
 import pathlib
+import re
 import secrets
 import sqlite3
+import subprocess
 import sys
 import time
 
@@ -224,7 +226,7 @@ def _next_steps(con, team, agent):
         steps.append(
             "YOU OWN THE SHARED CONTEXT (you brought the task). Before anything else, publish it so\n"
             "your teammates work in the same place:\n"
-            f"  mb team context --agent {agent} \"<task, repo, shared task dir, skills + SKILL.md paths, key files>\"\n"
+            f"  mb team context --agent {agent} \"<task, repo, task dir, locks dir, skills + SKILL.md paths, key files>\"\n"
             "Use absolute paths. If your task's skill creates a task directory, set it up first."
         )
     elif context:
@@ -334,6 +336,35 @@ def cmd_team_context(args):
     seq = _post(con, f"team/{team}", args.agent, f"CONTEXT:\n{body}")
     con.execute("COMMIT")
     print(f"shared context published (seq={seq}) to team/{team}")
+    if not _lock_dir(con, team):
+        print("note: no `locks: <absolute dir>` line in the context, so `mb lock` will not work until you add one.")
+
+
+LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
+OWNER_CMDS = {"acquire", "wait", "release", "release-all", "alive"}
+
+
+def _lock_dir(con, team):
+    context = con.execute("SELECT context FROM teams WHERE id=?", (team,)).fetchone()[0] or ""
+    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", context, re.MULTILINE)
+    return os.path.expanduser(m.group(1)) if m else None
+
+
+def cmd_lock(args):
+    if not args.lock_args:
+        die("usage: mb lock --agent ID <acquire|wait|release|release-all|alive|check|list|status|watch|reap|break> [args...]")
+    con = connect()
+    team = _team_of(con, args.agent)
+    if not team:
+        die(f"'{args.agent}' is not in any team; run `mb team join` first")
+    lock_dir = _lock_dir(con, team)
+    if not lock_dir:
+        die("the shared context has no `locks: <absolute dir>` line; the context owner must add it with `mb team context`")
+    if not LOCK_SH.is_file():
+        die(f"lock.sh not found at {LOCK_SH}; run the mb that ships in the team skill's bin/ (or a symlink to it)")
+    cmd, *rest = args.lock_args
+    argv = ["bash", str(LOCK_SH), lock_dir, cmd] + ([args.agent] if cmd in OWNER_CMDS else []) + rest
+    sys.exit(subprocess.run(argv).returncode)
 
 
 def cmd_team_show(args):
@@ -405,6 +436,11 @@ def main():
     jp.add_argument("--task", default=None)
     jp.add_argument("--ttl", type=int, default=30, metavar="MINUTES", help="abandon teams still forming after this long")
     jp.set_defaults(func=cmd_team_join)
+
+    kp = sub.add_parser("lock", help="path locks for your team: mb lock --agent ID <command> [args...]")
+    kp.add_argument("--agent", required=True)
+    kp.add_argument("lock_args", nargs=argparse.REMAINDER)
+    kp.set_defaults(func=cmd_lock)
 
     cp = team.add_parser("context", help="publish the team's shared context (task dir, skill, key files)")
     cp.add_argument("body")

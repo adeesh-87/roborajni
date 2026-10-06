@@ -4,7 +4,7 @@
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 
-chmod +x "$here/bin/mb" 2>/dev/null || true
+chmod +x "$here/bin/mb" "$here/bin/lock.sh" 2>/dev/null || true
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$here/bin/mb" "$HOME/.local/bin/mb"
 

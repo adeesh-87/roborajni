@@ -98,7 +98,7 @@ All code facts come from ONE index (`KB_DIR/index/index.json`): the bundled Grap
 ## Resume
 1. Read status.md `Config`, `Phases`, `Next steps`, `Open issues` only.
 2. Tell the user in 3 lines: current phase, done, next.
-3. Parallel executors in Config → `"$SKILL_DIR/resources/scripts/lock.sh" "$TASK/locks" status`; report STALE owners;
+3. Parallel executors in Config → `bash "$SKILL_DIR/../team/bin/lock.sh" "$TASK/locks" status` (team skill); report STALE owners;
    `reap` only with approval.
 4. User says they are an executor (e.g. "executor E2") → load `subskills/executor.md`.
 5. Otherwise continue at the first unticked phase. New work on a finished task → phase 4 again.
