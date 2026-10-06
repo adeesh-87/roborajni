@@ -7,8 +7,8 @@ locks; that is part of the ut contract.
 LOCK="$SKILL_DIR/../team/bin/lock.sh"; LD="$TASK/locks"; ME=E2      # repeat in every shell call
 ```
 `$LOCK` missing → the team skill is not installed next to this one: tell the user that parallel mode needs it, or
-run as a single executor. Inside a team (`/team` is driving this run), use `mb lock --agent <your id> <command>`
-instead of `bash "$LOCK" "$LD" <command> $ME`, with the same paths; the team's `locks:` dir should be `$TASK/locks`.
+run as a single executor. On a team job (`/team` is driving this run), use `mb lock --agent <your id> <command>`
+instead of `bash "$LOCK" "$LD" <command> $ME`, with the same paths; the job posting's `locks:` dir should be `$TASK/locks`.
 
 | Action | Command | Exit |
 |--------|---------|------|

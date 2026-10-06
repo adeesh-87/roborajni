@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""mb — minimal message board for a team of agents. Pull-based, email-like.
+"""mb — minimal message board for agents. Pull-based, email-like.
 
 Storage: single SQLite file (WAL mode) at ~/.mb/board.db (override with MB_DB).
 No daemon: every invocation opens the DB, does one operation, exits.
+Jobs: a manager posts a job, engineers apply, the manager hires the first applicant.
+Locks: `mb lock` runs lock.sh (next to this file) on the lock dir named in the job posting.
 """
 import argparse
 import os
@@ -16,6 +18,8 @@ import time
 
 DB_PATH = pathlib.Path(os.environ.get("MB_DB", pathlib.Path.home() / ".mb" / "board.db"))
 LOBBY = "lobby"
+LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
+OWNER_CMDS = {"acquire", "wait", "release", "release-all", "alive"}
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS messages (
@@ -35,19 +39,28 @@ CREATE TABLE IF NOT EXISTS cursors (
   agent    TEXT PRIMARY KEY,
   last_seq INTEGER NOT NULL DEFAULT 0
 );
-CREATE TABLE IF NOT EXISTS teams (
+CREATE TABLE IF NOT EXISTS jobs (
   id         TEXT PRIMARY KEY,
   label      TEXT,
-  roles      TEXT NOT NULL,
-  task       TEXT,
-  owner      TEXT,
-  context    TEXT,
+  title      TEXT NOT NULL,
+  posting    TEXT NOT NULL,
+  manager    TEXT NOT NULL,
+  engineer   TEXT,
   status     TEXT NOT NULL,
   start_seq  INTEGER NOT NULL,
+  ttl_min    INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS applications (
+  seq        INTEGER PRIMARY KEY AUTOINCREMENT,
+  job        TEXT NOT NULL,
+  agent      TEXT NOT NULL UNIQUE,
+  reply      TEXT NOT NULL,
+  status     TEXT NOT NULL,
   created_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS members (
-  team      TEXT NOT NULL REFERENCES teams(id),
+  team      TEXT NOT NULL,
   role      TEXT NOT NULL,
   agent     TEXT NOT NULL UNIQUE,
   joined_at INTEGER NOT NULL,
@@ -71,10 +84,6 @@ def connect():
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA busy_timeout=30000")
     con.executescript(SCHEMA)
-    cols = {r[1] for r in con.execute("PRAGMA table_info(teams)")}
-    for col in ("owner", "context"):
-        if col not in cols:
-            con.execute(f"ALTER TABLE teams ADD COLUMN {col} TEXT")
     return con
 
 
@@ -86,6 +95,10 @@ def _post(con, topic, sender, body, reply_to=None):
     return cur.lastrowid
 
 
+def _max_seq(con):
+    return con.execute("SELECT COALESCE(MAX(seq), 0) FROM messages").fetchone()[0]
+
+
 def _set_cursor(con, agent, seq):
     con.execute(
         "INSERT INTO cursors (agent, last_seq) VALUES (?, ?) "
@@ -94,50 +107,49 @@ def _set_cursor(con, agent, seq):
     )
 
 
-def _team_of(con, agent):
-    row = con.execute("SELECT team FROM members WHERE agent=?", (agent,)).fetchone()
+def _job_of(con, agent):
+    row = con.execute(
+        "SELECT m.team FROM members m JOIN jobs j ON j.id = m.team WHERE m.agent=?", (agent,)
+    ).fetchone()
     return row[0] if row else None
 
 
+def _is_member(con, job, agent):
+    return con.execute("SELECT 1 FROM members WHERE team=? AND agent=?", (job, agent)).fetchone() is not None
+
+
+# ---- messages ----------------------------------------------------------------------------------
+
 def cmd_pub(args):
     con = connect()
-    if args.topic.startswith("team/"):
-        team = args.topic[len("team/"):]
-        if not con.execute("SELECT 1 FROM members WHERE team=? AND agent=?", (team, args.sender)).fetchone():
-            die(f"'{args.sender}' is not a member of team {team}; team channels are private")
+    if args.topic.startswith("job/") and not _is_member(con, args.topic[4:], args.sender):
+        die(f"'{args.sender}' is not on job {args.topic[4:]}; job channels are private")
     seq = _post(con, args.topic, args.sender, args.body, args.reply_to)
     print(f"published seq={seq} topic={args.topic}")
 
 
 def cmd_say(args):
     con = connect()
-    team = _team_of(con, args.agent)
-    if not team:
-        die(f"'{args.agent}' is not in any team; run `mb team join` first and use the agent id it prints")
-    seq = _post(con, f"team/{team}", args.agent, args.body, args.reply_to)
-    print(f"published seq={seq} topic=team/{team}")
+    job = _job_of(con, args.agent)
+    if not job:
+        die(f"'{args.agent}' is not on any job (post one, or apply and get hired, first)")
+    seq = _post(con, f"job/{job}", args.agent, args.body, args.reply_to)
+    print(f"published seq={seq} topic=job/{job}")
 
 
 def cmd_sub(args):
     con = connect()
-    if args.topic.startswith("team/"):
-        team = args.topic[len("team/"):]
-        if not con.execute("SELECT 1 FROM members WHERE team=? AND agent=?", (team, args.agent)).fetchone():
-            die(f"'{args.agent}' is not a member of team {team}; join with `mb team join`")
+    if args.topic.startswith("job/") and not _is_member(con, args.topic[4:], args.agent):
+        die(f"'{args.agent}' is not on job {args.topic[4:]}")
     con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (args.agent, args.topic))
     print(f"{args.agent} subscribed to {args.topic}")
-
-
-def _inbox_topics(con, agent):
-    topics = [f"agent/{agent}", "all"]
-    topics += [r[0] for r in con.execute("SELECT topic FROM subscriptions WHERE agent=?", (agent,))]
-    return topics
 
 
 def _unread(con, agent):
     row = con.execute("SELECT last_seq FROM cursors WHERE agent=?", (agent,)).fetchone()
     last_seq = row[0] if row else 0
-    topics = _inbox_topics(con, agent)
+    topics = [f"agent/{agent}", "all"]
+    topics += [r[0] for r in con.execute("SELECT topic FROM subscriptions WHERE agent=?", (agent,))]
     placeholders = ",".join("?" * len(topics))
     return con.execute(
         f"SELECT seq, topic, sender, body, reply_to FROM messages "
@@ -171,222 +183,266 @@ def cmd_ack(args):
 
 def cmd_tail(args):
     con = connect()
-    if args.topic:
-        rows = con.execute(
-            "SELECT seq, topic, sender, body FROM messages WHERE topic=? ORDER BY seq DESC LIMIT ?",
-            (args.topic, args.n),
-        ).fetchall()
-    else:
-        rows = con.execute(
-            "SELECT seq, topic, sender, body FROM messages ORDER BY seq DESC LIMIT ?",
-            (args.n,),
-        ).fetchall()
+    where, params = ("WHERE topic=?", (args.topic,)) if args.topic else ("", ())
+    rows = con.execute(
+        f"SELECT seq, topic, sender, body FROM messages {where} ORDER BY seq DESC LIMIT ?", (*params, args.n)
+    ).fetchall()
     for seq, topic, sender, body in reversed(rows):
         print(f"[{seq}] {topic} <{sender}>: {body}")
 
 
-def _roster(con, team):
-    return dict(con.execute("SELECT role, agent FROM members WHERE team=?", (team,)).fetchall())
+# ---- jobs --------------------------------------------------------------------------------------
+
+def _expire(con):
+    for (jid,) in con.execute(
+        "SELECT id FROM jobs WHERE status='open' AND created_at < ? - ttl_min * 60000", (now_ms(),)
+    ).fetchall():
+        con.execute("UPDATE jobs SET status='expired' WHERE id=?", (jid,))
+        con.execute("UPDATE applications SET status='rejected' WHERE job=? AND status='pending'", (jid,))
+        _post(con, LOBBY, "mb", f"EXPIRED: job {jid} was never filled")
 
 
-def _indent(text, prefix="                 "):
-    return "\n".join(prefix + line for line in text.splitlines())
-
-
-def _describe(con, team, agent=None):
-    tid, label, roles, task, owner, context, status = con.execute(
-        "SELECT id, label, roles, task, owner, context, status FROM teams WHERE id=?", (team,)
+def _oldest_open(con, label):
+    row = con.execute(
+        "SELECT id FROM jobs WHERE status='open' AND label IS ? ORDER BY created_at LIMIT 1", (label,)
     ).fetchone()
-    roster = _roster(con, tid)
-    missing = [r for r in roles.split(",") if r not in roster]
-    lines = []
-    if agent:
-        lines.append(f"YOUR AGENT ID: {agent}   <- use it as --agent / --sender in EVERY mb command")
-    lines += [
-        f"team:          {tid}" + (f" (label: {label})" if label else ""),
-        f"team channel:  team/{tid}   (post with: mb say \"<TYPE>: ...\" --agent {agent or '<your id>'})",
-        f"task:          {task or '(none given)'}",
-        f"context owner: {owner or '(nobody has brought a task yet)'}",
-        "roster:        " + " ; ".join(f"{r} -> {roster.get(r, '(open)')}" for r in roles.split(",")),
-        f"status:        {status}" + (f" (waiting for: {', '.join(missing)})" if missing and status == "forming" else ""),
-    ]
-    if context:
-        lines += ["shared context:", _indent(context)]
-    else:
-        lines.append("shared context: (not posted yet)")
-    return "\n".join(lines)
+    return row[0] if row else None
 
 
-def _next_steps(con, team, agent):
-    owner, context, status = con.execute(
-        "SELECT owner, context, status FROM teams WHERE id=?", (team,)
+def _resolve_job(con, args):
+    if getattr(args, "job", None):
+        if not con.execute("SELECT 1 FROM jobs WHERE id=?", (args.job,)).fetchone():
+            die(f"no job {args.job}; list them with `mb job list`")
+        return args.job
+    if getattr(args, "agent", None):
+        job = _job_of(con, args.agent)
+        if not job:
+            die(f"'{args.agent}' is not on any job")
+        return job
+    return _oldest_open(con, args.label)
+
+
+def _lock_dir(con, job):
+    posting = con.execute("SELECT posting FROM jobs WHERE id=?", (job,)).fetchone()[0]
+    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", posting, re.MULTILINE)
+    return os.path.expanduser(m.group(1)) if m else None
+
+
+def _show(con, job):
+    jid, label, title, posting, manager, engineer, status = con.execute(
+        "SELECT id, label, title, posting, manager, engineer, status FROM jobs WHERE id=?", (job,)
     ).fetchone()
-    steps = []
-    if agent == owner:
-        steps.append(
-            "YOU OWN THE SHARED CONTEXT (you brought the task). Before anything else, publish it so\n"
-            "your teammates work in the same place:\n"
-            f"  mb team context --agent {agent} \"<task, repo, task dir, locks dir, skills + SKILL.md paths, key files>\"\n"
-            "Use absolute paths. If your task's skill creates a task directory, set it up first."
-        )
-    elif context:
-        steps.append(
-            "The shared context is above. Before doing ANYTHING else, read the directories and files it\n"
-            "names, including the SKILL.md of every skill it lists. It overrides any task wording you were given."
-        )
-    else:
-        steps.append(
-            "Do NOT start on the task yet: the shared context has not been posted. Read the board and\n"
-            f"wait for a CONTEXT message:  mb inbox --agent {agent} --wait 90"
-        )
-    if status == "forming":
-        steps.append(f"The team is still forming. Wait for FORMED:  mb inbox --agent {agent} --wait 90")
-    else:
-        steps.append(f"The team is complete. Read the board:  mb inbox --agent {agent}")
-    return "\n\nNext:\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
+    pending = con.execute(
+        "SELECT COUNT(*) FROM applications WHERE job=? AND status='pending'", (jid,)
+    ).fetchone()[0]
+    print(f"job:       {jid}" + (f" (label: {label})" if label else ""))
+    print(f"title:     {title}")
+    print(f"status:    {status}" + (f" ({pending} application(s) pending)" if status == "open" else ""))
+    print(f"manager:   {manager}")
+    print(f"engineer:  {engineer or '(not hired yet)'}")
+    print(f"channel:   job/{jid}")
+    print("posting:")
+    print("\n".join("  " + line for line in posting.splitlines()))
 
 
-def cmd_team_join(args):
-    roles = sorted({r.strip() for r in args.roles.split(",") if r.strip()})
-    if args.role not in roles:
-        die(f"role '{args.role}' is not in team roles {roles}")
-    roles_key = ",".join(roles)
-    task = args.task.strip() if args.task else None
+def cmd_job_post(args):
+    posting = args.posting.strip()
+    if not posting:
+        die("the posting is empty")
+    con = connect()
+    con.execute("BEGIN IMMEDIATE")
+    _expire(con)
+    job = f"j-{secrets.token_hex(3)}"
+    manager = f"manager@{job}"
+    start = _max_seq(con)
+    con.execute(
+        "INSERT INTO jobs (id, label, title, posting, manager, status, start_seq, ttl_min, created_at) "
+        "VALUES (?, ?, ?, ?, ?, 'open', ?, ?, ?)",
+        (job, args.label, args.title, posting, manager, start, args.ttl, now_ms()),
+    )
+    con.execute("INSERT INTO members (team, role, agent, joined_at) VALUES (?, 'manager', ?, ?)", (job, manager, now_ms()))
+    con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (manager, f"job/{job}"))
+    _set_cursor(con, manager, start)
+    _post(con, LOBBY, "mb", f"JOB {job}" + (f" [label {args.label}]" if args.label else "") + f": {args.title}")
+    con.execute("COMMIT")
+    print(f"YOUR AGENT ID: {manager}   <- use it as --agent / --sender in EVERY mb command")
+    print(f"posted job {job}; engineers find it with `mb job show --next" + (f" --label {args.label}" if args.label else "") + "`")
+    if not _lock_dir(con, job):
+        print("note: the posting has no `locks: <absolute dir>` line, so `mb lock` will not work until you add it (mb job update).")
+    print(f"\nNext: wait for applications (they arrive in your inbox as APPLY):  mb inbox --agent {manager} --wait 540")
+    print(f"Then hire the first applicant:  mb job hire --agent {manager}")
+
+
+def cmd_job_show(args):
+    con = connect()
+    con.execute("BEGIN IMMEDIATE")
+    _expire(con)
+    con.execute("COMMIT")
+    deadline = time.time() + args.wait
+    job = _resolve_job(con, args)
+    while not job and time.time() < deadline:
+        time.sleep(3)
+        job = _oldest_open(con, args.label)
+    if not job:
+        print("(no open job)" + (f" with label {args.label}" if args.label else ""))
+        return
+    _show(con, job)
+    if not args.agent:
+        status = con.execute("SELECT status FROM jobs WHERE id=?", (job,)).fetchone()[0]
+        if status == "open":
+            print(f"\nTo take it, reply to the manager:  mb job apply {job} \"<your reply>\"")
+
+
+def cmd_job_list(args):
+    con = connect()
+    con.execute("BEGIN IMMEDIATE")
+    _expire(con)
+    con.execute("COMMIT")
+    rows = con.execute(
+        "SELECT id, label, status, title, engineer, created_at FROM jobs ORDER BY created_at DESC LIMIT ?", (args.n,)
+    ).fetchall()
+    if not rows:
+        print("(no jobs)")
+    for jid, label, status, title, engineer, created in rows:
+        apps = con.execute("SELECT COUNT(*) FROM applications WHERE job=?", (jid,)).fetchone()[0]
+        age = (now_ms() - created) // 60000
+        print(f"{jid} [{status}]" + (f" label={label}" if label else "") + f" apps={apps} age={age}m"
+              + (f" engineer={engineer}" if engineer else "") + f"  {title}")
+
+
+def cmd_job_apply(args):
+    reply = args.reply.strip()
+    if not reply:
+        die("the reply is empty: say what you understood, what you would add, and what you already know")
     con = connect()
     con.execute("BEGIN IMMEDIATE")
     try:
-        cutoff = now_ms() - args.ttl * 60_000
-        for (stale,) in con.execute(
-            "SELECT id FROM teams WHERE status='forming' AND created_at < ?", (cutoff,)
-        ).fetchall():
-            con.execute("UPDATE teams SET status='abandoned' WHERE id=?", (stale,))
-            _post(con, LOBBY, "mb", f"ABANDONED: team {stale} never filled all roles")
-
-        row = con.execute(
-            "SELECT id FROM teams WHERE status='forming' AND roles=? AND label IS ? "
-            "AND id NOT IN (SELECT team FROM members WHERE role=?) ORDER BY created_at LIMIT 1",
-            (roles_key, args.label, args.role),
-        ).fetchone()
-        if row:
-            team = row[0]
-        else:
-            team = f"t-{secrets.token_hex(3)}"
-            start_seq = con.execute("SELECT COALESCE(MAX(seq), 0) FROM messages").fetchone()[0]
-            con.execute(
-                "INSERT INTO teams (id, label, roles, status, start_seq, created_at) "
-                "VALUES (?, ?, ?, 'forming', ?, ?)",
-                (team, args.label, roles_key, start_seq, now_ms()),
-            )
-            _post(con, LOBBY, "mb", f"OPEN: team {team} roles={roles_key}"
-                  + (f" label={args.label}" if args.label else "") + (f" task={task}" if task else ""))
-
-        agent = f"{args.role}@{team}"
-        start_seq, team_task = con.execute("SELECT start_seq, task FROM teams WHERE id=?", (team,)).fetchone()
-        warning = None
-        if task and not team_task:
-            con.execute("UPDATE teams SET task=?, owner=? WHERE id=?", (task, agent, team))
-        elif task and team_task and task != team_task:
-            warning = ("WARNING: the task you were given differs from the team's task. The team task and the\n"
-                       "shared context (below) are authoritative; post anything extra you know as `NOTE:`.")
-
+        _expire(con)
+        job = args.job or _oldest_open(con, args.label)
+        if not job:
+            die("there is no open job; wait for one with `mb job show --next --wait 90`")
+        row = con.execute("SELECT status, manager FROM jobs WHERE id=?", (job,)).fetchone()
+        if not row:
+            die(f"no job {job}")
+        status, manager = row
+        if status != "open":
+            die(f"job {job} is {status}; look for another with `mb job show --next`")
+        while True:
+            agent = f"engineer-{secrets.token_hex(2)}@{job}"
+            if not con.execute("SELECT 1 FROM applications WHERE agent=?", (agent,)).fetchone():
+                break
         con.execute(
-            "INSERT INTO members (team, role, agent, joined_at) VALUES (?, ?, ?, ?)",
-            (team, args.role, agent, now_ms()),
+            "INSERT INTO applications (job, agent, reply, status, created_at) VALUES (?, ?, ?, 'pending', ?)",
+            (job, agent, reply, now_ms()),
         )
-        con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (agent, f"team/{team}"))
-        _set_cursor(con, agent, start_seq)
-        _post(con, f"team/{team}", agent, f"JOIN: {agent} (role {args.role})")
-
-        roster = _roster(con, team)
-        if all(r in roster for r in roles):
-            con.execute("UPDATE teams SET status='formed' WHERE id=?", (team,))
-            final_task, owner, context = con.execute(
-                "SELECT task, owner, context FROM teams WHERE id=?", (team,)
-            ).fetchone()
-            body = f"FORMED: team {team}\ntask: {final_task or '(none given)'}\nroster:\n" + "\n".join(
-                f"- {r}: {roster[r]}" for r in roles
-            )
-            if context:
-                body += f"\nshared context (from {owner}):\n{context}"
-            elif owner:
-                body += f"\nshared context: not posted yet. {owner} will post a CONTEXT message; wait for it."
-            _post(con, f"team/{team}", "mb", body)
-            _post(con, LOBBY, "mb", f"FORMED: team {team} " + " ".join(roster[r] for r in roles))
+        _set_cursor(con, agent, _max_seq(con))
+        _post(con, f"agent/{manager}", agent, f"APPLY: {agent} applies for job {job}\n{reply}")
         con.execute("COMMIT")
     except BaseException:
-        con.execute("ROLLBACK")
+        if con.in_transaction:
+            con.execute("ROLLBACK")
         raise
-
-    if warning:
-        print(warning)
-    print(_describe(con, team, agent))
-    print(_next_steps(con, team, agent))
+    print(f"YOUR AGENT ID: {agent}   <- use it as --agent / --sender in EVERY mb command")
+    print(f"applied for job {job}. Wait for HIRED or REJECTED:  mb inbox --agent {agent} --wait 90")
 
 
-def cmd_team_context(args):
+def cmd_job_hire(args):
     con = connect()
-    team = _team_of(con, args.agent)
-    if not team:
-        die(f"'{args.agent}' is not in any team; run `mb team join` first")
-    body = args.body.strip()
-    if not body:
-        die("context is empty")
     con.execute("BEGIN IMMEDIATE")
-    con.execute("UPDATE teams SET context=?, owner=COALESCE(owner, ?) WHERE id=?", (body, args.agent, team))
-    seq = _post(con, f"team/{team}", args.agent, f"CONTEXT:\n{body}")
+    try:
+        job = _job_of(con, args.agent)
+        row = con.execute("SELECT status, manager, start_seq FROM jobs WHERE id=?", (job,)).fetchone() if job else None
+        if not row or row[1] != args.agent:
+            die(f"'{args.agent}' is not the manager of a job")
+        status, manager, start = row
+        if status != "open":
+            die(f"job {job} is {status}")
+        if args.applicant:
+            pick = con.execute(
+                "SELECT agent FROM applications WHERE job=? AND agent=? AND status='pending'", (job, args.applicant)
+            ).fetchone()
+            if not pick:
+                die(f"no pending application from {args.applicant}")
+        else:
+            pick = con.execute(
+                "SELECT agent FROM applications WHERE job=? AND status='pending' ORDER BY seq LIMIT 1", (job,)
+            ).fetchone()
+            if not pick:
+                die(f"no applications yet; wait for one:  mb inbox --agent {manager} --wait 540")
+        engineer = pick[0]
+        con.execute("UPDATE jobs SET status='filled', engineer=? WHERE id=?", (engineer, job))
+        con.execute("UPDATE applications SET status='hired' WHERE agent=?", (engineer,))
+        con.execute("INSERT INTO members (team, role, agent, joined_at) VALUES (?, 'engineer', ?, ?)", (job, engineer, now_ms()))
+        con.execute("INSERT OR IGNORE INTO subscriptions (agent, topic) VALUES (?, ?)", (engineer, f"job/{job}"))
+        _set_cursor(con, engineer, start)
+        rejected = [r[0] for r in con.execute(
+            "SELECT agent FROM applications WHERE job=? AND status='pending'", (job,)
+        ).fetchall()]
+        for agent in rejected:
+            con.execute("UPDATE applications SET status='rejected' WHERE agent=?", (agent,))
+            _post(con, f"agent/{agent}", "mb", f"REJECTED: job {job} went to another engineer. Look for another job: mb job show --next")
+        _post(con, f"agent/{engineer}", "mb",
+              f"HIRED: you are the engineer on job {job}. Read the posting: mb job show --agent {engineer}. "
+              f"Talk on the job channel: mb say \"<TYPE>: ...\" --agent {engineer}")
+        _post(con, f"job/{job}", "mb", f"HIRED: {engineer} is the engineer on job {job}")
+        _post(con, LOBBY, "mb", f"FILLED: job {job} by {engineer}")
+        con.execute("COMMIT")
+    except BaseException:
+        if con.in_transaction:
+            con.execute("ROLLBACK")
+        raise
+    print(f"hired {engineer}" + (f"; rejected {len(rejected)} other applicant(s)" if rejected else ""))
+    print(f"Talk on the job channel:  mb say \"<TYPE>: ...\" --agent {args.agent}")
+
+
+def cmd_job_update(args):
+    posting = args.posting.strip()
+    con = connect()
+    job = _job_of(con, args.agent)
+    if not job or con.execute("SELECT manager FROM jobs WHERE id=?", (job,)).fetchone()[0] != args.agent:
+        die(f"'{args.agent}' is not the manager of a job")
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("UPDATE jobs SET posting=? WHERE id=?", (posting, job))
+    seq = _post(con, f"job/{job}", args.agent, f"POSTING UPDATED:\n{posting}")
     con.execute("COMMIT")
-    print(f"shared context published (seq={seq}) to team/{team}")
-    if not _lock_dir(con, team):
-        print("note: no `locks: <absolute dir>` line in the context, so `mb lock` will not work until you add one.")
+    print(f"posting of job {job} updated (seq={seq})")
+    if not _lock_dir(con, job):
+        print("note: the posting has no `locks: <absolute dir>` line, so `mb lock` will not work.")
 
 
-LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
-OWNER_CMDS = {"acquire", "wait", "release", "release-all", "alive"}
+def cmd_job_close(args):
+    con = connect()
+    job = _job_of(con, args.agent)
+    if not job or con.execute("SELECT manager FROM jobs WHERE id=?", (job,)).fetchone()[0] != args.agent:
+        die(f"'{args.agent}' is not the manager of a job")
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("UPDATE jobs SET status='closed' WHERE id=?", (job,))
+    for (agent,) in con.execute("SELECT agent FROM applications WHERE job=? AND status='pending'", (job,)).fetchall():
+        con.execute("UPDATE applications SET status='rejected' WHERE agent=?", (agent,))
+        _post(con, f"agent/{agent}", "mb", f"REJECTED: job {job} was closed")
+    _post(con, f"job/{job}", "mb", f"CLOSED: job {job}" + (f": {args.note}" if args.note else ""))
+    _post(con, LOBBY, "mb", f"CLOSED: job {job}" + (f": {args.note}" if args.note else ""))
+    con.execute("COMMIT")
+    print(f"job {job} closed")
 
 
-def _lock_dir(con, team):
-    context = con.execute("SELECT context FROM teams WHERE id=?", (team,)).fetchone()[0] or ""
-    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", context, re.MULTILINE)
-    return os.path.expanduser(m.group(1)) if m else None
-
+# ---- locks -------------------------------------------------------------------------------------
 
 def cmd_lock(args):
     if not args.lock_args:
         die("usage: mb lock --agent ID <acquire|wait|release|release-all|alive|check|list|status|watch|reap|break> [args...]")
     con = connect()
-    team = _team_of(con, args.agent)
-    if not team:
-        die(f"'{args.agent}' is not in any team; run `mb team join` first")
-    lock_dir = _lock_dir(con, team)
+    job = _job_of(con, args.agent)
+    if not job:
+        die(f"'{args.agent}' is not on any job")
+    lock_dir = _lock_dir(con, job)
     if not lock_dir:
-        die("the shared context has no `locks: <absolute dir>` line; the context owner must add it with `mb team context`")
+        die("the job posting has no `locks: <absolute dir>` line; the manager must add it with `mb job update`")
     if not LOCK_SH.is_file():
         die(f"lock.sh not found at {LOCK_SH}; run the mb that ships in the team skill's bin/ (or a symlink to it)")
     cmd, *rest = args.lock_args
     argv = ["bash", str(LOCK_SH), lock_dir, cmd] + ([args.agent] if cmd in OWNER_CMDS else []) + rest
     sys.exit(subprocess.run(argv).returncode)
-
-
-def cmd_team_show(args):
-    con = connect()
-    team = _team_of(con, args.agent)
-    if not team:
-        die(f"'{args.agent}' is not in any team")
-    print(_describe(con, team, args.agent))
-
-
-def cmd_team_list(args):
-    con = connect()
-    rows = con.execute(
-        "SELECT id, label, status, roles, task FROM teams ORDER BY created_at DESC LIMIT ?", (args.n,)
-    ).fetchall()
-    if not rows:
-        print("(no teams)")
-    for tid, label, status, roles, task in rows:
-        roster = _roster(con, tid)
-        members = " ".join(roster.get(r, f"{r}:(open)") for r in roles.split(","))
-        print(f"{tid} [{status}]" + (f" label={label}" if label else "") + f"  {members}"
-              + (f"  task={task[:60]}" if task else ""))
 
 
 def main():
@@ -400,7 +456,7 @@ def main():
     pp.add_argument("--reply-to", type=int, default=None, dest="reply_to")
     pp.set_defaults(func=cmd_pub)
 
-    yp = sub.add_parser("say", help="publish to your own team's channel")
+    yp = sub.add_parser("say", help="post to your job's channel")
     yp.add_argument("body")
     yp.add_argument("--agent", required=True)
     yp.add_argument("--reply-to", type=int, default=None, dest="reply_to")
@@ -422,38 +478,58 @@ def main():
     ap.add_argument("seq", type=int)
     ap.set_defaults(func=cmd_ack)
 
-    tp = sub.add_parser("tail", help="debug: show recent messages regardless of cursor")
+    tp = sub.add_parser("tail", help="recent messages regardless of cursor")
     tp.add_argument("--topic", default=None)
     tp.add_argument("-n", type=int, default=20)
     tp.set_defaults(func=cmd_tail)
 
-    team = sub.add_parser("team", help="team rendezvous").add_subparsers(dest="team_cmd", required=True)
+    job = sub.add_parser("job", help="job postings: manager posts, engineers apply, manager hires").add_subparsers(
+        dest="job_cmd", required=True)
 
-    jp = team.add_parser("join", help="join (or start) a team that needs your role")
-    jp.add_argument("--role", required=True)
-    jp.add_argument("--roles", default="proposer,critic", help="full team composition, comma-separated")
-    jp.add_argument("--label", default=None, help="only team up with agents using the same label")
-    jp.add_argument("--task", default=None)
-    jp.add_argument("--ttl", type=int, default=30, metavar="MINUTES", help="abandon teams still forming after this long")
-    jp.set_defaults(func=cmd_team_join)
+    jp = job.add_parser("post", help="manager: post a job (prints your manager id)")
+    jp.add_argument("posting", help="the posting text; include a `locks: <absolute dir>` line")
+    jp.add_argument("--title", required=True)
+    jp.add_argument("--label", default=None)
+    jp.add_argument("--ttl", type=int, default=240, metavar="MINUTES", help="expire if nobody is hired by then")
+    jp.set_defaults(func=cmd_job_post)
 
-    kp = sub.add_parser("lock", help="path locks for your team: mb lock --agent ID <command> [args...]")
+    shp = job.add_parser("show", help="show a job: by id, your own (--agent), or the oldest open one")
+    shp.add_argument("job", nargs="?")
+    shp.add_argument("--agent", default=None)
+    shp.add_argument("--next", action="store_true", help="the oldest open job (default when no id/agent)")
+    shp.add_argument("--label", default=None)
+    shp.add_argument("--wait", type=int, default=0, metavar="SECONDS", help="wait up to SECONDS for an open job")
+    shp.set_defaults(func=cmd_job_show)
+
+    lp = job.add_parser("list", help="recent jobs")
+    lp.add_argument("-n", type=int, default=20)
+    lp.set_defaults(func=cmd_job_list)
+
+    app = job.add_parser("apply", help="engineer: reply to a job posting (prints your engineer id)")
+    app.add_argument("job", nargs="?", help="job id (default: the oldest open job)")
+    app.add_argument("reply")
+    app.add_argument("--label", default=None)
+    app.set_defaults(func=cmd_job_apply)
+
+    hp = job.add_parser("hire", help="manager: hire the first pending applicant (or a named one)")
+    hp.add_argument("applicant", nargs="?")
+    hp.add_argument("--agent", required=True)
+    hp.set_defaults(func=cmd_job_hire)
+
+    up = job.add_parser("update", help="manager: replace the posting (e.g. with the agreed scope)")
+    up.add_argument("posting")
+    up.add_argument("--agent", required=True)
+    up.set_defaults(func=cmd_job_update)
+
+    cp = job.add_parser("close", help="manager: close the job")
+    cp.add_argument("--agent", required=True)
+    cp.add_argument("--note", default=None)
+    cp.set_defaults(func=cmd_job_close)
+
+    kp = sub.add_parser("lock", help="path locks for your job: mb lock --agent ID <command> [args...]")
     kp.add_argument("--agent", required=True)
     kp.add_argument("lock_args", nargs=argparse.REMAINDER)
     kp.set_defaults(func=cmd_lock)
-
-    cp = team.add_parser("context", help="publish the team's shared context (task dir, skill, key files)")
-    cp.add_argument("body")
-    cp.add_argument("--agent", required=True)
-    cp.set_defaults(func=cmd_team_context)
-
-    shp = team.add_parser("show", help="show your team, task and roster")
-    shp.add_argument("--agent", required=True)
-    shp.set_defaults(func=cmd_team_show)
-
-    lp = team.add_parser("list", help="list recent teams")
-    lp.add_argument("-n", type=int, default=20)
-    lp.set_defaults(func=cmd_team_list)
 
     args = p.parse_args()
     args.func(args)

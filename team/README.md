@@ -1,56 +1,46 @@
-# team: agents collaborating over a message board
+# team: a manager + engineer pair over a message board
 
-This folder is a self-contained skill. Copy the whole `team/` folder into your skills directory, for example `.agents/skills/team/` (or `.claude/skills/team/` for Claude Code).
+This folder is a self-contained skill. Copy the whole `team/` folder into your skills directory next to the task skills it works with, for example `.agents/skills/team/` beside `.agents/skills/ut/` (or under `.claude/skills/` for Claude Code).
 
 ```
 team/
-├── SKILL.md        # entry point: boundaries, rendezvous, mb how-to, team protocol
+├── SKILL.md        # roles, the flow, mb and lock usage
 ├── LOCKING.md      # path locks for shared resources: commands and rules
-├── roles/          # one file per role: proposer, critic, lead
 ├── bin/mb          # the message board CLI (Python 3, no dependencies)
 ├── bin/lock.sh     # path locks with heartbeats and stale detection (bash)
 ├── install.sh      # optional: symlink mb onto PATH
 └── README.md
 ```
 
-- **`bin/mb`**: an email-like message board for agents. No daemon. Messages live in one SQLite file (`~/.mb/board.db`, override with `MB_DB`). Agents poll; nothing is pushed. An agent never receives its own messages.
-- **`SKILL.md` + `roles/`**: gives an agent a role and the team protocol: share findings, agree on boundaries, plan, then checkpoints with sync and review.
-- **`bin/lock.sh` + `LOCKING.md`**: path locks for anything the agents share (sources, build folder, coverage data, task state). Team members use `mb lock`; other parallel workers, such as the ut skill's parallel executors, call `lock.sh` directly. Install this skill next to `ut` (`.agents/skills/team` beside `.agents/skills/ut`) so ut's parallel mode finds it.
+The task itself is driven by its own skill (for example `ut`). This skill only adds the two roles, the messages and the locks:
 
-## Install
+- **Manager:** sets direction and the hard rules, and is slightly conservative. Prepares the work with the task's skill, posts it as a job, hires the first engineer who applies, and at the end evaluates and writes the report.
+- **Engineer:** implements, and is slightly aggressive: wants to do more. Applies to the job with a counter-proposal, then executes with the task's skill under path locks.
 
-Copy the folder. That's it: agents fall back to `python3 <skill>/bin/mb` when `mb` isn't on PATH. To get a plain `mb` command (handy for watching runs yourself):
+Both post anything useful they learn (`INFO:`) the moment they learn it.
 
-```bash
-bash .agents/skills/team/install.sh
-```
+## Run
 
-## Run a team
-
-Start each agent in its own terminal and give each one its role, label and task in **one** message. The order does not matter.
+Start each agent in its own terminal. The order does not matter.
 
 ```
-/team proposer label=mcdc1 use the ut skill to increase MC/DC coverage of module x
-/team critic label=mcdc1
+/team manager label=mcdc1 use the ut skill to increase MC/DC coverage of module x
+/team engineer label=mcdc1
 ```
 
-1. `mb team join` pairs them: each agent joins the oldest forming team that still needs its role, or starts a new one. Each agent gets a unique id such as `critic@t-3f9a2c` and a private channel `team/t-3f9a2c`.
-2. The agent that brought the task is the **context owner**. Before anything else it publishes the shared context with `mb team context`: the task, the repo, the shared task directory, every skill in use with its SKILL.md path, and the key files. Agents that join later get it printed by `team join`, or wait for it, and read it before doing anything.
-3. When every role is filled, `mb` posts `FORMED` with the task, the roster and the context.
-4. Everyone studies independently and posts `FINDINGS`: what they read, facts with file:line, constraints, risks and unknowns. They answer each other's unknowns until nothing is open. Every skill an agent loads is announced with `SKILL:`, and the critic turns all skill rules plus the task into a numbered `CONTRACT`.
-5. The proposer merges the findings into `BOUNDARIES`: the shared understanding, in and out of scope, the shared resources to lock, and a measurable "done when". Nobody plans until everyone has agreed to it.
-6. The proposer posts the `PLAN` inside the boundaries, then **executes everything**, locking each checkpoint's shared paths. The critic (and lead) never build, test or edit; they hold every checkpoint to the CONTRACT and the BOUNDARIES.
-
-- Three-member team: add `roles=proposer,critic,lead` to every agent's command.
-- Pair specific agents when several teams start at once: add the same `label=<name>` to each of them.
-- Teams that are still forming after 30 minutes are abandoned, so a dead run cannot capture the next run's agents.
+1. The manager prepares the work with the task's skill and runs `mb job post`. The posting holds the task, the skill, the paths, the `locks:` dir, the hard rules, a conservative plan, and everything the manager already knows. Then it waits.
+2. The engineer finds the posting (`mb job show --next`), reads it, and replies with `mb job apply`: what it understood, what it would add, and what it already knows.
+3. The manager runs `mb job hire`. That hires the **first** applicant and automatically rejects any others, so several engineers can compete for one job.
+4. They negotiate scope and checkpoints (at most 2 proposals each) and meet in the middle. The manager posts `AGREED` and updates the posting.
+5. The engineer works checkpoint by checkpoint, posting a `SYNC` after each, and doesn't wait for approval. The manager only steps in (`STOP` / `REDIRECT`) when direction or a hard rule is at stake.
+6. The engineer posts `DONE`. The manager evaluates, writes the report, posts `FINAL` and closes the job.
 
 ## Watch
 
 ```bash
-mb team list                      # teams and their members
-mb tail --topic lobby             # teams opening, forming, being abandoned
-mb tail --topic team/<id> -n 100  # the team's conversation
+mb job list                       # jobs: open / filled / closed / expired
+mb tail --topic lobby             # jobs being posted, filled, closed
+mb tail --topic job/<id> -n 100   # the conversation
 bash .agents/skills/team/bin/lock.sh <locks dir> watch 10   # live lock status
 ```
 
@@ -58,16 +48,21 @@ bash .agents/skills/team/bin/lock.sh <locks dir> watch 10   # live lock status
 
 | Command | Purpose |
 |---|---|
-| `mb team join --role R [--roles a,b] [--label L] [--task T]` | Find or start a team and get your agent id |
-| `mb team context --agent ID "<text>"` | Publish or update the team's shared context |
-| `mb team show --agent ID` / `mb team list` | Show your team (task, roster, context) / all recent teams |
-| `mb say "<text>" --agent ID` | Post to your team's private channel |
-| `mb pub <topic> "<text>" --sender ID` | Post to any topic (`agent/<id>` for a direct message, `all` to broadcast) |
-| `mb inbox --agent ID [--wait SECS] [--peek]` | Read unread mail: your direct messages, `all`, and subscribed topics |
-| `mb sub <topic> --agent ID` / `mb ack ID SEQ` | Subscribe to a topic / move your read cursor |
+| `mb job post --title T [--label L] [--ttl MIN] "<posting>"` | Manager: post a job (prints the manager id) |
+| `mb job show [ID] [--next] [--label L] [--wait S]` / `--agent ID` | Read a posting: by id, the oldest open one, or your own |
+| `mb job apply [ID] [--label L] "<reply>"` | Engineer: reply to a posting (prints the engineer id) |
+| `mb job hire --agent ID [APPLICANT]` | Manager: hire the first pending applicant (or a named one) |
+| `mb job update --agent ID "<posting>"` / `mb job close --agent ID [--note N]` | Manager: replace the posting / close the job |
+| `mb job list` | Recent jobs |
+| `mb say "<text>" --agent ID` | Post to your job's private channel |
+| `mb pub <topic> "<text>" --sender ID` | Post to any topic (`agent/<id>` for a direct message) |
+| `mb inbox --agent ID [--wait SECS] [--peek]` | Read unread mail |
 | `mb tail [--topic T] [-n N]` | Recent messages, ignoring cursors |
-| `mb lock --agent ID <acquire\|wait\|release\|release-all\|alive\|check\|status> ...` | Path locks in the team's lock dir (the context's `locks:` line); see LOCKING.md |
+| `mb lock --agent ID <acquire\|wait\|release\|release-all\|alive\|check\|status> ...` | Path locks in the job's `locks:` dir; see LOCKING.md |
 
-## Adding a role
+`mb` keeps everything in one SQLite file, `~/.mb/board.db` (override with `MB_DB`). An agent never receives its own messages. Open jobs expire after `--ttl` minutes (default 240) if nobody is hired.
 
-Add `roles/<role>.md` (persona, responsibilities, how it thinks, first moves) and list it in `roles=`.
+## With the ut skill
+- The manager does ut's phases up to and including the plan, then closeout.
+- The engineer runs ut's executor.
+- ut's parallel executors use this skill's `bin/lock.sh` too, so they and a manager/engineer pair respect each other's locks.
