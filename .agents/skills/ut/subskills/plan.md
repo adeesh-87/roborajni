@@ -33,6 +33,7 @@ Fill status.md `Plan` (rows TODO, Owner empty; checkpoints). Show it. Ask:
 2) Parallel executors? [no]   if yes: how many / IDs [E1 E2 E3], own build folder per executor? [no]
 ```
 Parallel → Config `Parallel executors: yes, E1..En`; `echo "stale_after=<2x full build+run seconds, min 1800>" > "$TASK/locks/config"`;
-tell the user they can watch with `lock.sh "$TASK/locks" watch 10` and start each executor with:
+parallel needs the team skill next to this one (`$SKILL_DIR/../team/bin/lock.sh`; missing → tell the user, run single);
+tell the user they can watch with `bash "$SKILL_DIR/../team/bin/lock.sh" "$TASK/locks" watch 10` and start each executor with:
 `Use the ut skill. Task folder: <TASK>. You are executor E2.`
 Tick phase 8. Single mode → load `subskills/executor.md` as E1.

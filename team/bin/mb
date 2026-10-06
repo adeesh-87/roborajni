@@ -7,8 +7,10 @@ No daemon: every invocation opens the DB, does one operation, exits.
 import argparse
 import os
 import pathlib
+import re
 import secrets
 import sqlite3
+import subprocess
 import sys
 import time
 
@@ -38,6 +40,8 @@ CREATE TABLE IF NOT EXISTS teams (
   label      TEXT,
   roles      TEXT NOT NULL,
   task       TEXT,
+  owner      TEXT,
+  context    TEXT,
   status     TEXT NOT NULL,
   start_seq  INTEGER NOT NULL,
   created_at INTEGER NOT NULL
@@ -67,6 +71,10 @@ def connect():
     con.execute("PRAGMA journal_mode=WAL")
     con.execute("PRAGMA busy_timeout=30000")
     con.executescript(SCHEMA)
+    cols = {r[1] for r in con.execute("PRAGMA table_info(teams)")}
+    for col in ("owner", "context"):
+        if col not in cols:
+            con.execute(f"ALTER TABLE teams ADD COLUMN {col} TEXT")
     return con
 
 
@@ -181,9 +189,13 @@ def _roster(con, team):
     return dict(con.execute("SELECT role, agent FROM members WHERE team=?", (team,)).fetchall())
 
 
+def _indent(text, prefix="                 "):
+    return "\n".join(prefix + line for line in text.splitlines())
+
+
 def _describe(con, team, agent=None):
-    tid, label, roles, task, status = con.execute(
-        "SELECT id, label, roles, task, status FROM teams WHERE id=?", (team,)
+    tid, label, roles, task, owner, context, status = con.execute(
+        "SELECT id, label, roles, task, owner, context, status FROM teams WHERE id=?", (team,)
     ).fetchone()
     roster = _roster(con, tid)
     missing = [r for r in roles.split(",") if r not in roster]
@@ -194,10 +206,44 @@ def _describe(con, team, agent=None):
         f"team:          {tid}" + (f" (label: {label})" if label else ""),
         f"team channel:  team/{tid}   (post with: mb say \"<TYPE>: ...\" --agent {agent or '<your id>'})",
         f"task:          {task or '(none given)'}",
+        f"context owner: {owner or '(nobody has brought a task yet)'}",
         "roster:        " + " ; ".join(f"{r} -> {roster.get(r, '(open)')}" for r in roles.split(",")),
         f"status:        {status}" + (f" (waiting for: {', '.join(missing)})" if missing and status == "forming" else ""),
     ]
+    if context:
+        lines += ["shared context:", _indent(context)]
+    else:
+        lines.append("shared context: (not posted yet)")
     return "\n".join(lines)
+
+
+def _next_steps(con, team, agent):
+    owner, context, status = con.execute(
+        "SELECT owner, context, status FROM teams WHERE id=?", (team,)
+    ).fetchone()
+    steps = []
+    if agent == owner:
+        steps.append(
+            "YOU OWN THE SHARED CONTEXT (you brought the task). Before anything else, publish it so\n"
+            "your teammates work in the same place:\n"
+            f"  mb team context --agent {agent} \"<task, repo, task dir, locks dir, skills + SKILL.md paths, key files>\"\n"
+            "Use absolute paths. If your task's skill creates a task directory, set it up first."
+        )
+    elif context:
+        steps.append(
+            "The shared context is above. Before doing ANYTHING else, read the directories and files it\n"
+            "names, including the SKILL.md of every skill it lists. It overrides any task wording you were given."
+        )
+    else:
+        steps.append(
+            "Do NOT start on the task yet: the shared context has not been posted. Read the board and\n"
+            f"wait for a CONTEXT message:  mb inbox --agent {agent} --wait 90"
+        )
+    if status == "forming":
+        steps.append(f"The team is still forming. Wait for FORMED:  mb inbox --agent {agent} --wait 90")
+    else:
+        steps.append(f"The team is complete. Read the board:  mb inbox --agent {agent}")
+    return "\n\nNext:\n" + "\n".join(f"{i}. {s}" for i, s in enumerate(steps, 1))
 
 
 def cmd_team_join(args):
@@ -227,21 +273,22 @@ def cmd_team_join(args):
             team = f"t-{secrets.token_hex(3)}"
             start_seq = con.execute("SELECT COALESCE(MAX(seq), 0) FROM messages").fetchone()[0]
             con.execute(
-                "INSERT INTO teams (id, label, roles, task, status, start_seq, created_at) "
-                "VALUES (?, ?, ?, ?, 'forming', ?, ?)",
-                (team, args.label, roles_key, task, start_seq, now_ms()),
+                "INSERT INTO teams (id, label, roles, status, start_seq, created_at) "
+                "VALUES (?, ?, ?, 'forming', ?, ?)",
+                (team, args.label, roles_key, start_seq, now_ms()),
             )
             _post(con, LOBBY, "mb", f"OPEN: team {team} roles={roles_key}"
                   + (f" label={args.label}" if args.label else "") + (f" task={task}" if task else ""))
 
+        agent = f"{args.role}@{team}"
         start_seq, team_task = con.execute("SELECT start_seq, task FROM teams WHERE id=?", (team,)).fetchone()
         warning = None
         if task and not team_task:
-            con.execute("UPDATE teams SET task=? WHERE id=?", (task, team))
+            con.execute("UPDATE teams SET task=?, owner=? WHERE id=?", (task, agent, team))
         elif task and team_task and task != team_task:
-            warning = "WARNING: the task you were given differs from the team's task. The team task (below) is authoritative."
+            warning = ("WARNING: the task you were given differs from the team's task. The team task and the\n"
+                       "shared context (below) are authoritative; post anything extra you know as `NOTE:`.")
 
-        agent = f"{args.role}@{team}"
         con.execute(
             "INSERT INTO members (team, role, agent, joined_at) VALUES (?, ?, ?, ?)",
             (team, args.role, agent, now_ms()),
@@ -253,10 +300,16 @@ def cmd_team_join(args):
         roster = _roster(con, team)
         if all(r in roster for r in roles):
             con.execute("UPDATE teams SET status='formed' WHERE id=?", (team,))
-            final_task = con.execute("SELECT task FROM teams WHERE id=?", (team,)).fetchone()[0]
+            final_task, owner, context = con.execute(
+                "SELECT task, owner, context FROM teams WHERE id=?", (team,)
+            ).fetchone()
             body = f"FORMED: team {team}\ntask: {final_task or '(none given)'}\nroster:\n" + "\n".join(
                 f"- {r}: {roster[r]}" for r in roles
             )
+            if context:
+                body += f"\nshared context (from {owner}):\n{context}"
+            elif owner:
+                body += f"\nshared context: not posted yet. {owner} will post a CONTEXT message; wait for it."
             _post(con, f"team/{team}", "mb", body)
             _post(con, LOBBY, "mb", f"FORMED: team {team} " + " ".join(roster[r] for r in roles))
         con.execute("COMMIT")
@@ -267,11 +320,51 @@ def cmd_team_join(args):
     if warning:
         print(warning)
     print(_describe(con, team, agent))
-    status = con.execute("SELECT status FROM teams WHERE id=?", (team,)).fetchone()[0]
-    if status == "forming":
-        print(f"\nNext: wait for the FORMED message: mb inbox --agent {agent} --wait 90")
-    else:
-        print(f"\nTeam is complete. Read the FORMED message: mb inbox --agent {agent}")
+    print(_next_steps(con, team, agent))
+
+
+def cmd_team_context(args):
+    con = connect()
+    team = _team_of(con, args.agent)
+    if not team:
+        die(f"'{args.agent}' is not in any team; run `mb team join` first")
+    body = args.body.strip()
+    if not body:
+        die("context is empty")
+    con.execute("BEGIN IMMEDIATE")
+    con.execute("UPDATE teams SET context=?, owner=COALESCE(owner, ?) WHERE id=?", (body, args.agent, team))
+    seq = _post(con, f"team/{team}", args.agent, f"CONTEXT:\n{body}")
+    con.execute("COMMIT")
+    print(f"shared context published (seq={seq}) to team/{team}")
+    if not _lock_dir(con, team):
+        print("note: no `locks: <absolute dir>` line in the context, so `mb lock` will not work until you add one.")
+
+
+LOCK_SH = pathlib.Path(__file__).resolve().parent / "lock.sh"
+OWNER_CMDS = {"acquire", "wait", "release", "release-all", "alive"}
+
+
+def _lock_dir(con, team):
+    context = con.execute("SELECT context FROM teams WHERE id=?", (team,)).fetchone()[0] or ""
+    m = re.search(r"^\s*locks:\s*(\S.*?)\s*$", context, re.MULTILINE)
+    return os.path.expanduser(m.group(1)) if m else None
+
+
+def cmd_lock(args):
+    if not args.lock_args:
+        die("usage: mb lock --agent ID <acquire|wait|release|release-all|alive|check|list|status|watch|reap|break> [args...]")
+    con = connect()
+    team = _team_of(con, args.agent)
+    if not team:
+        die(f"'{args.agent}' is not in any team; run `mb team join` first")
+    lock_dir = _lock_dir(con, team)
+    if not lock_dir:
+        die("the shared context has no `locks: <absolute dir>` line; the context owner must add it with `mb team context`")
+    if not LOCK_SH.is_file():
+        die(f"lock.sh not found at {LOCK_SH}; run the mb that ships in the team skill's bin/ (or a symlink to it)")
+    cmd, *rest = args.lock_args
+    argv = ["bash", str(LOCK_SH), lock_dir, cmd] + ([args.agent] if cmd in OWNER_CMDS else []) + rest
+    sys.exit(subprocess.run(argv).returncode)
 
 
 def cmd_team_show(args):
@@ -343,6 +436,16 @@ def main():
     jp.add_argument("--task", default=None)
     jp.add_argument("--ttl", type=int, default=30, metavar="MINUTES", help="abandon teams still forming after this long")
     jp.set_defaults(func=cmd_team_join)
+
+    kp = sub.add_parser("lock", help="path locks for your team: mb lock --agent ID <command> [args...]")
+    kp.add_argument("--agent", required=True)
+    kp.add_argument("lock_args", nargs=argparse.REMAINDER)
+    kp.set_defaults(func=cmd_lock)
+
+    cp = team.add_parser("context", help="publish the team's shared context (task dir, skill, key files)")
+    cp.add_argument("body")
+    cp.add_argument("--agent", required=True)
+    cp.set_defaults(func=cmd_team_context)
 
     shp = team.add_parser("show", help="show your team, task and roster")
     shp.add_argument("--agent", required=True)

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# lock.sh - path locks for parallel ut executors, with heartbeats and stale detection.
+# lock.sh - path locks for agents sharing resources, with heartbeats and stale detection.
 #
 # A lock protects ONE canonical absolute path (file, dir, executable, script, or a name that
 # does not exist yet). Locking a directory also blocks everything inside it, and a lock on a
@@ -10,7 +10,7 @@
 # it has not been seen for STALE_AFTER seconds (default 1800) and is not inside a declared busy
 # window. Stale owners are reported on every call; they are never removed automatically.
 #
-# Usage (LOCK_DIR is normally <task folder>/locks):
+# Usage (LOCK_DIR is normally <task dir>/locks; team members call it via `mb lock`):
 #   lock.sh LOCK_DIR acquire     OWNER PATH...          exit 0 got all | 1 held by active owner | 3 held only by STALE owners
 #   lock.sh LOCK_DIR wait        OWNER SECONDS PATH...  retry acquire until timeout (same exit codes)
 #   lock.sh LOCK_DIR release     OWNER PATH...
@@ -20,10 +20,10 @@
 #   lock.sh LOCK_DIR list                               locks: owner, state, age, path
 #   lock.sh LOCK_DIR status                             owners (ACTIVE/BUSY/STALE), locks, recent log
 #   lock.sh LOCK_DIR watch       [INTERVAL_SECONDS]     refresh status until Ctrl-C (for a human terminal)
-#   lock.sh LOCK_DIR reap        OWNER [--force]        remove all locks of a STALE owner (user approval!)
-#   lock.sh LOCK_DIR break       PATH...                force-remove single locks (user approval!)
+#   lock.sh LOCK_DIR reap        OWNER [--force]        remove all locks of a STALE owner (approval!)
+#   lock.sh LOCK_DIR break       PATH...                force-remove single locks (approval!)
 #
-# OWNER: short id without spaces, e.g. E1. STALE_AFTER: env UT_LOCK_STALE_AFTER, or a line
+# OWNER: id without spaces, e.g. E1 or critic@t-3f9a2c. STALE_AFTER: env LOCK_STALE_AFTER, or a line
 # "stale_after=SECONDS" in LOCK_DIR/config. All actions are logged in LOCK_DIR/lock.log.
 
 set -u
@@ -40,7 +40,7 @@ MUTEX="$LOCK_DIR/.mutex"
 LOG="$LOCK_DIR/lock.log"
 MUTEX_STALE_SECS=60
 
-STALE_AFTER=${UT_LOCK_STALE_AFTER:-}
+STALE_AFTER=${LOCK_STALE_AFTER:-}
 if [ -z "$STALE_AFTER" ] && [ -f "$LOCK_DIR/config" ]; then
   STALE_AFTER=$(sed -n 's/^stale_after=\([0-9][0-9]*\).*/\1/p' "$LOCK_DIR/config" | head -1)
 fi
@@ -167,7 +167,7 @@ stale_warning() {   # one line per stale owner that still holds locks (except $1
     case $seen in *" $o "*) continue ;; esac; seen="$seen$o "
     st=$(state_of "$o")
     if [ "$st" = STALE ]; then
-      echo "STALE-WARNING: owner $o last seen $(age $(( $(now) - $(last_seen_of "$o") ))) ago still holds $(count_of "$o") lock(s). Tell the user; only with approval run: lock.sh $LOCK_DIR reap $o"
+      echo "STALE-WARNING: owner $o last seen $(age $(( $(now) - $(last_seen_of "$o") ))) ago still holds $(count_of "$o") lock(s). Do not remove its locks on your own: follow your skill's stale-owner rule (reap needs approval: lock.sh $LOCK_DIR reap $o)"
     fi
   done
 }
@@ -223,7 +223,7 @@ do_list() {
   load_locks
   for i in "${!LP[@]}"; do
     o=${LO[$i]}
-    printf '%-8s %-6s locked %-7s ago  %s\n' "$o" "$(state_of "$o")" "$(age $(( $(now) - ${LT[$i]} )))" "${LP[$i]}"; n=$((n+1))
+    printf '%-20s %-6s locked %-7s ago  %s\n' "$o" "$(state_of "$o")" "$(age $(( $(now) - ${LT[$i]} )))" "${LP[$i]}"; n=$((n+1))
   done
   [ $n = 0 ] && echo "(no locks)"
   return 0
@@ -231,7 +231,7 @@ do_list() {
 
 do_status() {
   local f o t n st bu note owners=" "
-  echo "== ut locks: $LOCK_DIR   ($(stamp), stale after $(age "$STALE_AFTER") without heartbeat)"
+  echo "== locks: $LOCK_DIR   ($(stamp), stale after $(age "$STALE_AFTER") without heartbeat)"
   load_locks
   for f in "$OWNERS"/*; do
     [ -f "$f" ] || continue
@@ -239,7 +239,7 @@ do_status() {
     o=$(basename "$f"); case $owners in *" $o "*) ;; *) owners="$owners$o " ;; esac
   done
   for o in "${LO[@]}"; do case $owners in *" $o "*) ;; *) owners="$owners$o " ;; esac; done
-  printf '%-8s %-6s %-10s %-6s %-10s %s\n' OWNER STATE LAST_SEEN LOCKS BUSY_LEFT NOTE
+  printf '%-20s %-6s %-10s %-6s %-10s %s\n' OWNER STATE LAST_SEEN LOCKS BUSY_LEFT NOTE
   for o in $owners; do
     n=$(count_of "$o")
     t=$(now); st=$(state_of "$o")
@@ -247,7 +247,7 @@ do_status() {
     bu=$(ofield "$o" busy_until); case ${bu:-} in ''|*[!0-9]*) bu=0 ;; esac
     if [ "$bu" -gt "$t" ]; then bu=$(age $((bu - t))); else bu=-; fi
     note=$(ofield "$o" note)
-    printf '%-8s %-6s %-10s %-6s %-10s %s\n' "$o" "$st" "$(age $(( t - $(last_seen_of "$o") )))" "$n" "$bu" "${note:--}"
+    printf '%-20s %-6s %-10s %-6s %-10s %s\n' "$o" "$st" "$(age $(( t - $(last_seen_of "$o") )))" "$n" "$bu" "${note:--}"
   done
   echo "-- locks"
   do_list

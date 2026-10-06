@@ -1,6 +1,6 @@
 # Phase 10 — Close out
 
-1. Parallel → `lock.sh "$TASK/locks" status`: only your locks may remain (others → ask; `reap` only with approval).
+1. Parallel → `bash "$SKILL_DIR/../team/bin/lock.sh" "$TASK/locks" status`: only your locks may remain (others → ask; `reap` only with approval).
 2. Clean build + all tests (+ coverage if in scope) with KB `Commands` → `$TASK/logs/final-*.log`. Compare with `Baseline`.
 3. status.md `Final summary` (after `Log`):
    ```
