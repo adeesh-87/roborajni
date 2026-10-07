@@ -368,18 +368,30 @@ def _unread(con, agent):
 
 
 def _job_note(con, agent, empty):
-    """What the agent must know about its job(s) on every poll: closed means stop, active means keep polling."""
+    """What the agent must know about its job(s) on every poll."""
     job = _engineer_job(con, agent)
     if job:
-        status = con.execute("SELECT status FROM jobs WHERE id=?", (job,)).fetchone()[0]
+        status, label = con.execute("SELECT status, label FROM jobs WHERE id=?", (job,)).fetchone()
         if status in ("closed", "expired"):
             return (f"JOB CLOSED: your job {job} is {status}. Release your locks "
-                    f"(mb lock --agent {agent} release-all) and stop.")
+                    f"(mb lock --agent {agent} release-all), then find your next job: "
+                    f"mb job show --next" + (f" --label {label}" if label else "") + " --wait 300")
         return f"(your job {job} is still active: when you have nothing else to do, poll again)" if empty else None
+    if not empty:
+        return None
     managed = _managed_jobs(con, agent)
-    if managed and empty:
-        return (f"({len(managed)} job(s) still active: {', '.join(managed)}. Keep polling until each one's goals "
-                f"are met and you close it with `mb job close --job <id>`)")
+    if managed:
+        statuses = dict(con.execute(
+            f"SELECT id, status FROM jobs WHERE id IN ({','.join('?' * len(managed))})", managed).fetchall())
+        filled = [j for j in managed if statuses[j] == "filled"]
+        waiting = [j for j in managed if statuses[j] == "open"]
+        return (f"({len(filled)} job(s) in progress" + (f": {', '.join(filled)}" if filled else "")
+                + f"; {len(waiting)} waiting for an engineer" + (f": {', '.join(waiting)}" if waiting else "")
+                + ". Hire when APPLY arrives; close each job when its goals are met.)")
+    project = _managed_project(con, agent)
+    if project and con.execute("SELECT status FROM projects WHERE id=?", (project,)).fetchone()[0] != "closed":
+        return (f"(no active jobs in project {project}. Post more jobs if work remains, "
+                f"or keep polling for a TASK from the user)")
     return None
 
 
@@ -524,7 +536,7 @@ def cmd_project_close(args):
 
 def _expire(con):
     for (jid,) in con.execute(
-        "SELECT id FROM jobs WHERE status='open' AND created_at < ? - ttl_min * 60000", (now_ms(),)
+        "SELECT id FROM jobs WHERE status='open' AND ttl_min > 0 AND created_at < ? - ttl_min * 60000", (now_ms(),)
     ).fetchall():
         con.execute("UPDATE jobs SET status='expired', closed_at=? WHERE id=?", (now_ms(), jid))
         con.execute("UPDATE applications SET status='rejected' WHERE job=? AND status='pending'", (jid,))
@@ -1216,7 +1228,8 @@ def main():
     jp.add_argument("--agent", required=True)
     jp.add_argument("--title", required=True)
     jp.add_argument("--kind", default="code", help="e.g. code or build (default code)")
-    jp.add_argument("--ttl", type=int, default=240, metavar="MINUTES", help="expire if nobody is hired by then")
+    jp.add_argument("--ttl", type=int, default=0, metavar="MINUTES",
+                    help="expire if nobody is hired by then (default 0: never, so a backlog can wait)")
     jp.set_defaults(func=cmd_job_post)
 
     shp = job.add_parser("show", help="show a job: by id, your own (--agent), or the next free one")
