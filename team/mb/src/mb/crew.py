@@ -18,9 +18,10 @@ import time
 CONFIG_FILE = pathlib.Path(os.environ.get("MB_CONFIG") or pathlib.Path.home() / ".config" / "mb" / "config.json")
 LOG_ROOT = pathlib.Path.home() / ".local" / "state" / "crew"
 SEP = "\t"
-FIELDS = ["session", "window", "dead", "status", "harness", "started", "activity", "command", "crew", "log"]
+FIELDS = ["session", "window", "dead", "status", "harness", "started", "activity", "command", "crew", "log", "start_at"]
 FORMAT = SEP.join(["#{session_name}", "#{window_name}", "#{pane_dead}", "#{pane_dead_status}", "#{@crew_harness}",
-                   "#{@crew_started}", "#{window_activity}", "#{pane_current_command}", "#{@crew}", "#{@crew_log}"])
+                   "#{@crew_started}", "#{window_activity}", "#{pane_current_command}", "#{@crew}", "#{@crew_log}",
+                   "#{@crew_start_at}"])
 
 
 def die(msg, code=1):
@@ -180,12 +181,18 @@ def cmd_launch(args):
         if "=" not in kv:
             die(f"--env needs KEY=VALUE, got {kv}")
         env += ["-e", kv]
+    if args.stagger < 0:
+        die("--stagger must be 0 or more seconds")
     session_exists = tmux("has-session", "-t", f"={args.session}", check=False).returncode == 0
     launched = []
+    now = int(time.time())
     for i, name in enumerate(_names(args.session, args.name, args.n), 1):
         text = prompt.replace("{i}", str(i)).replace("{name}", name).replace("{session}", args.session)
         full = command.replace("{prompt}", shlex.quote(text)) if "{prompt}" in command \
             else f"{command} {shlex.quote(text)}"
+        delay = (i - 1) * args.stagger
+        if delay:
+            full = f"echo '[crew] starting in {delay}s'; sleep {delay}; {full}"
         wenv = env + ["-e", f"CREW_NAME={name}", "-e", f"CREW_SESSION={args.session}"]
         if session_exists:
             create = ["new-window", "-d", "-t", f"={args.session}:", "-n", name, "-c", cwd] + wenv + [full]
@@ -197,7 +204,8 @@ def cmd_launch(args):
                 ";", "set-option", "-w", "-t", target, "automatic-rename", "off",
                 ";", "set-option", "-w", "-t", target, "@crew", "1",
                 ";", "set-option", "-w", "-t", target, "@crew_harness", hname,
-                ";", "set-option", "-w", "-t", target, "@crew_started", str(int(time.time()))]
+                ";", "set-option", "-w", "-t", target, "@crew_started", str(now),
+                ";", "set-option", "-w", "-t", target, "@crew_start_at", str(now + delay)]
         log = None
         if args.log:
             log = LOG_ROOT / args.session / f"{name}.log"
@@ -205,10 +213,10 @@ def cmd_launch(args):
             opts += [";", "set-option", "-w", "-t", target, "@crew_log", str(log),
                      ";", "pipe-pane", "-o", "-t", target, f"cat >> {shlex.quote(str(log))}"]
         tmux(*create, *opts)
-        launched.append((name, log))
+        launched.append((name, log, delay))
     print(f"launched {len(launched)} agent(s) in tmux session '{args.session}' with harness {hname}: {command}")
-    for name, log in launched:
-        print(f"  {name}" + (f"   log: {log}" if log else ""))
+    for name, log, delay in launched:
+        print(f"  {name}" + (f"   starts in {delay}s" if delay else "") + (f"   log: {log}" if log else ""))
     print(f"\nsee them: crew ls   read one: crew peek {launched[0][0]}   enter one: crew attach {launched[0][0]}")
 
 
@@ -220,18 +228,24 @@ def cmd_ls(args):
     now = int(time.time())
 
     def quiet(a):
-        return a["dead"] != "1" and a["activity"].isdigit() and now - int(a["activity"]) > args.stale * 60
+        begun = max(int(a["activity"]) if a["activity"].isdigit() else 0,
+                    int(a["start_at"]) if a["start_at"].isdigit() else 0)
+        return a["dead"] != "1" and begun and now - begun > args.stale * 60
 
     running = sum(a["dead"] != "1" for a in agents)
     stale = sum(quiet(a) for a in agents)
     sessions = sorted({a["session"] for a in agents})
     print(f"{len(agents)} agent(s) in {len(sessions)} session(s): {running} running, {len(agents) - running} exited"
           + (f", {stale} quiet for >{args.stale}m (maybe waiting at a prompt: crew peek <agent>)" if stale else ""))
-    print(f"{'#':>3}  {'SESSION':14} {'AGENT':14} {'STATE':12} {'HARNESS':10} {'UP':>7}  {'OUTPUT':>9}  COMMAND")
+    print(f"{'#':>3}  {'SESSION':14} {'AGENT':14} {'STATE':15} {'HARNESS':10} {'UP':>7}  {'OUTPUT':>9}  COMMAND")
     for i, a in enumerate(agents, 1):
-        state = "running" if a["dead"] != "1" else f"exited({a['status'] or '?'})"
-        flag = "  <- quiet" if quiet(a) else ""
-        print(f"{i:>3}  {a['session']:14} {a['window']:14} {state:12} {a['harness'] or '-':10} "
+        waiting = a["dead"] != "1" and a["start_at"].isdigit() and int(a["start_at"]) > now
+        if waiting:
+            state = f"starts in {int(a['start_at']) - now}s"
+        else:
+            state = "running" if a["dead"] != "1" else f"exited({a['status'] or '?'})"
+        flag = "  <- quiet" if quiet(a) and not waiting else ""
+        print(f"{i:>3}  {a['session']:14} {a['window']:14} {state:15} {a['harness'] or '-':10} "
               f"{_age(a['started']):>7}  {_age(a['activity']) + ' ago':>9}  {a['command']}{flag}")
 
 
@@ -304,6 +318,8 @@ def main():
     lp.add_argument("--cwd", default=".", help="working directory (default: here)")
     lp.add_argument("--env", action="append", default=[], metavar="KEY=VALUE", help="extra environment (repeatable)")
     lp.add_argument("--prompt-file", default=None, help="read the prompt from a file ('-' for stdin)")
+    lp.add_argument("--stagger", type=int, default=0, metavar="SECONDS",
+                    help="start the instances SECONDS apart to spread API load (the first starts at once)")
     lp.add_argument("--log", action="store_true", help=f"also record each screen to {LOG_ROOT}/<session>/<agent>.log")
     lp.set_defaults(func=cmd_launch)
 

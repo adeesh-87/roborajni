@@ -59,7 +59,7 @@ crew harness                                    # list them
 
 # one run = one tmux session; every instance gets the prompt
 crew launch --session mcdc7 --name manager '$team manager engineers=2 label=mcdc7 use $ut to increase MC/DC coverage of module x'
-crew launch --session mcdc7 --name eng -n 3 '$team engineer label=mcdc7'
+crew launch --session mcdc7 --name eng -n 3 --stagger 90 '$team engineer label=mcdc7'   # start them 90 s apart
 crew launch --session mcdc7 --name eng -n 1 --harness claude '$team engineer label=mcdc7'   # another harness, same run
 
 crew ls                     # how many are running or exited; flags agents with no output for 15 min (--stale)
@@ -73,6 +73,7 @@ crew kill --exited          # tidy up; also: crew kill eng-2, crew kill --all [-
 - **Harness placement:** if a harness takes the prompt somewhere other than the end, put `{prompt}` in its command. `--harness` also accepts a literal command instead of a saved name.
 - **Naming:** agents are named `<name>-1`, `<name>-2` and so on, and later launches continue the numbering. Targets are a name, `<session>:<name>`, or the `#` from `crew ls`.
 - **Exited agents** keep their screen until you kill them.
+- **Staggering:** `--stagger <seconds>` starts the instances that far apart (the first one at once). This spreads the start-up burst, when every agent reads the skills and code at the same moment, so you're less likely to hit API rate limits (429s). `crew launch` returns at once, and `crew ls` shows the agents still waiting as `starts in Ns`.
 - **Recording:** `--log` also records each screen to `~/.local/state/crew/<session>/<agent>.log`.
 - **Other options:**
   - `--cwd` sets the working directory.
